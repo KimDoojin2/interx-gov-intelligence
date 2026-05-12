@@ -355,10 +355,227 @@ class KoiiaCollector(BaseCollector):
 
 
 # =============================================================================
+# IITP 정보통신기획평가원
+# =============================================================================
+import re as _re_iitp
+
+_IITP_BASE       = "https://www.iitp.kr"
+_IITP_LIST_URL   = _IITP_BASE + "/kr/1/business/pbancList.it?pageIndex={page}"
+_IITP_DETAIL_TPL = _IITP_BASE + "/kr/1/business/pbancView.it?articleSeq={seq}"
+_IITP_SEQ_RE     = _re_iitp.compile(r"articleSeq[=,'\"](\d+)", _re_iitp.I)
+
+
+class IitpCollector(PlaywrightBaseCollector):
+    """
+    정보통신기획평가원 (IITP) 사업공고 수집기.
+    Vue.js SPA — Playwright 렌더링 필수.
+    AI·반도체·6G·양자·사이버보안 R&D 과제 공고.
+    """
+    site_key = "iitp"
+    ministry = "과학기술정보통신부"
+    agency   = "정보통신기획평가원"
+    LIST_URL = _IITP_LIST_URL
+
+    def _page_url(self, page: int) -> str:
+        return self.LIST_URL.replace("{page}", str(page))
+
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        notices = []
+        seen: set = set()
+
+        # 1) tbody tr 기반 (서버사이드 렌더링 가능한 경우)
+        for tr in soup.select("table tbody tr, tbody tr"):
+            tds = tr.find_all(["td", "th"])
+            if len(tds) < 2:
+                continue
+            a = None
+            for td in tds:
+                cand = td.find("a", href=True)
+                if cand and len(cand.get_text(strip=True)) >= 3:
+                    a = cand
+                    break
+            if not a:
+                a = tr.find("a")
+            if not a:
+                continue
+            title = a.get_text(strip=True)
+            if not title or len(title) < 3:
+                continue
+
+            href = (a.get("href") or "").strip()
+            # articleSeq 추출
+            m = _IITP_SEQ_RE.search(href)
+            if m:
+                detail = _IITP_DETAIL_TPL.format(seq=m.group(1))
+            elif href and not href.lower().startswith("javascript"):
+                detail = href if href.startswith("http") else urljoin(_IITP_BASE, href)
+            else:
+                # onclick 탐색
+                onclick = (a.get("onclick") or tr.get("onclick") or "").strip()
+                m2 = _IITP_SEQ_RE.search(onclick)
+                if m2:
+                    detail = _IITP_DETAIL_TPL.format(seq=m2.group(1))
+                else:
+                    continue
+
+            if detail in seen:
+                continue
+            seen.add(detail)
+            row_text = tr.get_text(" ", strip=True)
+            dates    = _extract_dates(row_text)
+            notices.append(self._make_notice(
+                execution_id, title, detail,
+                dates[-1] if dates else "",
+                dates[0]  if len(dates) >= 2 else "",
+            ))
+
+        # 2) Vue.js 렌더링 후 카드/리스트 형태
+        if not notices:
+            for a in soup.select(
+                "a[href*='pbancView'], a[href*='articleSeq'], "
+                "a[href*='business/view'], .biz-list a, .notice-list a"
+            ):
+                title = a.get_text(strip=True)
+                if not title or len(title) < 3:
+                    continue
+                href = (a.get("href") or "").strip()
+                m = _IITP_SEQ_RE.search(href)
+                if m:
+                    detail = _IITP_DETAIL_TPL.format(seq=m.group(1))
+                else:
+                    detail = href if href.startswith("http") else urljoin(_IITP_BASE, href)
+                if detail in seen:
+                    continue
+                seen.add(detail)
+                row  = a.find_parent("tr") or a.find_parent("li") or a.find_parent("div") or a.parent
+                text = row.get_text(" ", strip=True) if row else title
+                dates = _extract_dates(text)
+                notices.append(self._make_notice(
+                    execution_id, title, detail,
+                    dates[-1] if dates else "",
+                    dates[0]  if len(dates) >= 2 else "",
+                ))
+
+        return notices
+
+    def _collect_playwright(self, execution_id: str) -> List[Notice]:
+        """Vue.js SPA: 렌더링 후 JS evaluate로 공고 데이터 직접 추출."""
+        import time, random
+        from playwright.sync_api import sync_playwright  # type: ignore
+
+        notices: List[Notice] = []
+        seen_ids: set = set()
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="ko-KR",
+            )
+            page = ctx.new_page()
+
+            for pg in range(1, self.max_pages + 1):
+                url = self._page_url(pg)
+                try:
+                    page.goto(url, wait_until="networkidle", timeout=30_000)
+                    page.wait_for_timeout(3_000)  # Vue.js 렌더링 대기
+
+                    # JS evaluate: Vue.js 렌더링 후 실제 DOM에서 공고 데이터 추출
+                    rows_data: list = []
+                    try:
+                        rows_data = page.evaluate("""
+                            () => {
+                                const rows = [];
+                                // 테이블 행
+                                document.querySelectorAll('table tbody tr').forEach(tr => {
+                                    const a = tr.querySelector('a[href]');
+                                    if (a && a.textContent.trim().length >= 3) {
+                                        rows.push({
+                                            title:   a.textContent.trim(),
+                                            href:    a.href,
+                                            rowText: tr.textContent.trim().slice(0, 300)
+                                        });
+                                    }
+                                });
+                                // 리스트/카드 형태
+                                if (rows.length === 0) {
+                                    document.querySelectorAll('li a, .list-item a, .card a').forEach(a => {
+                                        if (a.href.includes('articleSeq') || a.href.includes('pbancView')) {
+                                            rows.push({
+                                                title:   a.textContent.trim(),
+                                                href:    a.href,
+                                                rowText: (a.closest('li') || a.closest('div') || a).textContent.trim().slice(0, 300)
+                                            });
+                                        }
+                                    });
+                                }
+                                return rows;
+                            }
+                        """)
+                    except Exception:
+                        rows_data = []
+
+                    # JS 추출 성공 시 직접 공고 생성
+                    items = []
+                    if rows_data:
+                        seen_urls: set = set()
+                        for row in rows_data:
+                            title = row.get("title", "").strip()
+                            href  = row.get("href", "").strip()
+                            if not title or len(title) < 3 or not href:
+                                continue
+                            detail = href if href.startswith("http") else urljoin(_IITP_BASE, href)
+                            if detail in seen_urls:
+                                continue
+                            seen_urls.add(detail)
+                            dates = _extract_dates(row.get("rowText", ""))
+                            items.append(self._make_notice(
+                                execution_id, title, detail,
+                                dates[-1] if dates else "",
+                                dates[0]  if len(dates) >= 2 else "",
+                            ))
+
+                    # JS 실패 시 BeautifulSoup fallback
+                    if not items:
+                        html  = page.content()
+                        soup  = BeautifulSoup(html, "lxml")
+                        items = self._parse_page(soup, execution_id)
+
+                except Exception as e:
+                    log.error("[iitp] playwright p%d 오류: %s", pg, e)
+                    break
+
+                if not items:
+                    log.debug("[iitp] p%d 공고 없음 → 마지막 페이지", pg)
+                    break
+                new = [n for n in items if n.notice_id not in seen_ids]
+                if not new:
+                    break
+                for n in new:
+                    seen_ids.add(n.notice_id)
+                notices.extend(new)
+                time.sleep(random.uniform(1.0, 2.0))
+
+            browser.close()
+
+        if not notices:
+            log.warning("⚠️  [iitp] playwright 수집 0건 — IITP URL/구조 확인 필요")
+        else:
+            log.info("[IITP] playwright %d건 수집 완료", len(notices))
+            notices = self._enrich_notices(notices)
+        return notices
+
+
+# =============================================================================
 # 레지스트리
 # =============================================================================
 from interx_engine.infrastructure.collectors.sites.jejutp_collector import JejtpCollector
 from interx_engine.infrastructure.collectors.sites.smart_factory_collector import SmartFactoryCollector
+from interx_engine.infrastructure.collectors.sites.gbtp_collector import GbtpCollector
 
 NEW_COLLECTOR_CLASSES: dict = {
     "nrf":           NrfCollector,
@@ -367,4 +584,6 @@ NEW_COLLECTOR_CLASSES: dict = {
     "koiia":         KoiiaCollector,
     "jejutp":        JejtpCollector,
     "smart_factory": SmartFactoryCollector,
+    "gbtp":          GbtpCollector,
+    "iitp":          IitpCollector,
 }

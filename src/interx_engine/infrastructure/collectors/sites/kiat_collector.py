@@ -92,6 +92,92 @@ class KiatCollector(PlaywrightBaseCollector):
         "?board_id={board}&MenuId={menu}&pageIndex={{page}}".format(board=_BOARD, menu=_MENU)
     )
 
+    # ── Playwright 목록 + 상세 통합 수집 (requests로는 detail 404) ──────────────
+    def _collect_playwright(self, execution_id: str) -> List[Notice]:
+        import time
+        import random
+        from playwright.sync_api import sync_playwright  # type: ignore
+
+        notices: List[Notice] = []
+        seen_ids: set = set()
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                locale="ko-KR",
+            )
+            page = ctx.new_page()
+
+            # 1. 목록 수집
+            for pg in range(1, self.max_pages + 1):
+                url = self._page_url(pg)
+                try:
+                    page.goto(url, wait_until="networkidle", timeout=30_000)
+                    page.wait_for_timeout(2_000)
+                    html  = page.content()
+                    soup  = BeautifulSoup(html, "lxml")
+                    items = self._parse_page(soup, execution_id)
+                except Exception as e:
+                    log.error("[kiat] playwright p%d 오류: %s", pg, e)
+                    break
+
+                if not items:
+                    break
+                new = [n for n in items if n.notice_id not in seen_ids]
+                if not new:
+                    break
+                for n in new:
+                    seen_ids.add(n.notice_id)
+                notices.extend(new)
+                time.sleep(random.uniform(1.0, 2.0))
+
+            if not notices:
+                log.warning("⚠️  [kiat] playwright 수집 0건")
+                browser.close()
+                return []
+
+            log.info("[KIAT] playwright %d건 수집 완료", len(notices))
+
+            # 2. 상세 페이지를 Playwright로 방문 (requests GET은 서버 404 반환)
+            filled = 0
+            for notice in notices:
+                if not notice.detail_url:
+                    continue
+                try:
+                    page.goto(notice.detail_url, wait_until="networkidle", timeout=30_000)
+                    page.wait_for_timeout(1_500)
+                    cur_url = page.url          # 리다이렉트 후 최종 URL
+                    if cur_url != notice.detail_url:
+                        notice.detail_url   = cur_url
+                        notice.notice_link  = cur_url
+                    html = page.content()
+                    soup = BeautifulSoup(html, "lxml")
+                    data = self._parse_detail_page(soup, notice.detail_url)
+                    if data.get("body_text"):
+                        notice.body_text = data["body_text"]
+                        filled += 1
+                    if data.get("budget") and not notice.budget:
+                        notice.budget = data["budget"]
+                    if data.get("summary") and not notice.summary:
+                        notice.summary = data["summary"]
+                    if data.get("structured"):
+                        notice.structured.update(data["structured"])
+                    if data.get("attachment_items"):
+                        notice.attachment_items = data["attachment_items"]
+                    time.sleep(random.uniform(0.5, 1.0))
+                except Exception as e:
+                    log.debug("[kiat] detail 파싱 실패 %s: %s", notice.detail_url, e)
+
+            log.info("[KIAT] detail 보강 완료 (playwright): %d/%d건", filled, len(notices))
+            browser.close()
+
+        return notices
+
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
         notices = []
 

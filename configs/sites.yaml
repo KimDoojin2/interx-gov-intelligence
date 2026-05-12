@@ -53,8 +53,8 @@ sites:
     collector_type: requests
   - code: gbtp
     name: 경북테크노파크
-    enabled: false   # JS 전용 onclick — 정적 파싱 불가 (Playwright 클릭 기반 구현 필요)
-    collector_type: requests
+    enabled: true
+    collector_type: requests   # boardDetail.do + onclick nttNo 파싱 — requests 수집 가능
   - code: jntp
     name: 전남테크노파크
     enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
@@ -87,6 +87,10 @@ sites:
     name: 스마트제조혁신추진단 (smart-factory.kr)
     enabled: true
     collector_type: playwright  # React/Ant Design SPA — Playwright 필수
+  - code: iitp
+    name: 정보통신기획평가원 (iitp.kr)
+    enabled: true
+    collector_type: playwright   # Vue.js SPA — AI·반도체·6G 과제 공고
   - code: mock
     name: 테스트 목업
     enabled: false

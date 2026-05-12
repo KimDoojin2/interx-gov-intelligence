@@ -43,6 +43,12 @@ _SF_BOARDS = [
 
 _ID_RE = re.compile(r"[?&](?:bbsId|nttId|seq|idx|no)=([A-Za-z0-9_-]+)", re.I)
 
+# 게시판별 상세 URL 접두사
+_SF_DETAIL = {
+    "사업공고": _SF_BASE + "/usr/bg/ba/ma/bsnsPbancDtl",
+    "모집공고": _SF_BASE + "/usr/bg/ra/ma/rcrtPbancDtl",
+}
+
 
 def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
                    base_url: str = _SF_BASE) -> List[Notice]:
@@ -221,9 +227,53 @@ class SmartFactoryCollector(PlaywrightBaseCollector):
                                 page.goto(old_url, wait_until="networkidle", timeout=30_000)
 
                         page.wait_for_timeout(2_000)
+
+                        # Ant Design 테이블: data-row-key + a.href(DOM property) 추출
+                        # BeautifulSoup은 href 어트리뷰트만 보므로 nttId가 없을 수 있음
+                        # → JS evaluation으로 실제 DOM href(full URL) 또는 data-row-key 확보
+                        row_meta: list = []
+                        try:
+                            row_meta = page.evaluate("""
+                                () => Array.from(
+                                    document.querySelectorAll('tr.ant-table-row')
+                                ).map(tr => {
+                                    const a = tr.querySelector('a');
+                                    return {
+                                        rowKey: tr.getAttribute('data-row-key') || '',
+                                        href:   a ? a.href : '',
+                                        text:   a ? a.textContent.trim() : ''
+                                    };
+                                })
+                            """)
+                        except Exception:
+                            row_meta = []
+
                         html  = page.content()
                         soup  = BeautifulSoup(html, "lxml")
                         items = _parse_sf_soup(soup, execution_id)
+
+                        # detail_url 보정: JS에서 추출한 href 또는 nttId 적용
+                        if row_meta and items:
+                            # title → (href, rowKey) 매핑
+                            meta_map = {m["text"]: m for m in row_meta if m.get("text")}
+                            detail_base = _SF_DETAIL.get(board["label"], "")
+                            for notice in items:
+                                meta = meta_map.get(notice.title)
+                                if not meta:
+                                    continue
+                                # 1) DOM href에 nttId가 있으면 그대로 사용
+                                dom_href = meta.get("href", "")
+                                if dom_href and "nttId" in dom_href:
+                                    notice.detail_url  = dom_href
+                                    notice.notice_link = dom_href
+                                # 2) data-row-key가 숫자면 nttId로 사용
+                                elif meta.get("rowKey", "").isdigit() and detail_base:
+                                    proper = f"{detail_base}?nttId={meta['rowKey']}"
+                                    notice.detail_url  = proper
+                                    notice.notice_link = proper
+                                # notice_id 재계산 (URL이 바뀌었을 수 있음)
+                                from interx_engine.infrastructure.collectors.sites.base_collector import _notice_id as _nid
+                                notice.notice_id = _nid(SmartFactoryCollector.site_key, notice.detail_url)
 
                     except Exception as e:
                         log.error("[smart_factory] %s p%d 오류: %s",
