@@ -31,13 +31,13 @@ _SF_BASE = "https://www.smart-factory.kr"
 _SF_BOARDS = [
     {
         "label":    "사업공고",
-        "list_url": _SF_BASE + "/bsnsPbanc/list",
-        "old_url":  _SF_BASE + "/usr/bbs/bbsList.do?menuNo=00000157&pageIndex={page}",
+        "list_url": _SF_BASE + "/usr/bg/ba/ma/bsnsPbanc",
+        "old_url":  _SF_BASE + "/usr/bg/ba/ma/bsnsPbanc?pageIndex={page}",
     },
     {
         "label":    "모집공고",
-        "list_url": _SF_BASE + "/rcrtPbanc/list",
-        "old_url":  _SF_BASE + "/usr/bbs/bbsList.do?menuNo=00000168&pageIndex={page}",
+        "list_url": _SF_BASE + "/usr/bg/ra/ma/rcrtPbanc",
+        "old_url":  _SF_BASE + "/usr/bg/ra/ma/rcrtPbanc?pageIndex={page}",
     },
 ]
 
@@ -160,7 +160,7 @@ class SmartFactoryCollector(PlaywrightBaseCollector):
     site_key = "smart_factory"
     ministry = "중소벤처기업부"
     agency   = "스마트제조혁신추진단"
-    LIST_URL = _SF_BASE + "/bsnsPbanc/list"   # 기본 (단일 게시판 쿼리용)
+    LIST_URL = _SF_BASE + "/usr/bg/ba/ma/bsnsPbanc"   # 기본 (단일 게시판 쿼리용)
 
     def _page_url(self, page: int) -> str:
         """단순 호출 시 사업공고 첫 페이지 반환 (collect() 오버라이드로 미사용)."""
