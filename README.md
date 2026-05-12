@@ -147,6 +147,20 @@ tests/
 └── integration/                         # 파이프라인 dry-run, settings 검증
 ```
 
+## 실행 결과 스크린샷
+
+### 파이프라인 자동 분석 대시보드
+> 파이프라인 실행마다 자동 생성 (`data/analysis/`) — 등급 분포, PCA 클러스터, 키워드 빈도, 이상치 탐지 등
+
+![파이프라인 대시보드](docs/screenshots/pipeline_dashboard.png)
+
+### 수주 가능성 예측 (Win Prediction)
+> 공고별 수주 확률 + 피처별 기여도 시각화 (rule_v1 기반, sklearn ML 모델 학습 시 자동 전환)
+
+![수주 예측 결과](docs/screenshots/win_prediction.png)
+
+---
+
 ## 핵심 원칙
 
 - **도메인 규칙은 `core/`에만** — infrastructure에 비즈니스 로직 넣지 말 것
