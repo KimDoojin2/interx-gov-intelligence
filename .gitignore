@@ -1,0 +1,41 @@
+# 보안 파일 (절대 업로드 금지)
+service_account.json
+service_account.json.json
+*.json.json
+.env
+.env.*
+secrets/
+credentials/
+
+# 가상환경
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 수집 데이터
+data/
+output/
+logs/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 빌드
+dist/
+build/
+*.egg-info/
+
+# 임시파일
+*.tmp
+*.bak
+*.swp

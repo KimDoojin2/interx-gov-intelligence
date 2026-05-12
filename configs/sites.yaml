@@ -1,0 +1,89 @@
+sites:
+  - code: bizinfo
+    name: 기업마당
+    enabled: true
+    collector_type: requests
+  - code: ntis
+    name: NTIS
+    enabled: false
+    collector_type: requests
+  - code: iris
+    name: IRIS (국가연구개발사업)
+    enabled: true
+    collector_type: requests
+  - code: kiat
+    name: KIAT (한국산업기술진흥원)
+    enabled: true
+    collector_type: playwright
+  - code: smba
+    name: 중소벤처기업부
+    enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
+    collector_type: requests
+  - code: nipa
+    name: NIPA (정보통신산업진흥원)
+    enabled: true
+    collector_type: requests
+  - code: innopolis
+    name: 연구개발특구진흥재단
+    enabled: true
+    collector_type: requests
+  - code: bipa
+    name: 부산정보산업진흥원
+    enabled: true
+    collector_type: requests
+  - code: uipa
+    name: 울산정보산업진흥원
+    enabled: true
+    collector_type: requests
+  - code: gicon
+    name: 광주전남연구원
+    enabled: true
+    collector_type: requests
+  - code: ttp
+    name: 대전테크노파크 (djtp.or.kr)
+    enabled: true
+    collector_type: requests
+  - code: dicia
+    name: DICIA (의료기기산업협회)
+    enabled: true
+    collector_type: playwright
+  - code: gjtp
+    name: 광주테크노파크
+    enabled: true
+    collector_type: requests
+  - code: gbtp
+    name: 경북테크노파크
+    enabled: false   # JS 전용 onclick — 정적 파싱 불가 (Playwright 클릭 기반 구현 필요)
+    collector_type: requests
+  - code: jntp
+    name: 전남테크노파크
+    enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
+    collector_type: requests
+  - code: jbtp
+    name: 전북테크노파크
+    enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
+    collector_type: requests
+  - code: jejutp
+    name: 제주테크노파크
+    enabled: true
+    collector_type: requests
+  - code: nrf
+    name: 한국연구재단
+    enabled: false   # 500 서버 에러 / AJAX 기반 목록 — URL 재조사 필요
+    collector_type: requests
+  - code: kised
+    name: 창업진흥원 (k-startup.go.kr)
+    enabled: true
+    collector_type: requests
+  - code: ketep
+    name: 에너지기술평가원
+    enabled: true
+    collector_type: playwright
+  - code: koiia
+    name: 산업지능화협회
+    enabled: true
+    collector_type: requests
+  - code: mock
+    name: 테스트 목업
+    enabled: false
+    collector_type: mock

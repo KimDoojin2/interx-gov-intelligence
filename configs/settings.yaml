@@ -1,0 +1,35 @@
+pipeline:
+  source_site: iris
+  enabled_sites: ["bizinfo", "ntis", "iris"]
+  download_mode: best_effort
+  parse_mode: best_effort
+  max_pages: 3
+
+storage:
+  backend: dual
+  sqlite_path: "data/interx_engine.db"   # project_root 기준 상대경로
+
+dedup:
+  sim_threshold: 0.82   # TF-IDF 코사인 유사도 중복 판정 임계값 (0~1)
+
+matching:
+  top_k: 3              # 파트너 매칭 결과 최대 후보 수
+
+alert:
+  urgent_dday: 7        # D-day ≤ N이면 긴급마감 시트에 포함
+
+proposal:
+  output_dir: "data/proposals"   # 제안서 저장 디렉토리 (project_root 기준)
+
+collector:
+  retry_total: 2
+  retry_backoff: 0.5
+  retry_status_codes: [429, 500, 502, 503, 504]
+  timeout: 20           # 사이트당 connect+read 타임아웃 (초)
+  fetch_detail: true    # 상세 페이지 방문 여부 (false이면 목록만 수집)
+  detail_workers: 3     # 상세 페이지 병렬 워커 수 (사이트당)
+
+summarize:
+  enabled: false        # Claude API L3 요약 — 명시적으로 true 설정 시에만 과금 발생
+  model: "claude-haiku-4-5-20251001"
+  max_tokens: 512

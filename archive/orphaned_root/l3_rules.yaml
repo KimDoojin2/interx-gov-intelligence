@@ -1,0 +1,27 @@
+﻿l3_rules:
+  thresholds:
+    l3_strong_score: 74
+    partner_candidate_score: 54
+  gating:
+    min_high_signal_hits: 2
+    min_solution_hits: 1
+  boosters:
+    - name: budget_present
+      when_any: [억원, 천만원, 예산, 정부출연금]
+      add_score: 6
+    - name: field_poc
+      when_any: [실증, 현장, 수요기업, 컨소시엄, 검증]
+      add_score: 9
+    - name: manufacturing_focus
+      when_any: [제조ai, 스마트공장, 공정, 품질, 검사, 자동화]
+      add_score: 8
+    - name: commercialization
+      when_any: [상용화, 확산, 도입, 시장진입]
+      add_score: 6
+  penalties:
+    - name: non_target_context
+      when_any: [관광, 문화예술, 단순행사, 홍보]
+      sub_score: 18
+  outputs:
+    include_reason_fields: true
+    reason_top_k: 7

@@ -1,0 +1,102 @@
+# =============================================================================
+# InterX 점수 기준 — 단일 소스 (Single Source of Truth)
+# 기반: 인터엑스 브로슈어 v1.1/08.2025
+# 솔루션: Manufacturing.DT / Recipe.AI / Quality.AI / Inspection.AI /
+#          Safety.AI / AX.Infra / Gen.AI / DS.Platform / AI Kit
+# =============================================================================
+
+thresholds:
+  # ── 적합도(fitness) 기준 ────────────────────────────────────────────────────
+  # body_text 제외 이후 scoring 범위 재보정 (2026-05-08)
+  # scored_text = 제목+요약+구조화 데이터만 → 전체 점수 범위 축소
+  # 제목 히트 예시: "스마트공장"(5)+"AI"(3) = 8×5 = 40, industry≈10
+  # priority = 40×0.6 + 10×0.4 = 28 → B등급(30) 근처
+  l3_strong:           30   # fitness >= 30 → L3 강공고 (직접 제안 대상) ← 35→30
+  partner_candidate:   18   # priority >= 18 → 파트너 전달 후보
+  # ── 우선순위(priority) 등급 컷 ───────────────────────────────────────────────
+  grade_a:             48   # priority >= 48 → A (최우선) ← 55→48
+  grade_b:             30   # priority >= 30 → B           ← 40→30
+  grade_c:             18   # priority >= 18 → C           ← 25→18
+  # D: priority < 18 → 자동 모니터링만
+  # ── 코어 키워드 최소 존재 여부 ─────────────────────────────────────────────
+  min_core_keywords:   1
+  # ── 감점/가점 배율 ──────────────────────────────────────────────────────────
+  neg_multiplier:      6.0
+  pos_multiplier:      5.0
+  struct_bonus_factor: 1.5
+  budget_bonus:        3.0
+
+solutions:
+  scale_factor: 15.0
+  names:
+    - ManufacturingDT
+    - RecipeAI
+    - QualityAI
+    - InspectionAI
+    - SafetyAI
+    - GenAI
+    - InfraDS
+    - PdM
+
+priority_formula:
+  w_fitness:  0.6
+  w_industry: 0.4
+
+l3_keywords:
+  # ── L3 사전 필터 — 제목+요약에 min_hits개 이상 포함 시 L3 후보 ────────────
+  min_hits: 1
+  keywords:
+    # InterX 핵심 솔루션 브랜드
+    - 스마트공장
+    - 스마트팩토리
+    - 자율제조
+    - 자율공장
+    - 자율형공장
+    - 자율형 공장
+    - ax실증
+    - ax 실증
+    # 제조 AI
+    - 제조ai
+    - 제조 ai
+    - 산업ai
+    - 산업 ai
+    - 제조인공지능
+    # DT/디지털트윈
+    - 디지털트윈
+    - 디지털 트윈
+    # 검사/안전/품질
+    - 머신비전
+    - 머신 비전
+    - 비전검사
+    - 비전 검사
+    - 이상탐지
+    - 이상 탐지
+    - 중대재해
+    - 제조안전
+    # AX 관련
+    - manufacturing-x
+    - 공정최적화
+    - 공정 최적화
+    - 예지보전
+    - ai팩토리
+    - ai 팩토리
+    - ai공장
+    - ai 공장
+    # AI 에이전트·솔루션·응용제품
+    - 산업ai에이전트
+    - 산업 ai에이전트
+    - ai에이전트
+    - ai agent
+    - 산업ai솔루션
+    - 산업 ai솔루션
+    - ai응용제품
+    - ai 응용제품
+    - 신속상용화
+    - 신속 상용화
+    # DX
+    - 제조dx
+    - 제조 dx
+    # 데이터스페이스/공급망
+    - 데이터스페이스
+    - catena-x
+    - aas
