@@ -53,8 +53,7 @@ sites:
     collector_type: requests
   - code: gbtp
     name: 경북테크노파크
-    enabled: true
-    collector_type: playwright  # JS 렌더링 필요 — Playwright 전환
+    enabled: false   # Colab GCP IP 차단 (requests/playwright 모두 0건)
   - code: jntp
     name: 전남테크노파크
     enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
