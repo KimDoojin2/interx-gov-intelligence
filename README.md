@@ -161,6 +161,231 @@ tests/
 
 ---
 
+## 파이프라인 구동 흐름
+
+`run_engine.py` → `DailyPipelineOrchestrator.run()` 순서로 아래 17단계가 순차 실행됩니다.
+
+```
+[1]  수집 (Collect)
+     └─ 20개+ 사이트 콜렉터를 ThreadPoolExecutor로 병렬 실행
+        각 콜렉터는 목록 페이지 → 상세 페이지 2단계 수집
+
+[2]  notice_id 중복 제거
+     └─ site + URL MD5 해시로 생성된 notice_id 기준 중복 제거
+
+[2B] SQLite 기존 공고 필터
+     └─ 30일 내 이미 수집된 공고는 is_new=False 마킹
+
+[3]  마감 지난 공고 제거
+     └─ deadline_date < 오늘 인 공고 자동 제거
+
+[4]  스코어링 (Scoring)
+     └─ 가점/감점 키워드 + 솔루션별 점수 → fitness·priority·grade 계산
+
+[5]  TF-IDF 중복 제거
+     └─ 제목 코사인 유사도 0.85 이상이면 중복으로 판단, 점수 낮은 것 제거
+
+[6]  변경 감지 (Change Detection)
+     └─ 이전 실행 대비 제목·예산·마감일 변경 여부 감지
+
+[7]  담당자 자동 배정
+     └─ manager_rules.yaml 키워드 매칭으로 담당자 자동 배정
+
+[7B] BD 마일스톤 자동 배정
+     └─ 등급·D-Day 기준으로 BD 단계(Qualify/Proposal/Submit) 배정
+
+[8]  경쟁사 트래킹
+     └─ competitors.yaml에 등록된 경쟁사 공고 감지 및 플래그
+
+[9]  사이트별 품질 등급
+     └─ 수집 성공률·점수 분포로 사이트 데이터 품질 A~D 등급
+
+[10] 행 빌드 (Row Build)
+     └─ Notice + ScoreCard → Google Sheets 업로드용 딕셔너리 변환
+
+[11] 부가 분석 (병렬 처리)
+     ├─ DeepParsing   : 첨부파일(PDF/HWP) 정밀 파싱 → 예산·KPI 추출
+     ├─ L3 AI 요약    : Claude API로 L3 강공고 자동 요약 (API Key 필요)
+     ├─ 포트폴리오 분석: pandas 기반 등급 분포·키워드 트렌드 리포트
+     ├─ 수주 예측     : rule_v1 가중합 or sklearn ML 모델
+     └─ 제안서 생성   : A/B 등급 공고 Word .docx 초안 자동 생성
+
+[12] KPI / 실행 로그 빌드
+     └─ 실행 통계(수집수·등급분포·소요시간 등) 행 생성
+
+[13] 학습 데이터 자동 Export
+     └─ C/D 등급 포함 전체 공고를 JSONL로 data/exports/training/ 저장
+
+[14] Google Sheets 업로드
+     └─ 7개 시트에 분산 저장 (마스터·L3·긴급·KPI·통계·로그·에러)
+
+[15] SQLite 저장
+     └─ data/interx.db 에 실행 결과 영속화
+
+[16] 알림 발송
+     └─ L3 강공고 즉시 알림 + 일별 요약 (Telegram 또는 Slack)
+
+[17] 자동 비지도학습 분석 + PNG 생성
+     └─ PCA 클러스터·이상치 탐지·키워드 빈도 등 9패널 차트 자동 저장
+        → data/analysis/dashboard_EXEC-YYYYMMDD-HHMMSS.png
+```
+
+---
+
+## HTML 파싱 방식
+
+수집은 **2단계 파싱**으로 이루어집니다.
+
+### 1단계 — 목록 페이지 파싱 (`_parse_page`)
+
+각 사이트 콜렉터가 상속하는 `BaseCollector`가 페이지를 순회하며 공고를 수집합니다.
+
+```
+목록 URL 요청 (requests + Retry 어댑터)
+    └─ JS 렌더링 필요 사이트 (bizinfo, kiat, dicia)
+       → PlaywrightBaseCollector: headless Chromium으로 렌더링 후 파싱
+    └─ 일반 사이트
+       → requests.get → BeautifulSoup lxml 파싱
+
+각 <tr> 또는 <li> 행에서:
+  ├─ <a href> → 공고 제목 + 상세 URL 추출
+  ├─ 날짜 패턴 정규식 → 게시일·마감일 추출
+  └─ notice_id = site_key + URL MD5 해시(8자리)
+
+중복 감지: seen_ids set으로 동일 페이지 내 중복 제거
+빈 페이지 감지: 공고 0건이면 마지막 페이지로 판단 → 순회 중단
+페이지 간 딜레이: random.uniform(0.5, 1.2)초 (서버 부하 방지)
+```
+
+### 2단계 — 상세 페이지 보강 (`_enrich_notices`)
+
+목록에서 수집한 공고의 상세 URL을 재방문해 본문·예산·첨부파일을 추가합니다.
+
+```
+상세 URL 방문 (ThreadPoolExecutor, 최대 3 워커 병렬)
+    └─ BeautifulSoup → script/style/nav/header/footer 태그 제거
+    └─ GNB/LNB/SNB div 네비게이션 제거 (메뉴 텍스트 오염 방지)
+
+본문 텍스트 정제
+  └─ get_text(" ", strip=True) → 연속 공백 제거 → 최대 8,000자 저장
+
+예산 추출 (정규식 우선순위 순)
+  1. "지원금액 : N억원"
+  2. "총 사업비 : N백만원"
+  3. "과제당 : N억원"
+  4. "최대 N억원"
+  5. "N억원 이내/내외/규모"
+
+구조화 섹션 추출
+  └─ 사업목적 / 지원내용 / 지원대상 / 지원금액 / 신청방법 / 추진일정
+     각 섹션 헤더 키워드 탐지 → 다음 섹션까지 최대 300자 저장
+
+첨부파일 추출
+  └─ <a href> 중 .pdf/.hwp/.docx/.xlsx 확장자 또는
+     download/fileDown/atchFile 패턴 URL → {name, url} 목록 수집
+
+방문 간 딜레이: random.uniform(0.3, 0.8)초
+```
+
+---
+
+## 스코어링 알고리즘
+
+`PriorityScoringPolicy.calculate(notice)` → `ScoreCard` 반환
+
+### 점수 계산 구조
+
+```
+scored_text = 제목 + 요약 + 사업목적 + 지원내용   (body_text 제외 — 오염 방지)
+full_text   = scored_text + body_text              (코어 키워드 체크에만 사용)
+
+1. 코어 키워드 존재 여부 (full_text 기준)
+   └─ {제조, 스마트공장, AI, 데이터, 실증 ...} 중 하나라도 없으면 fitness=0
+
+2. 가점 계산 (scored_text 기준)
+   └─ POSITIVE_KEYWORDS 딕셔너리 순회
+      예: "스마트공장"=5, "AI"=3, "데이터"=2 ...
+      구조화 섹션(사업목적/지원내용)에서 히트 시 ×1.5 보너스
+      예산 정보 존재 시 +3.0 보너스
+
+3. 감점 계산 (scored_text 기준)
+   └─ NEGATIVE_KEYWORDS 딕셔너리 순회
+      예: "수요기업"=12, "일자리"=7, "세미나"=7, "소상공인"=6 ...
+      → 비제조·비조달 공고 필터링
+
+4. 적합도 (fitness) = pos_score×5 - neg_score×6 + struct_bonus
+   범위: 0.0 ~ 100.0
+
+5. 솔루션별 점수 (7개 솔루션)
+   ManufacturingDT / RecipeAI / QualityAI / InspectionAI
+   SafetyAI / GenAI / InfraDS / PdM
+   └─ 각 솔루션 키워드 합산 × scale(15) → 0~100점
+
+6. 산업 점수 (industry_score) = 비0점 솔루션 평균
+
+7. 우선순위 (priority) = fitness×0.6 + industry_score×0.4
+   └─ fitness=0이면 priority 강제 0 (industry 기여 차단)
+
+8. 등급 (grade)
+   A : priority ≥ 55   (최우선 영업 대상)
+   B : priority ≥ 40   (검토 대상)
+   C : priority ≥ 25   (모니터링)
+   D : priority <  25   (해당 없음)
+
+9. 제목 블랙리스트 강제 D
+   └─ 제목에 "수요기업", "육성과정", "시찰단" 포함 시
+      fitness=0, priority=0, grade=D 강제 설정
+
+10. L3 강공고 판정
+    └─ fitness ≥ 35 AND 제목에 L3 핵심 키워드 존재
+       (스마트공장/제조AI/디지털트윈/머신비전/예지보전 등)
+       → notice.l3_strong = "Y" → 즉시 Telegram/Slack 알림 대상
+```
+
+### 추천 솔루션 자동 매핑
+
+```
+sol_scores 상위 3개 솔루션 이름을 " / " 로 연결
+예: "ManufacturingDT / QualityAI / GenAI"
+    → Google Sheets 01_영업기회_정보 시트의 "추천솔루션" 컬럼에 자동 기재
+```
+
+---
+
+## 수주 예측 (Win Prediction)
+
+### rule_v1 — 즉시 사용 가능 (외부 패키지 불필요)
+
+```python
+score = (
+    fitness_score  × 0.350   # 적합도 (가장 중요)
+  + priority_score × 0.195   # 우선순위 점수
+  + l3_flag        × 0.100   # L3 강공고 여부
+  + budget_억      × 0.045   # 예산 규모 (억원 단위)
+  + dday_urgency   × 0.030   # D-Day 긴급도
+  + industry_score × 0.023   # 솔루션 산업 점수
+) / 정규화 → 0~100%
+
+등급: A≥60% / B≥40% / C≥20% / D<20%
+```
+
+### sklearn ML 모드 — 데이터 누적 후 자동 전환
+
+```
+파이프라인 실행마다:
+  data/exports/training/EXEC-YYYYMMDD-HHMMSS.jsonl 에 공고 데이터 자동 누적
+
+충분한 데이터 쌓이면 학습 실행:
+  from interx_engine.application.use_cases.win_prediction import WinPredictionTrainer
+  WinPredictionTrainer().train()
+  → data/models/win_pred_lr.pkl 생성
+
+이후 파이프라인 실행 시:
+  pkl 파일 감지 → LogisticRegression 모델 자동 로드 → rule_v1 대체
+```
+
+---
+
 ## 핵심 원칙
 
 - **도메인 규칙은 `core/`에만** — infrastructure에 비즈니스 로직 넣지 말 것
