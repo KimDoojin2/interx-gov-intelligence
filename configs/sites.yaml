@@ -78,7 +78,7 @@ sites:
   - code: ketep
     name: 에너지기술평가원
     enabled: true
-    collector_type: requests   # 2025~ URL 변경 후 requests로 정상 수집 가능
+    collector_type: playwright  # 2025~ /businessAcment URL로 변경, Playwright 필수
   - code: koiia
     name: 산업지능화협회
     enabled: true

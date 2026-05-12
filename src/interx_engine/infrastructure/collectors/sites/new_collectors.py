@@ -134,7 +134,7 @@ _KETEP_MENU_ID    = "MENU002080200000000"
 _KETEP_LIST_URL   = (
     _KETEP_BASE
     + "/businessAcment?menuId=" + _KETEP_MENU_ID
-    + "&pageNum={page}&rowCnt=10&subj_dmsy_tc=&status=진행"
+    + "&pageNum={page}&rowCnt=10"
 )
 _KETEP_DETAIL_URL = (
     _KETEP_BASE
@@ -144,11 +144,11 @@ _KETEP_DETAIL_URL = (
 _KETEP_ID_RE = _re_ketep.compile(r"uni_ancm_id=([A-Za-z0-9]+)")
 
 
-class KetepCollector(BaseCollector):
+class KetepCollector(PlaywrightBaseCollector):
     """
     KETEP 사업공고 수집기.
     2025년 이후 URL이 /businessAcment 로 변경됨.
-    진행 중인 공고만 수집 (status=진행).
+    Playwright로 렌더링 (React SPA 대응).
     """
     site_key = "ketep"
     ministry = "산업통상자원부"

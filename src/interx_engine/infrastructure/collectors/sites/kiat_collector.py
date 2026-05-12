@@ -12,8 +12,8 @@ from interx_engine.infrastructure.collectors.sites.base_collector import (
 from interx_engine.core.entities.notice import Notice
 
 _BASE   = "https://www.kiat.or.kr"
-_BOARD  = 71                                  # 2025년 이후 변경된 board_id
-_MENU   = "ae72d61a9a9745febf0f0ede05b375f7"  # 2025년 이후 변경된 MenuId
+_BOARD  = 90                                  # 사업공고 게시판 board_id (목록 정상)
+_MENU   = "b159c9dac684471b87256f1e25404f5e"  # 사업공고 게시판 MenuId
 
 # 상세 URL 템플릿
 _DETAIL_TPL = (
