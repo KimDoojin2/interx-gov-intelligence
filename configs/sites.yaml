@@ -83,6 +83,10 @@ sites:
     name: 산업지능화협회
     enabled: true
     collector_type: requests
+  - code: smart_factory
+    name: 스마트제조혁신추진단 (smart-factory.kr)
+    enabled: true
+    collector_type: playwright  # React/Ant Design SPA — Playwright 필수
   - code: mock
     name: 테스트 목업
     enabled: false

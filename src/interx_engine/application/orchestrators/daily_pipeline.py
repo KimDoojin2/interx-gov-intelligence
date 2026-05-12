@@ -20,6 +20,7 @@ from interx_engine.application.use_cases.detect_changes import detect_changes
 from interx_engine.application.use_cases.assign_manager import assign_managers
 from interx_engine.application.use_cases.assign_milestone import assign_milestones
 from interx_engine.application.use_cases.track_competitors import track_competitors
+from interx_engine.application.use_cases.detect_recurring import detect_recurring
 from interx_engine.application.use_cases.site_quality_grader import grade_site_quality
 from interx_engine.application.use_cases.generate_proposal import generate_proposals
 from interx_engine.application.mappers.notice_mapper import (
@@ -162,6 +163,15 @@ class DailyPipelineOrchestrator:
         # ── 8. 경쟁사 트래킹 ─────────────────────────────────────────────────
         notices = track_competitors(notices)
 
+        # ── 8-B. 정기공고 감지 (recurring_flag / recurring_group 설정) ──────
+        try:
+            notices, recurring_count = detect_recurring(notices)
+            if recurring_count:
+                log.info("[Pipeline] 정기공고 감지: %d건", recurring_count)
+        except Exception as e:
+            log.warning("[Pipeline] 정기공고 감지 실패 (무시): %s", e)
+            recurring_count = 0
+
         # ── 9. 사이트별 품질 등급 ─────────────────────────────────────────────
         quality_grades = grade_site_quality(notices, score_cards)
 
@@ -243,6 +253,7 @@ class DailyPipelineOrchestrator:
             f"총 {len(notices)}건 | L3={len(l3_rows)} | 긴급={len(urgent_rows)} | "
             f"신규={new_count} | 변경={changed_count} | "
             f"마감제거={expired_count} | 중복제거={dup_count} | "
+            f"정기공고={recurring_count} | "
             f"경쟁사={sum(1 for n in notices if n.competitor_flag)} | "
             f"제안서={len(proposal_files)} | 에러={len(error_rows)} | "
             f"마일스톤=[{ms_summary}]"

@@ -42,6 +42,8 @@ class Notice:
     is_changed: bool = False              # 변경 감지 (마감일·예산 등)
     memo: str = ""                        # 자동 메모 (중복의심·변경감지·경쟁사)
     bd_milestone: str = ""               # BD 마일스톤 코드 (M01~M18 / P01~P10)
+    recurring_flag: str = "N"           # 정기공고 여부 (Y/N)
+    recurring_group: str = ""           # 정기공고 그룹명 (e.g. 스마트공장구축, AI바우처)
 
     @property
     def notice_key(self) -> str:

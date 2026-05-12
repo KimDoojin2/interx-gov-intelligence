@@ -73,6 +73,8 @@ def notice_to_master_row(notice: Notice, score: Optional[ScoreCard] = None) -> d
         "중복의심":      dup_flag,
         "메모":         memo,
         "상세URL":      notice.detail_url,
+        "정기공고여부":  getattr(notice, "recurring_flag",  "N"),
+        "정기공고그룹":  getattr(notice, "recurring_group", ""),
     }
 
 

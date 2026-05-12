@@ -245,6 +245,53 @@ NEGATIVE_KEYWORDS: Dict[str, float] = {
     "데이터분석 교육": 6, "ai 교육": 4,
 }
 
+# ── COMBO 키워드 그룹 (두 키워드가 동시에 존재할 때 추가 가점) ───────────────────
+# 형식: (keyword_a, keyword_b, bonus_score)
+# 두 키워드가 모두 scored_text에 있으면 bonus_score를 pos_score에 더함
+COMBO_KEYWORD_GROUPS: List[tuple] = [
+    # AI + 제조 결합 — 고가치 핵심 조합
+    ("ai", "제조", 5),
+    ("인공지능", "제조", 5),
+    ("ai", "스마트공장", 5),
+    ("ai", "스마트팩토리", 5),
+    # AX / 자율제조 결합
+    ("ax", "실증", 5),
+    ("ax", "제조", 5),
+    ("자율제조", "ai", 5),
+    ("자율공장", "ai", 5),
+    # 스마트공장 + 구축/보급
+    ("스마트공장", "구축", 5),
+    ("스마트공장", "보급", 4),
+    ("스마트공장", "고도화", 4),
+    ("스마트팩토리", "구축", 5),
+    # 디지털트윈 + 제조/실증
+    ("디지털트윈", "제조", 5),
+    ("디지털트윈", "실증", 4),
+    ("디지털 트윈", "제조", 5),
+    # 바우처 + AI
+    ("바우처", "ai", 4),
+    ("바우처", "인공지능", 4),
+    # 품질/검사 + AI
+    ("품질", "ai", 4),
+    ("품질", "인공지능", 4),
+    ("검사", "ai", 4),
+    ("비전검사", "ai", 5),
+    # 예지보전 + 설비/센서
+    ("예지보전", "설비", 4),
+    ("예지보전", "ai", 5),
+    ("이상탐지", "ai", 5),
+    # 안전 + AI
+    ("안전", "ai", 4),
+    ("중대재해", "ai", 5),
+    # R&D + 제조
+    ("r&d", "제조", 3),
+    ("기술개발", "ai", 4),
+    ("기술개발", "제조", 3),
+    # 데이터 + 제조
+    ("데이터", "제조", 3),
+    ("제조데이터", "ai", 5),
+]
+
 # ── 필수 신호 키워드 (가점 합이 낮을 때 최소 하나 있어야 통과) ──────────────────
 _MIN_SIGNAL = {
     "ai", "인공지능", "제조", "실증", "자동화", "로봇", "품질", "안전",
@@ -317,6 +364,12 @@ class PriorityScoringPolicy:
                 pos_hits.append(kw)
                 pos_score += w
 
+        # ── COMBO 보너스 계산 ────────────────────────────────────────────────
+        combo_bonus = 0.0
+        for kw_a, kw_b, bonus in COMBO_KEYWORD_GROUPS:
+            if kw_a in scored_text and kw_b in scored_text:
+                combo_bonus += bonus
+
         # ── 감점 계산 (scored_text 기준 — 제목/요약에 명확히 비제조 주제인 경우) ──
         neg_hits: List[str] = []
         neg_score = 0.0
@@ -339,7 +392,7 @@ class PriorityScoringPolicy:
         elif pos_score <= 3.0 and not any(kw in scored_text for kw in _MIN_SIGNAL):
             raw_fit = 0.0
         else:
-            raw_fit = (pos_score * _CFG["POS_MULT"]) - (neg_score * _CFG["NEG_MULT"]) + struct_bonus
+            raw_fit = (pos_score * _CFG["POS_MULT"]) - (neg_score * _CFG["NEG_MULT"]) + struct_bonus + combo_bonus
 
         fitness = round(max(0.0, min(100.0, raw_fit)), 1)
 

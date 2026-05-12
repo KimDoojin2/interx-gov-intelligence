@@ -84,7 +84,7 @@ class TestNoticeToUrgentRow:
         assert row["적합도점수"]   == ""
 
 
-# ── notice_to_master_row (01_영업기회_정보: 25 컬럼) ─────────────────────────
+# ── notice_to_master_row (01_영업기회_정보: 27 컬럼) ─────────────────────────
 class TestNoticeToMasterRow:
     EXPECTED_KEYS = [
         "실행ID", "사이트", "공고명", "마감일", "D-day", "마감여부",
@@ -93,6 +93,7 @@ class TestNoticeToMasterRow:
         "L3강공고", "파트너후보",
         "담당자", "검토상태", "BD마일스톤",
         "신규여부", "변경여부", "경쟁사감지", "중복의심", "메모", "상세URL",
+        "정기공고여부", "정기공고그룹",
     ]
 
     def test_all_keys_present(self):
@@ -102,7 +103,7 @@ class TestNoticeToMasterRow:
 
     def test_exactly_25_keys(self):
         row = notice_to_master_row(_notice(), _score())
-        assert len(row) == 25, f"마스터 행은 25개 컬럼이어야 함. 현재: {len(row)}"
+        assert len(row) == 27, f"마스터 행은 27개 컬럼이어야 함. 현재: {len(row)}"
 
     def test_score_fills_grade_and_fitness(self):
         sc  = _score(priority_grade="A", fitness_score=91.0)

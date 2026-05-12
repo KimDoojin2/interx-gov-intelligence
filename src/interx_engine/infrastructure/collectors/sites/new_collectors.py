@@ -358,11 +358,13 @@ class KoiiaCollector(BaseCollector):
 # 레지스트리
 # =============================================================================
 from interx_engine.infrastructure.collectors.sites.jejutp_collector import JejtpCollector
+from interx_engine.infrastructure.collectors.sites.smart_factory_collector import SmartFactoryCollector
 
 NEW_COLLECTOR_CLASSES: dict = {
-    "nrf":    NrfCollector,
-    "kised":  KisedCollector,
-    "ketep":  KetepCollector,
-    "koiia":  KoiiaCollector,
-    "jejutp": JejtpCollector,
+    "nrf":           NrfCollector,
+    "kised":         KisedCollector,
+    "ketep":         KetepCollector,
+    "koiia":         KoiiaCollector,
+    "jejutp":        JejtpCollector,
+    "smart_factory": SmartFactoryCollector,
 }
