@@ -65,7 +65,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
         if not a:
             continue
         title = a.get_text(strip=True)
-        if not title or len(title) < 3:
+        if not title or len(title) < 8:   # "모집공고","사업안내" 등 메뉴 링크 필터
             continue
         href   = (a.get("href") or "").strip()
         detail = href if href.startswith("http") else urljoin(base_url, href)
@@ -96,7 +96,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
             if not a:
                 continue
             title = a.get_text(strip=True)
-            if not title or len(title) < 3:
+            if not title or len(title) < 8:   # "모집공고","사업안내" 등 메뉴 링크 필터
                 continue
             href   = (a.get("href") or "").strip()
             detail = href if href.startswith("http") else urljoin(base_url, href)
@@ -125,7 +125,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
             "a[href*='bbsView'], a[href*='nttId'], a[href*='bbsId']"
         ):
             title = a.get_text(strip=True)
-            if not title or len(title) < 3:
+            if not title or len(title) < 8:   # "모집공고","사업안내" 등 메뉴 링크 필터
                 continue
             href   = (a.get("href") or "").strip()
             detail = href if href.startswith("http") else urljoin(base_url, href)
