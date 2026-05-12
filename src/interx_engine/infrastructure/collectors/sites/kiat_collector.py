@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import List
 from urllib.parse import urljoin, urlparse, parse_qs
 
 from bs4 import BeautifulSoup
+
+log = logging.getLogger("interx.collectors")
 
 from interx_engine.infrastructure.collectors.sites.base_collector import (
     PlaywrightBaseCollector, _extract_dates,

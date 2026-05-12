@@ -62,4 +62,4 @@ tests/
 ## 주의사항
 - `service_account.json.json` — Git에 올리면 안 됨
 - `archive/` — 레거시 코드 보관, 수정 불필요
-- Playwright 필요 사이트: kiat, dicia (설치: `playwright install chromium`)
+- Playwright 필요 사이트: kiat, dicia, smart_factory, iitp, gbtp, ketep (설치: `playwright install chromium`)
