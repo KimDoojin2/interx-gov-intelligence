@@ -123,32 +123,112 @@ class KisedCollector(BaseCollector):
 
 
 # =============================================================================
-# 한국에너지기술평가원 (KETEP)  → playwright (400 Bad Request 우회)
+# 한국에너지기술평가원 (KETEP)  → requests (2025~ URL 변경)
+# 구 URL: /biz/rnd/announce/list.do (400 Bad Request)
+# 신 URL: /businessAcment?menuId=MENU002080200000000&pageNum={page}
 # =============================================================================
-class KetepCollector(PlaywrightBaseCollector):
+import re as _re_ketep
+
+_KETEP_BASE       = "https://www.ketep.re.kr"
+_KETEP_MENU_ID    = "MENU002080200000000"
+_KETEP_LIST_URL   = (
+    _KETEP_BASE
+    + "/businessAcment?menuId=" + _KETEP_MENU_ID
+    + "&pageNum={page}&rowCnt=10&subj_dmsy_tc=&status=진행"
+)
+_KETEP_DETAIL_URL = (
+    _KETEP_BASE
+    + "/businessAcment/view?menuId=" + _KETEP_MENU_ID
+    + "&uni_ancm_id={uid}"
+)
+_KETEP_ID_RE = _re_ketep.compile(r"uni_ancm_id=([A-Za-z0-9]+)")
+
+
+class KetepCollector(BaseCollector):
+    """
+    KETEP 사업공고 수집기.
+    2025년 이후 URL이 /businessAcment 로 변경됨.
+    진행 중인 공고만 수집 (status=진행).
+    """
     site_key = "ketep"
     ministry = "산업통상자원부"
     agency   = "한국에너지기술평가원"
-    LIST_URL = "https://www.ketep.re.kr/biz/rnd/announce/list.do?pageIndex={page}"
+    LIST_URL = _KETEP_LIST_URL
+
+    def _page_url(self, page: int) -> str:
+        return self.LIST_URL.replace("{page}", str(page))
 
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
-        BASE = "https://www.ketep.re.kr"
-        notices = _parse_tbody(soup, execution_id, self.site_key, BASE, self.ministry, self.agency)
+        notices = []
+        seen: set = set()
+
+        # 1) table tbody tr 기반 파싱
+        for tr in soup.select("table tbody tr, tbody tr"):
+            tds = tr.find_all(["td", "th"])
+            if len(tds) < 2:
+                continue
+            # 제목+링크 td 탐색
+            a = None
+            for td in tds:
+                candidate = td.find("a", href=True)
+                if candidate:
+                    txt = candidate.get_text(strip=True)
+                    if len(txt) >= 3:
+                        a = candidate
+                        break
+            if not a:
+                continue
+            title = a.get_text(strip=True)
+            if not title or len(title) < 3:
+                continue
+
+            href = (a.get("href") or "").strip()
+            # uni_ancm_id 추출
+            m = _KETEP_ID_RE.search(href)
+            if m:
+                uid = m.group(1)
+                detail = _KETEP_DETAIL_URL.format(uid=uid)
+            elif href and not href.lower().startswith("javascript"):
+                detail = href if href.startswith("http") else urljoin(_KETEP_BASE, href)
+            else:
+                continue
+
+            if detail in seen:
+                continue
+            seen.add(detail)
+
+            row_text = tr.get_text(" ", strip=True)
+            dates    = _extract_dates(row_text)
+            notices.append(self._make_notice(
+                execution_id, title, detail,
+                dates[-1] if dates else "",
+                dates[0]  if len(dates) >= 2 else "",
+            ))
+
+        # 2) 링크 직접 탐색 fallback (React/SPA 렌더 결과에서 href만 있는 경우)
         if not notices:
-            for a in soup.select("td.tit a, td.subject a, .list-title a, tbody tr a"):
+            for a in soup.select("a[href*='uni_ancm_id'], a[href*='businessAcment/view']"):
                 title = a.get_text(strip=True)
                 if not title or len(title) < 3:
                     continue
-                href   = a.get("href", "")
-                if not href or "javascript" in href.lower():
+                href = (a.get("href") or "").strip()
+                m = _KETEP_ID_RE.search(href)
+                if m:
+                    detail = _KETEP_DETAIL_URL.format(uid=m.group(1))
+                else:
+                    detail = href if href.startswith("http") else urljoin(_KETEP_BASE, href)
+                if detail in seen:
                     continue
-                detail = href if href.startswith("http") else urljoin(BASE, href)
-                row    = a.find_parent("tr")
-                text   = row.get_text(" ", strip=True) if row else title
-                dates  = _extract_dates(text)
-                notices.append(self._make_notice(execution_id, title, detail,
-                                                 dates[-1] if dates else "",
-                                                 dates[0]  if len(dates) >= 2 else ""))
+                seen.add(detail)
+                row  = a.find_parent("tr") or a.find_parent("li") or a.parent
+                text = row.get_text(" ", strip=True) if row else title
+                dates = _extract_dates(text)
+                notices.append(self._make_notice(
+                    execution_id, title, detail,
+                    dates[-1] if dates else "",
+                    dates[0]  if len(dates) >= 2 else "",
+                ))
+
         return notices
 
 

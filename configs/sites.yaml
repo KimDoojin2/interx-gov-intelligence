@@ -9,7 +9,7 @@ sites:
     collector_type: requests
   - code: iris
     name: IRIS (국가연구개발사업)
-    enabled: true
+    enabled: false   # 2025~ 로그인 필수 페이지로 변경 — 공개 수집 불가
     collector_type: requests
   - code: kiat
     name: KIAT (한국산업기술진흥원)
@@ -78,7 +78,7 @@ sites:
   - code: ketep
     name: 에너지기술평가원
     enabled: true
-    collector_type: playwright
+    collector_type: requests   # 2025~ URL 변경 후 requests로 정상 수집 가능
   - code: koiia
     name: 산업지능화협회
     enabled: true
