@@ -17,7 +17,7 @@
 10. [수주 예측 (Win Prediction)](#10-수주-예측-win-prediction)
 11. [담당자 자동 배정 & BD 마일스톤](#11-담당자-자동-배정--bd-마일스톤)
 12. [설정 파일 (configs/)](#12-설정-파일-configs)
-13. [Google Sheets 9시트 구조](#13-google-sheets-9시트-구조)
+13. [Google Sheets 10시트 구조](#13-google-sheets-10시트-구조)
 14. [새 컬렉터 추가 방법](#14-새-컬렉터-추가-방법)
 15. [테스트](#15-테스트)
 16. [핵심 원칙](#16-핵심-원칙)
@@ -40,9 +40,11 @@
 |------|------|
 | 수집 사이트 | 20개+ (requests 18개, Playwright 2개) |
 | 파이프라인 단계 | 17단계 |
-| 정기공고 패턴 | recurring.yaml에 정의된 반복 사업 패턴 |
+| 정기공고 패턴 | 18그룹, 120+ aliases (priority 1/2/3 등급) |
+| 콤보 키워드 | 38쌍 (두 키워드 동시 출현 시 가점) |
+| 감점 분류 | 3단계 (strong 6.0 / medium 4.0 / weak 2.0) |
 | 등급 | A / B / C / D |
-| Sheets 시트 수 | 9개 |
+| Sheets 시트 수 | 10개 (97_상태변경로그 포함) |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
 
 ---
@@ -317,7 +319,7 @@ interx_gov_intelligence/
 | `kiat` | 한국산업기술진흥원 | Playwright | Vue.js SPA |
 | `nipa` | 정보통신산업진흥원 | requests | |
 | `innopolis` | 연구개발특구진흥재단 | requests | |
-| `smart_factory` | 스마트제조혁신추진단 | Playwright | React SPA, 공고번호 기반 중복키 |
+| `smart_factory` | 스마트제조혁신추진단 | Playwright | React SPA, nttId 기반 중복키 (URL MD5 → nttId) |
 | `bipa` | 부산정보산업진흥원 | requests | |
 | `uipa` | 울산정보산업진흥원 | requests | |
 | `gicon` | 광주전남연구원 | requests | |
@@ -343,6 +345,7 @@ interx_gov_intelligence/
     - 공고명 + 상세 URL (<a href>)
     - 날짜 (정규식: \d{4}[-./]\d{1,2}[-./]\d{1,2})
     - notice_id = site_code + URL MD5(8자리)
+      (스마트공장: nttId 파라미터 기반 ID — URL 변형으로 인한 중복 방지)
 
   종료 조건: 공고 0건 페이지 감지 시 순회 중단
   딜레이: random.uniform(0.5, 1.2)초
@@ -371,6 +374,13 @@ interx_gov_intelligence/
        .pdf/.hwp/.hwpx/.docx/.xlsx 확장자 URL
        download/fileDown/atchFile 패턴 URL
        → {name, url} 목록
+
+    ⑤ 접수상태 자동 분류 (classify_apply_status)
+       본문에서 "접수기간: YYYY-MM-DD ~ YYYY-MM-DD" 패턴 파싱
+       → 오늘 < 시작일: "접수예정"
+       → 시작일 ≤ 오늘 ≤ 종료일: "접수중"
+       → 오늘 > 종료일: "마감"
+       패턴 미발견 시 deadline 기반 추정
 
   딜레이: random.uniform(0.3, 0.8)초
 ```
@@ -420,12 +430,19 @@ Step 2. 가점 계산 (scored_text 기준)
         예산 정보 존재 시 +3.0 보너스
         pos_score = Σ(키워드 가중치) × struct_bonus
 
-Step 3. 감점 계산 (scored_text 기준)
-        NEGATIVE_KEYWORDS 딕셔너리 순회
-        neg_score = Σ(키워드 감점)
+Step 2B. 콤보 키워드 보너스 (38쌍)
+         두 키워드가 scored_text에 동시 존재 시 추가 가점
+         예: ("상생형", "선도모델") → +8, ("ai", "제조") → +5
+         combo_bonus = Σ(매칭된 콤보 보너스)
+
+Step 3. 감점 계산 — 3단계 차등 (scored_text 기준)
+        STRONG (×6.0): 바이오/의료/건설/엔터/고용 — 완전 범위 외
+        MEDIUM (×4.0): 교육/창업/전시회/금융 — 일부 관련 가능
+        WEAK   (×2.0): 농업/식품/일반 콘텐츠 — 간접 관련 가능
+        neg_score = Σ(strong×1.0 + medium×0.67 + weak×0.33) 비율 적용
 
 Step 4. 적합도 계산
-        fitness = pos_score × 5.0 - neg_score × 6.0 + struct_bonus
+        fitness = pos_score × 5.0 - neg_score × 6.0 + struct_bonus + combo_bonus
         범위: 0.0 ~ 100.0 (min(100, max(0, ...)) 클램핑)
 
 Step 5. 솔루션별 점수 (8개 솔루션)
@@ -467,7 +484,22 @@ Step 10. L3 강공고 확정
 | `InfraDS` | 데이터스페이스, AAS, Catena-X, 클라우드 | 데이터 인프라 |
 | `PdM` | 예지보전, 설비관리, 고장예측, PHM | 예지보전 |
 
-### 7-4. 가점/감점 키워드 예시 (scoring.yaml)
+### 7-4. 콤보 키워드 (38쌍)
+
+두 키워드가 동시에 scored_text에 존재할 때 추가 가점. 핵심 공고 탐지력 향상.
+
+| 조합 예시 | 보너스 | 설명 |
+|----------|--------|------|
+| 상생형 + 선도모델 | +8 | 정부 핵심 정책 (최고 보너스) |
+| 상생형 + 스마트공장 | +6 | 대중소 상생형 공장 구축 |
+| ai + 제조 | +5 | 제조AI 핵심 |
+| ax + 실증 | +5 | AX 실증 공고 |
+| 탄소중립 + 스마트공장 | +5 | ESG 연계 제조 |
+| dx + 제조 | +5 | 제조DX |
+| 공급망 + ai | +4 | Catena-X / 공급망 디지털화 |
+| 로봇 + ai | +4 | 지능형 로봇 제조 |
+
+### 7-5. 가점/감점 키워드 예시
 
 ```yaml
 # 가점 키워드 (점수 높을수록 인터엑스 적합)
@@ -477,13 +509,16 @@ Step 10. L3 강공고 확정
 ai: 3,       머신비전: 3, 비전검사: 3
 데이터: 2,   자동화: 2
 
-# 감점 키워드 (비제조/비조달 필터)
-수요기업: 12   # 공급기업이 아님
-일자리: 7      # 취업 지원 공고
-세미나: 7      # 교육 행사
-소상공인: 6    # 대상 업종 불일치
-의료: 6
-바이오: 5
+# 감점 키워드 — 3단계 차등 감점
+# STRONG (×6.0): 완전 범위 외
+수요기업: 12, 일자리: 7, 세미나: 7
+바이오: 5, 신약: 6, 건설공사: 5
+
+# MEDIUM (×4.0): 일부 관련 가능
+소상공인: 6, 교육생모집: 6, 전시회: 4
+
+# WEAK (×2.0): 간접 관련 가능
+농업: 4, 식품기업: 4, 문화: 2
 ```
 
 ---
@@ -497,30 +532,41 @@ ai: 3,       머신비전: 3, 비전검사: 3
 ```python
 title = "2025년 스마트공장 구축지원 사업 통합 공고"
 
-# recurring.yaml 패턴 순회
-for (group_name, aliases) in _PATTERNS:
+# recurring.yaml 패턴 순회 (priority 순 정렬 — 핵심공고 먼저 매칭)
+for (group_name, aliases, priority) in _PATTERNS:
     for alias in aliases:
         if alias.lower() in title.lower():
-            notice.recurring_flag  = "Y"
-            notice.recurring_group = group_name
+            notice.recurring_flag     = "Y"
+            notice.recurring_group    = group_name
+            notice.recurring_priority = priority  # 1=핵심, 2=중간, 3=참고
             break
 ```
 
-### 8-2. recurring.yaml 주요 패턴
+### 8-2. recurring.yaml 주요 패턴 (18그룹, 120+ aliases)
 
-| 그룹명 | 대표 aliases |
-|--------|-------------|
-| `스마트공장구축` | 스마트공장 구축, 스마트팩토리 구축, 스마트공장 보급, AI 스마트공장 |
-| `제조혁신스마트공장` | 스마트제조혁신, 제조혁신, 스마트팩토리 확산 |
-| `AX-Sprint` | AX-Sprint, AX Sprint, AX사업, AX 실증, 제조AI AX |
-| `제조AI특화사업` | 제조AI 특화, 산업AI솔루션, AI응용제품, 제조인공지능 |
-| `AI바우처` | AI 바우처, 인공지능 바우처, AI바우처 공급기업 |
-| `데이터바우처` | 데이터 바우처, 데이터바우처 공급기업 |
-| `클라우드바우처` | 클라우드 바우처 |
-| `중소기업기술개발` | 중소기업 기술개발, R&D 지원, 기술개발사업 공고 |
-| `디지털트윈R&D` | 디지털트윈 기술개발, 디지털 트윈 R&D, DT 실증 |
+| Priority | 그룹명 | aliases 수 | 대표 aliases |
+|----------|--------|-----------|-------------|
+| **P1** | `스마트공장구축` | 13 | 스마트공장 구축, 스마트팩토리 구축, 보급확산, AI스마트공장 |
+| **P1** | `제조혁신스마트공장` | 7 | 스마트제조혁신, 제조혁신사업, 스마트공장 확산 |
+| **P1** | `AX-Sprint` | 9 | AX-Sprint, AX실증, 자율제조 AX, 자율형공장 AX |
+| **P1** | `제조AI특화사업` | 12 | 제조AI특화, 산업AI솔루션, AI응용제품, 신속상용화 |
+| **P1** | `상생형스마트공장` | 6 | 상생형 스마트공장, 상생형 선도모델, 대중소 상생형 |
+| **P2** | `AI바우처` | 7 | AI바우처사업, 인공지능 바우처, AI바우처 지원사업 |
+| **P2** | `데이터바우처` | 7 | 데이터바우처사업, 빅데이터 바우처 |
+| **P2** | `디지털트윈R&D` | 7 | 디지털트윈 기술개발, 디지털트윈 실증, DT 실증 |
+| **P2** | `신속실증특례` | 8 | 신속실증, PoC실증, 신속상용화, 실증사업 |
+| **P2** | `글로벌스마트공장` | 8 | 글로벌 스마트공장, K-스마트공장, 해외스마트공장 |
+| **P2** | `탄소중립스마트공장` | 9 | 탄소중립 스마트공장, 그린스마트공장, 넷제로스마트 |
+| **P2** | `데이터스페이스` | 6 | 데이터스페이스, Catena-X, 제조데이터 공유 |
+| **P2** | `공정최적화AI` | 5 | 공정최적화, AI 공정최적화, 공정혁신 |
+| **P3** | `클라우드바우처` | 4 | 클라우드바우처사업, 클라우드 서비스 바우처 |
+| **P3** | `중소기업기술개발` | 9 | 중소기업 기술개발, R&D 지원, 기술혁신개발사업 |
+| **P3** | `규제샌드박스` | 6 | 규제샌드박스, 산업융합샌드박스, ICT규제샌드박스 |
+| **P3** | `스마트공장전문인력` | 8 | 스마트공장 전문인력, 제조AI인력, 스마트제조인력양성 |
+| **P3** | `스마트산업단지` | 8 | 스마트산업단지, 스마트산단, 디지털클러스터 |
 
 > `recurring_flag = "Y"` 인 공고는 Google Sheets `01_영업기회_정보` 시트에 정기공고여부/정기공고그룹 컬럼에 자동 기재됩니다.
+> priority 필드로 핵심(P1) 정기공고를 우선 매칭하여, 여러 패턴에 해당될 때 가장 중요한 그룹이 배정됩니다.
 
 ---
 
@@ -657,7 +703,10 @@ thresholds:
   grade_a:           48   # priority ≥ 48 → A등급
   grade_b:           30   # priority ≥ 30 → B등급
   grade_c:           18   # priority ≥ 18 → C등급
-  neg_multiplier:     6.0 # 감점 배율
+  neg_multiplier:          6.0  # 감점 기본 배율 (하위 호환)
+  neg_multiplier_strong:   6.0  # 바이오/의료/건설 — 완전 범위 외
+  neg_multiplier_medium:   4.0  # 교육/인력 — 일부 관련 가능
+  neg_multiplier_weak:     2.0  # 식품/농업 — 간접 관련 가능
   pos_multiplier:     5.0 # 가점 배율
   struct_bonus_factor:1.5 # 구조화 섹션 보너스 배율
   budget_bonus:       3.0 # 예산 존재 시 보너스
@@ -712,16 +761,26 @@ sites:
 ```yaml
 patterns:
   - name: 스마트공장구축
+    priority: 1              # 1=핵심, 2=중간, 3=참고
     aliases:
       - 스마트공장 구축
       - 스마트팩토리 구축
       - 스마트공장 보급
-  - name: AX-Sprint
+      - 스마트공장 보급확산
+      - 스마트공장 고도화
+      - 자율형스마트공장
+      - AI스마트공장
+      - 스마트공장구축사업
+      ...  # 그룹당 6~13개 aliases
+
+  - name: 상생형스마트공장    # 신규 추가
+    priority: 1
     aliases:
-      - AX-Sprint
-      - AX 실증
-      - 제조AI AX
+      - 상생형 스마트공장
+      - 상생형 선도모델
+      - 대중소 상생형
   ...
+# 총 18그룹, 120+ aliases, priority 순 정렬 매칭
 ```
 
 ### manager_rules.yaml → [섹션 11-1 참조]
@@ -741,7 +800,7 @@ pipeline:
 
 ---
 
-## 13. Google Sheets 9시트 구조
+## 13. Google Sheets 10시트 구조
 
 파이프라인 실행 후 자동 업로드. Sheets를 백엔드 DB로 사용해 별도 DB 없이 플랫폼 연결 가능.
 
@@ -756,6 +815,7 @@ pipeline:
 | `93_통계` | 부처·솔루션·키워드 집계 | (시장 분석 참고용) |
 | `94_실행로그` | 파이프라인 실행 이력 | 실행ID·시작/종료시각·상태 |
 | `96_에러로그` | 수집 오류 사이트 | 사이트코드·오류메시지·발생시각 |
+| `97_상태변경로그` | 공고 상태 변경 이력 | 변경일시·공고ID·변경필드·이전값·변경값·변경사유·처리자 |
 
 ---
 
@@ -848,7 +908,8 @@ venv/Scripts/python -m pytest tests/ --cov=src/interx_engine --cov-report=html
 - **Playwright 필요 사이트**: `bizinfo`, `kiat`, `dicia`, `smart_factory`
   → 초기 실행 전 `playwright install chromium` 필수
 - **의존 방향**: infrastructure → application → core (역방향 절대 금지)
-- **중복 방지**: notice_id = site_code + URL MD5 / 스마트공장은 공고번호 기반 키 사용
+- **중복 방지**: notice_id = site_code + URL MD5 / 스마트공장은 nttId 기반 키 (`smart_factory-ntt{nttId}`)
+- **접수상태 자동 분류**: 상세 페이지 본문에서 접수기간 파싱 → 접수중/접수예정/마감 자동 판별
 
 ---
 
