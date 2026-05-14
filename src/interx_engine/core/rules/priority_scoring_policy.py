@@ -50,8 +50,11 @@ def _load_thresholds(config_path: str | None = None) -> dict:
                 "GRADE_A":           t.get("grade_a",          _GRADE_A),
                 "GRADE_B":           t.get("grade_b",          _GRADE_B),
                 "GRADE_C":           t.get("grade_c",          _GRADE_C),
-                "NEG_MULT":          t.get("neg_multiplier",   _NEG_MULT),
-                "POS_MULT":          t.get("pos_multiplier",   _POS_MULT),
+                "NEG_MULT":          t.get("neg_multiplier",          _NEG_MULT),
+                "NEG_MULT_STRONG":   t.get("neg_multiplier_strong",  _NEG_MULT),
+                "NEG_MULT_MEDIUM":   t.get("neg_multiplier_medium",  4.0),
+                "NEG_MULT_WEAK":     t.get("neg_multiplier_weak",    2.0),
+                "POS_MULT":          t.get("pos_multiplier",         _POS_MULT),
                 "STRUCT_BONUS":      t.get("struct_bonus_factor", _STRUCT_BONUS),
                 "BUDGET_BONUS":      t.get("budget_bonus",     _BUDGET_BONUS),
                 "SCALE":             sol.get("scale_factor",   _SCALE),
@@ -64,7 +67,9 @@ def _load_thresholds(config_path: str | None = None) -> dict:
     return {
         "L3_THRESHOLD": _L3_DEFAULT, "PARTNER_THRESHOLD": _PARTNER_DEFAULT,
         "GRADE_A": _GRADE_A, "GRADE_B": _GRADE_B, "GRADE_C": _GRADE_C,
-        "NEG_MULT": _NEG_MULT, "POS_MULT": _POS_MULT,
+        "NEG_MULT": _NEG_MULT, "NEG_MULT_STRONG": _NEG_MULT,
+        "NEG_MULT_MEDIUM": 4.0, "NEG_MULT_WEAK": 2.0,
+        "POS_MULT": _POS_MULT,
         "STRUCT_BONUS": _STRUCT_BONUS, "BUDGET_BONUS": _BUDGET_BONUS,
         "SCALE": _SCALE, "W_FIT": _W_FIT, "W_IND": _W_IND,
     }
@@ -201,48 +206,73 @@ POSITIVE_KEYWORDS: Dict[str, float] = {
     "중소기업": 1, "클라우드": 1, "api": 1,
 }
 
-# ── 감점 키워드 ───────────────────────────────────────────────────────────────
-NEGATIVE_KEYWORDS: Dict[str, float] = {
-    # 엔터테인먼트 / 비제조 콘텐츠
+# ── 감점 키워드 3단계 (P6: bizinfo_datalist.py 대비 보강) ────────────────────
+# strong: 완전 범위 외 (바이오/의료/건설/엔터) → neg_multiplier_strong (6.0)
+# medium: 일부 관련 가능 (교육/인력/창업) → neg_multiplier_medium (4.0)
+# weak:   간접 관련 가능 (식품/농업/일반) → neg_multiplier_weak (2.0)
+NEGATIVE_KEYWORDS_STRONG: Dict[str, float] = {
+    # 엔터테인먼트 / 비제조 콘텐츠 — 완전 범위 외
     "게임": 5, "웹툰": 5, "만화": 5, "영화": 5, "애니": 5,
-    "캐릭터": 4, "축제": 4, "전시": 3, "음악": 4, "공연": 4,
-    "e스포츠": 5, "공모전": 3, "관광": 3, "패션": 4, "뷰티": 4,
-    "스포츠": 3, "문화": 2, "예술": 3, "방송": 3, "미디어": 2, "콘텐츠": 2,
-    # 고용·일자리·창업 지원 (제조AI와 무관)
+    "캐릭터": 4, "축제": 4, "음악": 4, "공연": 4,
+    "e스포츠": 5, "패션": 4, "뷰티": 4, "스포츠": 3,
+    # 바이오/의료 — InterX 제조AI 완전 범위 외
+    "바이오": 5, "신약": 6, "임상": 6, "의료기기": 5,
+    "제약": 5, "유전체": 6, "세포치료": 6,
+    # 건설/토목 — 제조AI 범위 외
+    "건설공사": 5, "건축": 4, "토목": 5, "도로공사": 5, "교량": 5,
+    # 고용·일자리 (제조AI와 완전 무관)
     "일자리": 7, "고용장려": 6, "취업지원": 7, "구직": 5,
     "청년취업": 7, "청년일자리": 7, "고용보조금": 7,
     "사회적경제": 6, "협동조합": 5, "자활": 6,
-    # 창업 생태계 지원 (스타트업/보육/소상공인 — 제조AI 납품 대상 아님)
+    # 지역개발·도시재생
+    "밀집지역": 7, "미니클러스터": 6, "도시재생": 5, "주거환경": 5,
+    "마을기업": 6,
+    # 금융·경제정책
+    "한국은행": 7,
+    # 이벤트/세미나 (수주 대상 아님)
+    "세미나": 7, "컨퍼런스": 6, "웨비나": 7,
+    "참관단": 6, "참관객": 5, "수강생": 6,
+    "사전등록": 5, "ir pitching": 5,
+    "meet-up": 5, "meetup": 5, "biz meet": 5,
+    # 수요기업 모집 (InterX는 공급자)
+    "수요기업": 12,
+    # 비제조 패션
+    "소잉": 7, "업사이클링": 6, "의류": 5,
+}
+
+NEGATIVE_KEYWORDS_MEDIUM: Dict[str, float] = {
+    # 교육/인력 — 일부 제조 교육은 관련 가능
+    "교육생모집": 6, "교육생 모집": 6, "데이터분석 교육": 6, "ai 교육": 4,
+    "복지": 4, "돌봄": 5, "의료비": 5, "장학": 5,
+    # 창업 생태계 — 제조 스타트업은 가끔 관련
     "소상공인": 6, "예비창업": 6, "창업보육": 6, "창업교육": 5,
     "입주기업": 4, "입주사": 4,
     "ir피칭": 5, "창업경진": 5, "아이디어 공모": 5,
     "농촌창업": 6, "로컬푸드창업": 6,
-    # 지역개발·도시재생
-    "밀집지역": 7, "미니클러스터": 6, "도시재생": 5, "주거환경": 5,
-    "마을기업": 6, "소셜벤처": 4,
-    # 금융·경제정책
-    "한국은행": 7, "금융지원": 4, "보증": 3, "대출": 4,
+    # 전시회/시찰 — 파트너십 기회 가능
+    "전시회": 4, "특별관": 5, "한국관": 5, "공동관": 4,
+    "시찰단": 6, "창업가": 5, "육성과정": 5, "원데이": 4,
+    # 금융 — 기업 자금 지원은 간접 관련
+    "금융지원": 4, "보증": 3, "대출": 4,
     "위기대응": 5, "경영위기": 5,
-    # 보건·복지·교육
-    "복지": 4, "돌봄": 5, "의료비": 5, "장학": 5, "교육생모집": 6, "교육생 모집": 6,
-    # 비제조 산업 (패션·관광·농업·에너지·바이오 전용)
-    "소잉": 7, "업사이클링": 6, "의류": 5,
-    "관광기업": 6, "여행지원": 5, "농공단지": 4,
-    # 이벤트·세미나 (공고가 아닌 참가 모집 — 수주 대상 아님)
-    "세미나": 7, "컨퍼런스": 6, "웨비나": 7,
-    "참관단": 6, "참관객": 5, "수강생": 6,
-    "사전등록": 5, "ir pitching": 5, "전시회": 4,
-    "특별관": 5, "meet-up": 5, "meetup": 5, "biz meet": 5,
-    "한국관": 5, "공동관": 4,
-    # 해외 전시회 시찰단 / 교육 행사 (수주 대상 아님)
-    "시찰단": 6, "창업가": 5, "육성과정": 5,
-    "원데이": 4,  # 원데이 교육/세미나 이벤트 (ex: 디지털 트윈 원데이 기본 교육)
-    # 수요기업 모집 (InterX는 공급자 — 수요기업 모집 공고는 대상 아님)
-    "수요기업": 12,  # 5→8→12: penalty=72로 상향 (IoT/데이터 positive 점수 상쇄)
-    # 농업·식품 분야 (InterX 제조AI 범위 외)
-    "농업": 4, "농식품": 5, "식품기업": 4,
-    # 비제조 교육 프로그램
-    "데이터분석 교육": 6, "ai 교육": 4,
+    "소셜벤처": 4,
+    # 관광/여행
+    "관광기업": 6, "여행지원": 5,
+}
+
+NEGATIVE_KEYWORDS_WEAK: Dict[str, float] = {
+    # 농업·식품 — 스마트팜/식품제조와 간접 관련 가능
+    "농업": 4, "농식품": 5, "식품기업": 4, "농공단지": 4,
+    # 일반 콘텐츠 — 제조 콘텐츠와 혼동 가능
+    "전시": 3, "공모전": 3, "관광": 3,
+    "문화": 2, "예술": 3, "방송": 3, "미디어": 2, "콘텐츠": 2,
+}
+
+# 하위 호환: 기존 NEGATIVE_KEYWORDS를 flat으로도 유지 (외부 참조용)
+NEGATIVE_KEYWORDS: Dict[str, float] = {
+    **NEGATIVE_KEYWORDS_STRONG,
+    **NEGATIVE_KEYWORDS_MEDIUM,
+    **NEGATIVE_KEYWORDS_WEAK,
 }
 
 # ── COMBO 키워드 그룹 (두 키워드가 동시에 존재할 때 추가 가점) ───────────────────
@@ -290,6 +320,19 @@ COMBO_KEYWORD_GROUPS: List[tuple] = [
     # 데이터 + 제조
     ("데이터", "제조", 3),
     ("제조데이터", "ai", 5),
+    # ── 추가 7쌍 (bizinfo_datalist.py 대비 보강) ─────────────────────────────
+    # 상생형 + 선도모델 — 정부 핵심 정책 방향
+    ("상생형", "선도모델", 8),
+    ("상생형", "스마트공장", 6),
+    # 공급망 + AI/디지털 — Catena-X / 데이터스페이스 공고
+    ("공급망", "ai", 4),
+    ("공급망", "디지털", 4),
+    # 탄소중립 + 스마트공장 — ESG 연계 제조 공고
+    ("탄소중립", "스마트공장", 5),
+    # DX + 제조 — 제조DX 공고
+    ("dx", "제조", 5),
+    # 로봇 + AI — 지능형 로봇 제조 공고
+    ("로봇", "ai", 4),
 ]
 
 # ── 필수 신호 키워드 (가점 합이 낮을 때 최소 하나 있어야 통과) ──────────────────
@@ -370,13 +413,24 @@ class PriorityScoringPolicy:
             if kw_a in scored_text and kw_b in scored_text:
                 combo_bonus += bonus
 
-        # ── 감점 계산 (scored_text 기준 — 제목/요약에 명확히 비제조 주제인 경우) ──
+        # ── 감점 계산 3단계 (scored_text 기준) ─────────────────────────────────
         neg_hits: List[str] = []
         neg_score = 0.0
-        for kw, w in NEGATIVE_KEYWORDS.items():
+        # strong: 완전 범위 외 → 최대 감점
+        for kw, w in NEGATIVE_KEYWORDS_STRONG.items():
             if kw in scored_text:
                 neg_hits.append(kw)
-                neg_score += w
+                neg_score += w * (_CFG["NEG_MULT_STRONG"] / _CFG["NEG_MULT"])
+        # medium: 일부 관련 → 중간 감점
+        for kw, w in NEGATIVE_KEYWORDS_MEDIUM.items():
+            if kw in scored_text:
+                neg_hits.append(kw)
+                neg_score += w * (_CFG["NEG_MULT_MEDIUM"] / _CFG["NEG_MULT"])
+        # weak: 간접 관련 → 최소 감점
+        for kw, w in NEGATIVE_KEYWORDS_WEAK.items():
+            if kw in scored_text:
+                neg_hits.append(kw)
+                neg_score += w * (_CFG["NEG_MULT_WEAK"] / _CFG["NEG_MULT"])
 
         # ── 구조화 데이터 보너스 (사업목적/지원내용에 히트하면 1.5배) ───────────
         struct_bonus = 0.0

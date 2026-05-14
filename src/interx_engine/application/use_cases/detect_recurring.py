@@ -15,9 +15,10 @@ log = logging.getLogger("interx.recurring")
 
 # ── 패턴 로드 ─────────────────────────────────────────────────────────────────
 
-def _load_patterns() -> List[Tuple[str, List[str]]]:
+def _load_patterns() -> List[Tuple[str, List[str], int]]:
     """
-    recurring.yaml 을 로드해 (name, [aliases]) 리스트 반환.
+    recurring.yaml 을 로드해 (name, [aliases], priority) 리스트 반환.
+    priority: 1=최우선(핵심공고), 2=중간, 3=참고. 미지정 시 2.
     실패 시 빈 리스트 (패턴 없으면 전체 non-recurring).
     """
     here = Path(__file__).resolve()
@@ -35,20 +36,23 @@ def _load_patterns() -> List[Tuple[str, List[str]]]:
         raw = yaml.safe_load(candidates[0].read_text(encoding="utf-8")) or {}
         patterns = []
         for item in raw.get("patterns", []):
-            name    = item.get("name", "").strip()
-            aliases = [a.strip() for a in item.get("aliases", []) if a.strip()]
+            name     = item.get("name", "").strip()
+            aliases  = [a.strip() for a in item.get("aliases", []) if a.strip()]
+            priority = item.get("priority", 2)
             if name and aliases:
-                patterns.append((name, aliases))
-        log.debug("[recurring] %d개 패턴 로드 완료", len(patterns))
+                patterns.append((name, aliases, priority))
+        # priority 낮을수록 우선 매칭 (1=최우선)
+        patterns.sort(key=lambda x: x[2])
+        log.debug("[recurring] %d개 패턴 로드 완료 (priority 순 정렬)", len(patterns))
         return patterns
     except Exception as e:
         log.warning("[recurring] recurring.yaml 로드 실패: %s", e)
         return []
 
 
-_PATTERNS: List[Tuple[str, List[str]]] = []
+_PATTERNS: List[Tuple[str, List[str], int]] = []
 
-def _get_patterns() -> List[Tuple[str, List[str]]]:
+def _get_patterns() -> List[Tuple[str, List[str], int]]:
     global _PATTERNS
     if not _PATTERNS:
         _PATTERNS = _load_patterns()
@@ -57,17 +61,18 @@ def _get_patterns() -> List[Tuple[str, List[str]]]:
 
 # ── 감지 함수 ─────────────────────────────────────────────────────────────────
 
-def _match_recurring(title: str) -> Tuple[str, str]:
+def _match_recurring(title: str) -> Tuple[str, str, int]:
     """
     공고명에서 정기공고 패턴 매칭.
-    Returns: (recurring_flag, recurring_group) — ("Y", "스마트공장구축") or ("N", "")
+    Returns: (recurring_flag, recurring_group, priority)
+             — ("Y", "스마트공장구축", 1) or ("N", "", 0)
     """
     title_lower = title.lower()
-    for name, aliases in _get_patterns():
+    for name, aliases, priority in _get_patterns():
         for alias in aliases:
             if alias.lower() in title_lower:
-                return "Y", name
-    return "N", ""
+                return "Y", name, priority
+    return "N", "", 0
 
 
 def detect_recurring(notices: List[Notice]) -> Tuple[List[Notice], int]:
@@ -85,12 +90,15 @@ def detect_recurring(notices: List[Notice]) -> Tuple[List[Notice], int]:
 
     count = 0
     for notice in notices:
-        flag, group = _match_recurring(notice.title)
+        flag, group, priority = _match_recurring(notice.title)
         notice.recurring_flag  = flag
         notice.recurring_group = group
+        # recurring_priority: 1=핵심, 2=중간, 3=참고 (향후 시트/플랫폼에서 활용)
+        if hasattr(notice, '__dict__'):
+            notice.__dict__['recurring_priority'] = priority
         if flag == "Y":
             count += 1
-            log.debug("[recurring] 정기공고 감지: %s → %s", notice.title[:40], group)
+            log.debug("[recurring] 정기공고 감지: %s → %s (P%d)", notice.title[:40], group, priority)
 
     log.info("[recurring] 정기공고 감지 완료: %d/%d건", count, len(notices))
     return notices, count

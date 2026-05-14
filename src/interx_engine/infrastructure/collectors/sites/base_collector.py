@@ -78,6 +78,54 @@ def _extract_dates(text: str) -> List[str]:
     return normalized
 
 
+# ── 접수상태 자동 분류 (P4: bizinfo_datalist.py 대비 보강) ────────────────────────
+_APPLY_PERIOD_RE = re.compile(
+    r"(?:접수|신청|모집)\s*(?:기간|일정)\s*[:：]?\s*"
+    r"(\d{4}[-./]\d{1,2}[-./]\d{1,2})\s*[-~]\s*(\d{4}[-./]\d{1,2}[-./]\d{1,2})"
+)
+
+
+def classify_apply_status(text: str, deadline: str = "") -> str:
+    """
+    본문/메타에서 접수 기간을 파싱하여 접수상태 분류.
+    Returns: "접수중" | "접수예정" | "마감" | ""(판별불가)
+    """
+    from datetime import date, datetime
+
+    today = date.today()
+
+    # 1) 접수기간 패턴 매칭 (본문에서 시작~종료 날짜 추출)
+    m = _APPLY_PERIOD_RE.search(text)
+    if m:
+        try:
+            start_str = re.sub(r"[./]", "-", m.group(1))
+            end_str   = re.sub(r"[./]", "-", m.group(2))
+            start = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end   = datetime.strptime(end_str,   "%Y-%m-%d").date()
+            if today < start:
+                return "접수예정"
+            elif today <= end:
+                return "접수중"
+            else:
+                return "마감"
+        except (ValueError, IndexError):
+            pass
+
+    # 2) deadline 기반 판별 (접수기간 못 찾았을 때)
+    if deadline:
+        try:
+            dl = re.sub(r"[./]", "-", deadline)
+            dl_date = datetime.strptime(dl, "%Y-%m-%d").date()
+            if today > dl_date:
+                return "마감"
+            else:
+                return "접수중"  # 마감 전이면 접수중으로 추정
+        except (ValueError, IndexError):
+            pass
+
+    return ""
+
+
 def _notice_id(site_key: str, raw: str) -> str:
     return f"{site_key}-{hashlib.md5(raw.encode()).hexdigest()[:8]}"
 
@@ -357,6 +405,12 @@ class BaseCollector(NoticeCollectorPort, ABC):
                     notice.structured.update(data["structured"])
                 if data.get("attachment_items"):
                     notice.attachment_items = data["attachment_items"]
+
+                # P4: 접수상태 자동 분류
+                source_text = data.get("body_text", "") or notice.body_text or ""
+                apply_status = classify_apply_status(source_text, notice.deadline_date)
+                if apply_status and hasattr(notice, '__dict__'):
+                    notice.__dict__['apply_status'] = apply_status
 
                 time.sleep(random.uniform(0.3, 0.8))
             except Exception as e:

@@ -42,6 +42,21 @@ _SF_BOARDS = [
 ]
 
 _ID_RE = re.compile(r"[?&](?:bbsId|nttId|seq|idx|no)=([A-Za-z0-9_-]+)", re.I)
+_NTT_ID_RE = re.compile(r"[?&]nttId=([A-Za-z0-9_-]+)", re.I)
+
+
+def _sf_notice_id(detail_url: str) -> str:
+    """
+    스마트공장 전용 notice_id 생성.
+    URL에서 nttId 파라미터 추출 → 있으면 nttId 기반 ID (중복 방지 핵심).
+    없으면 기존 URL MD5 방식 fallback.
+    """
+    m = _NTT_ID_RE.search(detail_url)
+    if m:
+        return f"smart_factory-ntt{m.group(1)}"
+    # fallback: 기존 URL MD5
+    from interx_engine.infrastructure.collectors.sites.base_collector import _notice_id
+    return _notice_id("smart_factory", detail_url)
 
 # 게시판별 상세 URL 접두사
 _SF_DETAIL = {
@@ -83,7 +98,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
         notices.append(Notice(
             execution_id  = execution_id,
             site          = SmartFactoryCollector.site_key,
-            notice_id     = _notice_id(SmartFactoryCollector.site_key, detail),
+            notice_id     = _sf_notice_id(detail),
             title         = title,
             detail_url    = detail,
             notice_link   = detail,
@@ -114,7 +129,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
             notices.append(Notice(
                 execution_id  = execution_id,
                 site          = SmartFactoryCollector.site_key,
-                notice_id     = _notice_id(SmartFactoryCollector.site_key, detail),
+                notice_id     = _sf_notice_id(detail),
                 title         = title,
                 detail_url    = detail,
                 notice_link   = detail,
@@ -144,7 +159,7 @@ def _parse_sf_soup(soup: BeautifulSoup, execution_id: str,
             notices.append(Notice(
                 execution_id  = execution_id,
                 site          = SmartFactoryCollector.site_key,
-                notice_id     = _notice_id(SmartFactoryCollector.site_key, detail),
+                notice_id     = _sf_notice_id(detail),
                 title         = title,
                 detail_url    = detail,
                 notice_link   = detail,
@@ -271,9 +286,8 @@ class SmartFactoryCollector(PlaywrightBaseCollector):
                                     proper = f"{detail_base}?nttId={meta['rowKey']}"
                                     notice.detail_url  = proper
                                     notice.notice_link = proper
-                                # notice_id 재계산 (URL이 바뀌었을 수 있음)
-                                from interx_engine.infrastructure.collectors.sites.base_collector import _notice_id as _nid
-                                notice.notice_id = _nid(SmartFactoryCollector.site_key, notice.detail_url)
+                                # notice_id 재계산 (URL이 바뀌었을 수 있음) — nttId 기반
+                                notice.notice_id = _sf_notice_id(notice.detail_url)
 
                     except Exception as e:
                         log.error("[smart_factory] %s p%d 오류: %s",

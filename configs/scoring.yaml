@@ -21,7 +21,10 @@ thresholds:
   # ── 코어 키워드 최소 존재 여부 ─────────────────────────────────────────────
   min_core_keywords:   1
   # ── 감점/가점 배율 ──────────────────────────────────────────────────────────
-  neg_multiplier:      6.0
+  neg_multiplier:      6.0     # strong 기본값 (하위 호환)
+  neg_multiplier_strong:  6.0  # 바이오/의료/건설 — 완전 범위 외
+  neg_multiplier_medium:  4.0  # 교육/인력 — 일부 관련 가능
+  neg_multiplier_weak:    2.0  # 식품/농업 — 간접 관련 가능
   pos_multiplier:      5.0
   struct_bonus_factor: 1.5
   budget_bonus:        3.0
