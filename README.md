@@ -1,415 +1,860 @@
 # InterX Government Intelligence Engine
 
-정부지원사업 공고를 자동 수집·점수화·분류해 Google Sheets CRM에 업로드하는 파이프라인.
+정부지원사업 공고를 **자동 수집 → 필터링 → 점수화 → 등급 분류 → Google Sheets 업로드** 하는 풀파이프라인 엔진.
 
-## 실행
+---
+
+## 목차
+1. [한눈에 보기](#1-한눈에-보기)
+2. [빠른 실행](#2-빠른-실행)
+3. [아키텍처 — 3레이어 클린 구조](#3-아키텍처--3레이어-클린-구조)
+4. [디렉토리 구조](#4-디렉토리-구조)
+5. [파이프라인 17단계 상세](#5-파이프라인-17단계-상세)
+6. [수집 (Collector)](#6-수집-collector)
+7. [스코어링 알고리즘](#7-스코어링-알고리즘)
+8. [정기공고 탐지](#8-정기공고-탐지)
+9. [L3 강공고 정책](#9-l3-강공고-정책)
+10. [수주 예측 (Win Prediction)](#10-수주-예측-win-prediction)
+11. [담당자 자동 배정 & BD 마일스톤](#11-담당자-자동-배정--bd-마일스톤)
+12. [설정 파일 (configs/)](#12-설정-파일-configs)
+13. [Google Sheets 9시트 구조](#13-google-sheets-9시트-구조)
+14. [새 컬렉터 추가 방법](#14-새-컬렉터-추가-방법)
+15. [테스트](#15-테스트)
+16. [핵심 원칙](#16-핵심-원칙)
+
+---
+
+## 1. 한눈에 보기
+
+```
+20개+ 정부사이트
+  └─ 병렬 크롤링 (requests / Playwright)
+      └─ 3겹 필터 (기본 → L3 → 키워드)
+          └─ 스코어링 (fitness → priority → grade A/B/C/D)
+              └─ 부가 분석 (정기공고 탐지 / win_probability / 클러스터링)
+                  └─ Google Sheets 9시트 자동 업로드
+                      └─ Slack/Telegram 알림
+```
+
+| 항목 | 수치 |
+|------|------|
+| 수집 사이트 | 20개+ (requests 18개, Playwright 2개) |
+| 파이프라인 단계 | 17단계 |
+| 정기공고 패턴 | recurring.yaml에 정의된 반복 사업 패턴 |
+| 등급 | A / B / C / D |
+| Sheets 시트 수 | 9개 |
+| 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
+
+---
+
+## 2. 빠른 실행
 
 ```bash
-# 전체 파이프라인 (기본)
+# 기본 실행 (수집 → 스코어링 → Sheets 업로드)
 venv/Scripts/python run_engine.py
 
-# 옵션
-venv/Scripts/python run_engine.py --full          # 클러스터링·파트너매칭·알림 포함
-venv/Scripts/python run_engine.py --dry-run       # Mock 데이터로 테스트
-venv/Scripts/python run_engine.py --no-sheets     # Sheets 업로드 없이 실행
-venv/Scripts/python run_engine.py --no-alert      # 알림 비활성화
-venv/Scripts/python run_engine.py --no-detail     # 상세 페이지 방문 생략 (빠른 실행)
-venv/Scripts/python run_engine.py --sites bizinfo,bipa,kiat  # 특정 사이트만
+# 전체 실행 (클러스터링·파트너매칭·알림 포함)
+venv/Scripts/python run_engine.py --full
+
+# 개발/테스트용
+venv/Scripts/python run_engine.py --dry-run        # Mock 데이터로 실행
+venv/Scripts/python run_engine.py --no-sheets      # Sheets 업로드 생략
+venv/Scripts/python run_engine.py --no-alert       # 알림 생략
+venv/Scripts/python run_engine.py --no-detail      # 상세 페이지 방문 생략 (빠름)
+venv/Scripts/python run_engine.py --sites bizinfo,kiat,nipa  # 특정 사이트만
 
 # 테스트
 venv/Scripts/python -m pytest tests/unit/ -v --tb=short
 venv/Scripts/python -m pytest tests/ -v
 
-# 대시보드
+# 대시보드 UI
 streamlit run src/interx_engine/interfaces/dashboard/app.py
 ```
 
-## 디렉토리 구조
+**Playwright 사이트 초기 설정 (kiat, dicia, smart_factory)**
+```bash
+venv/Scripts/python -m playwright install chromium
+```
+
+---
+
+## 3. 아키텍처 — 3레이어 클린 구조
+
+```
+┌──────────────────────────────────────────┐
+│  core/                                    │  ← 도메인 순수 로직, 외부 의존성 없음
+│    entities/  notice, score_card, ...     │
+│    rules/     scoring_policy, l3_policy   │
+└───────────────┬──────────────────────────┘
+                │ 의존 방향 (단방향)
+┌───────────────▼──────────────────────────┐
+│  application/                             │  ← 유스케이스 & 오케스트레이터
+│    use_cases/ score, dedupe, cluster ...  │
+│    ports/     (인터페이스 정의)            │
+│    mappers/   notice_mapper, kpi_mapper   │
+│    orchestrators/ daily_pipeline          │
+└───────────────┬──────────────────────────┘
+                │
+┌───────────────▼──────────────────────────┐
+│  infrastructure/                          │  ← 실제 외부 구현체
+│    collectors/   requests / Playwright    │
+│    sheets/        Google Sheets API       │
+│    alert/         Slack / Telegram        │
+│    clustering/    TF-IDF / Embedding      │
+│    persistence/   SQLite                  │
+└──────────────────────────────────────────┘
+```
+
+**규칙**: 의존 방향은 항상 `infrastructure → application → core`. 역방향 금지.
+
+---
+
+## 4. 디렉토리 구조
 
 ```
 interx_gov_intelligence/
-├── run_engine.py                        # 단일 진입점
-├── configs/
-│   ├── settings.yaml                    # 전역 설정 (페이지수, 타임아웃 등)
-│   ├── scoring.yaml                     # 점수 가중치 및 등급 기준
-│   ├── sites.yaml                       # 수집 대상 사이트 목록 (enabled 플래그)
-│   ├── sheets.yaml                      # Google Sheets 컬럼 매핑
-│   ├── manager_rules.yaml               # 담당자 자동 배정 규칙
-│   └── competitors.yaml                 # 경쟁사 추적 대상
+├── run_engine.py                          # 단일 진입점 (CLI 파싱 → 오케스트레이터 호출)
+├── configs/                               # 모든 설정값 YAML (코드에 하드코딩 금지)
+│   ├── scoring.yaml                       # 점수 가중치, 등급 컷, 키워드 전체
+│   ├── sites.yaml                         # 수집 사이트 목록 (enabled 플래그)
+│   ├── recurring.yaml                     # 정기공고 패턴 (name + aliases)
+│   ├── manager_rules.yaml                 # 담당자 자동 배정 규칙
+│   ├── sheets.yaml                        # Google Sheets 시트명·컬럼 매핑
+│   ├── settings.yaml                      # 타임아웃·페이지수 등 전역 설정
+│   └── competitors.yaml                   # 경쟁사 추적 키워드
 │
 └── src/interx_engine/
-    ├── core/                            # 도메인 (외부 의존성 없음)
+    ├── core/                              # ← 외부 의존성 없는 순수 도메인
     │   ├── entities/
-    │   │   ├── notice.py                # 공고 엔티티
-    │   │   ├── score_card.py            # 채점 결과
-    │   │   ├── partner.py               # 파트너사
-    │   │   ├── recommendation.py        # BD 추천 액션
-    │   │   ├── cluster.py               # 공고 클러스터
-    │   │   ├── prediction_result.py     # 수주 예측 결과
-    │   │   ├── analysis_report.py       # 포트폴리오 분석 리포트
-    │   │   └── attachment.py            # 첨부파일
+    │   │   ├── notice.py                  # 공고 엔티티 (데이터 컨테이너)
+    │   │   ├── score_card.py              # 채점 결과 (fitness, grade, solutions)
+    │   │   ├── prediction_result.py       # 수주 예측 결과
+    │   │   ├── cluster.py                 # 공고 클러스터 그룹
+    │   │   ├── partner.py                 # 파트너사
+    │   │   ├── recommendation.py          # BD 추천 액션
+    │   │   ├── analysis_report.py         # 포트폴리오 분석 리포트
+    │   │   └── attachment.py              # 첨부파일 메타
     │   └── rules/
-    │       ├── priority_scoring_policy.py  # 점수 계산 핵심 로직
-    │       ├── l3_strong_policy.py         # L3 강공고 필터
-    │       └── recommendation_rules.py     # BD 액션 추천 규칙
+    │       ├── priority_scoring_policy.py # ★ 핵심 스코어링 로직 전체
+    │       ├── l3_strong_policy.py        # L3 강공고 키워드 사전 필터
+    │       └── recommendation_rules.py    # BD 액션 추천 규칙
     │
-    ├── application/                     # Use Cases & Orchestrators
-    │   ├── ports/
+    ├── application/                       # ← 유스케이스 (비즈니스 흐름)
+    │   ├── ports/                         # 인터페이스(추상) 정의
     │   │   ├── notice_collector_port.py
     │   │   ├── sheet_gateway_port.py
     │   │   ├── alert_gateway_port.py
     │   │   └── partner_repository_port.py
-    │   ├── use_cases/
-    │   │   ├── score_notices.py         # 스코어링
-    │   │   ├── deduplicate_notices.py   # TF-IDF 중복 제거
-    │   │   ├── detect_changes.py        # 공고 변경 감지
-    │   │   ├── assign_manager.py        # 담당자 자동 배정
-    │   │   ├── assign_milestone.py      # BD 마일스톤 배정
-    │   │   ├── track_competitors.py     # 경쟁사 트래킹
-    │   │   ├── match_partners.py        # 파트너사 매칭
-    │   │   ├── recommend_notices.py     # BD 추천 생성
-    │   │   ├── cluster_notices.py       # 공고 클러스터링
-    │   │   ├── alert_notices.py         # 알림 발송
-    │   │   ├── site_quality_grader.py   # 사이트 품질 등급
-    │   │   ├── deep_parsing.py          # 첨부파일 정밀 파싱 (PDF/HWP)
-    │   │   ├── portfolio_analysis.py    # 포트폴리오 분석
-    │   │   ├── win_prediction.py        # 수주 가능성 예측 (ML)
-    │   │   ├── generate_proposal.py     # 제안서 초안 자동 생성
-    │   │   ├── export_training_data.py  # ML 학습데이터 JSONL 저장
-    │   │   ├── summarize_l3.py          # L3 공고 Claude API 요약
-    │   │   ├── auto_analysis.py         # 비지도학습 자동 분석
-    │   │   ├── download_attachments.py  # 첨부파일 다운로드
-    │   │   └── log_pipeline_run.py      # 파이프라인 실행 로그
+    │   ├── use_cases/                     # 단일 책임 유스케이스
+    │   │   ├── score_notices.py           # 스코어링 실행
+    │   │   ├── deduplicate_notices.py     # TF-IDF 유사도 중복 제거
+    │   │   ├── detect_recurring.py        # 정기공고 패턴 매칭
+    │   │   ├── detect_changes.py          # 공고 변경 감지 (제목/예산/마감일)
+    │   │   ├── assign_manager.py          # 담당자 자동 배정
+    │   │   ├── assign_milestone.py        # BD 마일스톤 배정 (M01/M05/P01)
+    │   │   ├── track_competitors.py       # 경쟁사 공고 감지
+    │   │   ├── match_partners.py          # 파트너사 공고 매칭
+    │   │   ├── recommend_notices.py       # BD 추천 액션 생성
+    │   │   ├── cluster_notices.py         # 공고 클러스터링
+    │   │   ├── alert_notices.py           # 알림 발송 (Slack/Telegram)
+    │   │   ├── site_quality_grader.py     # 사이트 수집 품질 A~D 등급
+    │   │   ├── deep_parsing.py            # 첨부파일(PDF/HWP) 정밀 파싱
+    │   │   ├── portfolio_analysis.py      # pandas 기반 포트폴리오 분석
+    │   │   ├── win_prediction.py          # ★ 수주 가능성 예측 (룰/ML)
+    │   │   ├── generate_proposal.py       # 제안서 초안 Word .docx 자동 생성
+    │   │   ├── export_training_data.py    # ML 학습데이터 JSONL 저장
+    │   │   ├── summarize_l3.py            # L3 공고 Claude API 요약
+    │   │   ├── auto_analysis.py           # 비지도학습 자동 분석 (9패널 PNG)
+    │   │   ├── download_attachments.py    # 첨부파일 다운로드
+    │   │   └── log_pipeline_run.py        # 파이프라인 실행 로그
     │   ├── mappers/
-    │   │   ├── notice_mapper.py         # Notice → Sheets 행 변환
-    │   │   ├── kpi_mapper.py            # KPI/통계/로그 행 빌더
-    │   │   └── attachment_mapper.py     # 첨부파일 행 변환
+    │   │   ├── notice_mapper.py           # Notice+ScoreCard → Sheets 행 딕셔너리
+    │   │   ├── kpi_mapper.py              # 실행 통계 행 빌더
+    │   │   └── attachment_mapper.py       # 첨부파일 행 변환
     │   └── orchestrators/
-    │       ├── daily_pipeline.py        # 수집→스코어링→업로드 전체 흐름
-    │       └── full_pipeline.py         # daily + 클러스터링·파트너매칭·알림
+    │       ├── daily_pipeline.py          # ★ 수집→스코어링→업로드 전체 흐름
+    │       └── full_pipeline.py           # daily + 클러스터링·파트너매칭·알림
     │
-    ├── infrastructure/                  # 외부 구현체
-    │   ├── config/
-    │   │   └── settings_loader.py       # 설정 싱글턴
+    ├── infrastructure/                    # ← 외부 시스템 구현체
     │   ├── collectors/
-    │   │   ├── collector_factory.py     # 사이트별 콜렉터 팩토리
-    │   │   ├── html_utils.py            # HTML 파싱 공통 유틸
+    │   │   ├── collector_factory.py       # 사이트코드 → 콜렉터 인스턴스 팩토리
+    │   │   ├── html_utils.py              # HTML 파싱 공통 유틸
     │   │   └── sites/
-    │   │       ├── base_collector.py    # BaseCollector / PlaywrightBaseCollector
-    │   │       ├── bizinfo_collector.py # 기업마당
-    │   │       ├── iris_collector.py    # IRIS (국가과학기술지식정보서비스)
-    │   │       ├── kiat_collector.py    # 한국산업기술진흥원
-    │   │       ├── smba_collector.py    # 중소벤처기업부
-    │   │       ├── nipa_collector.py    # 정보통신산업진흥원
-    │   │       ├── innopolis_collector.py  # 연구개발특구진흥재단
-    │   │       ├── bipa_collector.py    # 부산정보산업진흥원
-    │   │       ├── uipa_collector.py    # 울산정보산업진흥원
-    │   │       ├── gicon_collector.py   # 광주정보문화산업진흥원
-    │   │       ├── ttp_collector.py     # 대전테크노파크
-    │   │       ├── dicia_collector.py   # 한국첨단의료산업진흥재단
-    │   │       ├── gjtp_collector.py    # 광주테크노파크
-    │   │       ├── gbtp_collector.py    # 경북테크노파크
-    │   │       ├── jntp_collector.py    # 전남테크노파크
-    │   │       ├── jbtp_collector.py    # 전북테크노파크
-    │   │       ├── jejutp_collector.py  # 제주테크노파크
-    │   │       ├── new_collectors.py    # NRF·KISED·KETEP·KOIIA
-    │   │       ├── ntis_collector.py    # NTIS (스캐폴드)
-    │   │       └── mock_notice_collector.py  # 테스트용 Mock
+    │   │       ├── base_collector.py      # BaseCollector / PlaywrightBaseCollector 추상
+    │   │       ├── bizinfo_collector.py   # 기업마당 (Playwright)
+    │   │       ├── kiat_collector.py      # 한국산업기술진흥원 (Playwright)
+    │   │       ├── nipa_collector.py      # 정보통신산업진흥원
+    │   │       ├── innopolis_collector.py # 연구개발특구진흥재단
+    │   │       ├── smart_factory_collector.py # 스마트제조혁신추진단 (Playwright)
+    │   │       ├── bipa_collector.py      # 부산정보산업진흥원
+    │   │       ├── uipa_collector.py      # 울산정보산업진흥원
+    │   │       ├── gicon_collector.py     # 광주전남연구원
+    │   │       ├── ttp_collector.py       # 대전테크노파크
+    │   │       ├── dicia_collector.py     # 의료기기산업협회 (Playwright)
+    │   │       ├── gjtp_collector.py      # 광주테크노파크
+    │   │       ├── new_collectors.py      # NRF·KISED·KETEP·KOIIA (멀티)
+    │   │       ├── multi_site_collectors.py # 추가 테크노파크 묶음
+    │   │       └── mock_notice_collector.py # 테스트용 Mock
     │   ├── sheets/
-    │   │   ├── google_sheet_gateway.py  # 실제 Google Sheets 연동
-    │   │   └── console_sheet_gateway.py # 콘솔 Fallback
-    │   ├── persistence/
-    │   │   └── sqlite_writer.py         # SQLite 영속성
+    │   │   ├── google_sheet_gateway.py    # 실제 Google Sheets API 연동
+    │   │   └── console_sheet_gateway.py   # 로컬 개발용 콘솔 Fallback
     │   ├── alert/
-    │   │   ├── telegram_gateway.py      # Telegram 알림
-    │   │   └── slack_gateway.py         # Slack 알림
+    │   │   ├── slack_gateway.py           # Slack Webhook 알림
+    │   │   └── telegram_gateway.py        # Telegram Bot 알림
     │   ├── clustering/
-    │   │   ├── tfidf_clusterer.py       # TF-IDF 클러스터링
-    │   │   └── embedding_clusterer.py   # Sentence-Transformers 클러스터링
-    │   ├── matching/
-    │   │   └── csv_partner_repository.py  # CSV 파트너 저장소
-    │   ├── storage/
-    │   │   ├── csv_writer.py            # CSV Fallback 저장
-    │   │   └── file_downloader.py       # 첨부파일 다운로더
+    │   │   ├── tfidf_clusterer.py         # TF-IDF + cosine 클러스터링 (기본)
+    │   │   └── embedding_clusterer.py     # Sentence-Transformers 임베딩 (선택)
+    │   ├── persistence/
+    │   │   └── sqlite_writer.py           # SQLite 영속성 (data/interx.db)
     │   ├── analysis/
-    │   │   ├── pandas_analyzer.py       # pandas 분석
-    │   │   └── sklearn_clusterer.py     # sklearn 클러스터링
+    │   │   ├── pandas_analyzer.py         # pandas 통계 분석
+    │   │   └── sklearn_clusterer.py       # sklearn PCA·KMeans·IsoForest
+    │   ├── storage/
+    │   │   ├── csv_writer.py              # CSV Fallback 저장
+    │   │   └── file_downloader.py         # 첨부파일 다운로더
+    │   ├── matching/
+    │   │   └── csv_partner_repository.py  # CSV 기반 파트너 저장소
+    │   ├── config/
+    │   │   ├── settings_loader.py         # 설정 싱글턴 (settings.yaml)
+    │   │   └── yaml_loader.py             # YAML 로딩 유틸
     │   └── utils/
-    │       ├── budget_parser.py         # 예산 문자열 정규화
-    │       └── morpheme_scorer.py       # 형태소 점수 계산
+    │       ├── budget_parser.py           # 예산 문자열 정규화 ("2억원" → 200000000)
+    │       └── morpheme_scorer.py         # 형태소 기반 점수 계산
     │
     └── interfaces/
         └── dashboard/
-            └── app.py                   # Streamlit 대시보드
-
-tests/
-├── unit/                                # 엔티티·매퍼·정책 단위 테스트
-└── integration/                         # 파이프라인 dry-run, settings 검증
+            └── app.py                     # Streamlit 대시보드 UI
 ```
-
-## 실행 결과 스크린샷
-
-### 파이프라인 자동 분석 대시보드
-> 파이프라인 실행마다 자동 생성 (`data/analysis/`) — 등급 분포, PCA 클러스터, 키워드 빈도, 이상치 탐지 등
-
-![파이프라인 대시보드](docs/screenshots/pipeline_dashboard.png)
-
-### 수주 가능성 예측 (Win Prediction)
-> 공고별 수주 확률 + 피처별 기여도 시각화 (rule_v1 기반, sklearn ML 모델 학습 시 자동 전환)
-
-![수주 예측 결과](docs/screenshots/win_prediction.png)
 
 ---
 
-## 파이프라인 구동 흐름
+## 5. 파이프라인 17단계 상세
 
-`run_engine.py` → `DailyPipelineOrchestrator.run()` 순서로 아래 17단계가 순차 실행됩니다.
+`run_engine.py` → `DailyPipelineOrchestrator.run()` 순으로 아래 17단계 실행.
 
 ```
 [1]  수집 (Collect)
-     └─ 20개+ 사이트 콜렉터를 ThreadPoolExecutor로 병렬 실행
-        각 콜렉터는 목록 페이지 → 상세 페이지 2단계 수집
+     └─ sites.yaml의 enabled: true 사이트를 ThreadPoolExecutor로 병렬 크롤링
+        각 콜렉터: 목록 페이지 순회 → 상세 페이지 방문 → Notice 객체 생성
 
 [2]  notice_id 중복 제거
-     └─ site + URL MD5 해시로 생성된 notice_id 기준 중복 제거
+     └─ notice_id = site_code + URL MD5(8자리)
+        동일 notice_id는 수집 즉시 제거 (같은 실행 내 중복)
 
 [2B] SQLite 기존 공고 필터
-     └─ 30일 내 이미 수집된 공고는 is_new=False 마킹
+     └─ data/interx.db 에 30일 내 동일 notice_id 존재 시 is_new=False 마킹
+        (완전 제거 아님 — 변경 감지를 위해 유지)
 
 [3]  마감 지난 공고 제거
-     └─ deadline_date < 오늘 인 공고 자동 제거
+     └─ deadline_date < 오늘 → 자동 제거
 
 [4]  스코어링 (Scoring)
-     └─ 가점/감점 키워드 + 솔루션별 점수 → fitness·priority·grade 계산
+     └─ PriorityScoringPolicy.calculate(notice) → ScoreCard
+        코어 키워드 체크 → 가점/감점 계산 → 솔루션별 점수 → grade A/B/C/D
 
 [5]  TF-IDF 중복 제거
-     └─ 제목 코사인 유사도 0.85 이상이면 중복으로 판단, 점수 낮은 것 제거
+     └─ 공고 제목 TF-IDF 벡터화 → cosine 유사도 0.85 이상 쌍 감지
+        점수 낮은 쪽 제거 (TfidfClusterer)
 
 [6]  변경 감지 (Change Detection)
-     └─ 이전 실행 대비 제목·예산·마감일 변경 여부 감지
+     └─ 이전 실행 대비 제목·예산·마감일 변경 시 notice.is_changed = True
 
 [7]  담당자 자동 배정
-     └─ manager_rules.yaml 키워드 매칭으로 담당자 자동 배정
+     └─ manager_rules.yaml 키워드 + ministry 매칭 → notice.manager 배정
+        매칭 실패 시 "미배정"
 
 [7B] BD 마일스톤 자동 배정
-     └─ 등급·D-Day 기준으로 BD 단계(Qualify/Proposal/Submit) 배정
+     └─ L3강공고=Y + D-day 기준으로 M01/M05/P01 자동 배정
 
 [8]  경쟁사 트래킹
-     └─ competitors.yaml에 등록된 경쟁사 공고 감지 및 플래그
+     └─ competitors.yaml 키워드 포함 공고 → notice.competitor_flag = True
 
 [9]  사이트별 품질 등급
-     └─ 수집 성공률·점수 분포로 사이트 데이터 품질 A~D 등급
+     └─ 수집 성공률·A/B 비율로 사이트별 데이터 품질 A~D 등급 산출
 
 [10] 행 빌드 (Row Build)
-     └─ Notice + ScoreCard → Google Sheets 업로드용 딕셔너리 변환
+     └─ NoticeMapper: Notice + ScoreCard → Google Sheets 업로드용 딕셔너리
+        KpiMapper: 실행 통계 행 생성
 
 [11] 부가 분석 (병렬 처리)
-     ├─ DeepParsing   : 첨부파일(PDF/HWP) 정밀 파싱 → 예산·KPI 추출
-     ├─ L3 AI 요약    : Claude API로 L3 강공고 자동 요약 (API Key 필요)
-     ├─ 포트폴리오 분석: pandas 기반 등급 분포·키워드 트렌드 리포트
-     ├─ 수주 예측     : rule_v1 가중합 or sklearn ML 모델
-     └─ 제안서 생성   : A/B 등급 공고 Word .docx 초안 자동 생성
+     ├─ 정기공고 탐지:    recurring.yaml 패턴 매칭 → recurring_flag/group 설정
+     ├─ DeepParsing:      첨부파일(PDF/HWP) 본문 추가 파싱 → 예산·KPI 보강
+     ├─ L3 AI 요약:       Claude API로 L3 강공고 자동 요약 (ANTHROPIC_API_KEY 필요)
+     ├─ 포트폴리오 분석:   pandas 기반 등급 분포·키워드 트렌드 리포트
+     ├─ 수주 예측:         rule_v1 가중합 or sklearn ML 모델 자동 선택
+     └─ 제안서 생성:       A/B등급 공고 Word .docx 초안 자동 생성
 
 [12] KPI / 실행 로그 빌드
-     └─ 실행 통계(수집수·등급분포·소요시간 등) 행 생성
+     └─ 수집수·등급분포·소요시간 등 통계 행 생성
 
 [13] 학습 데이터 자동 Export
-     └─ C/D 등급 포함 전체 공고를 JSONL로 data/exports/training/ 저장
+     └─ 전체 공고(C/D 포함)를 JSONL로 data/exports/training/ 저장
+        → 향후 Win Prediction ML 학습 데이터 누적
 
 [14] Google Sheets 업로드
-     └─ 7개 시트에 분산 저장 (마스터·L3·긴급·KPI·통계·로그·에러)
+     └─ 9개 시트에 분산 저장 (상세는 섹션 13 참조)
 
 [15] SQLite 저장
      └─ data/interx.db 에 실행 결과 영속화
 
-[16] 알림 발송
-     └─ L3 강공고 즉시 알림 + 일별 요약 (Telegram 또는 Slack)
+[16] 알림 발송 (--full 옵션 시)
+     └─ L3 강공고 즉시 알림 + 일별 요약 (Slack 또는 Telegram)
 
 [17] 자동 비지도학습 분석 + PNG 생성
-     └─ PCA 클러스터·이상치 탐지·키워드 빈도 등 9패널 차트 자동 저장
-        → data/analysis/dashboard_EXEC-YYYYMMDD-HHMMSS.png
+     └─ PCA·KMeans·IsolationForest → 9패널 차트 PNG 자동 저장
+        data/analysis/dashboard_EXEC-YYYYMMDD-HHMMSS.png
 ```
 
 ---
 
-## HTML 파싱 방식
+## 6. 수집 (Collector)
 
-수집은 **2단계 파싱**으로 이루어집니다.
+### 6-1. 사이트별 수집 방식
 
-### 1단계 — 목록 페이지 파싱 (`_parse_page`)
+| 사이트 코드 | 기관명 | 수집 방식 | 비고 |
+|------------|--------|----------|------|
+| `bizinfo` | 기업마당 | Playwright | JS 렌더링 필수 |
+| `kiat` | 한국산업기술진흥원 | Playwright | Vue.js SPA |
+| `nipa` | 정보통신산업진흥원 | requests | |
+| `innopolis` | 연구개발특구진흥재단 | requests | |
+| `smart_factory` | 스마트제조혁신추진단 | Playwright | React SPA, 공고번호 기반 중복키 |
+| `bipa` | 부산정보산업진흥원 | requests | |
+| `uipa` | 울산정보산업진흥원 | requests | |
+| `gicon` | 광주전남연구원 | requests | |
+| `ttp` | 대전테크노파크 | requests | |
+| `dicia` | 의료기기산업협회 | Playwright | |
+| `gjtp` | 광주테크노파크 | requests | |
+| `NRF` | 한국연구재단 | requests | new_collectors.py |
+| `KISED` | 창업진흥원 | requests | new_collectors.py |
+| `KETEP` | 에너지기술평가원 | requests | new_collectors.py |
+| `iris` | IRIS | requests | 로그인 필수로 현재 비활성 |
+| `smba` | 중소벤처기업부 | requests | 서버 차단으로 현재 비활성 |
+| `gbtp` | 경북테크노파크 | — | Colab IP 차단으로 비활성 |
 
-각 사이트 콜렉터가 상속하는 `BaseCollector`가 페이지를 순회하며 공고를 수집합니다.
-
-```
-목록 URL 요청 (requests + Retry 어댑터)
-    └─ JS 렌더링 필요 사이트 (bizinfo, kiat, dicia)
-       → PlaywrightBaseCollector: headless Chromium으로 렌더링 후 파싱
-    └─ 일반 사이트
-       → requests.get → BeautifulSoup lxml 파싱
-
-각 <tr> 또는 <li> 행에서:
-  ├─ <a href> → 공고 제목 + 상세 URL 추출
-  ├─ 날짜 패턴 정규식 → 게시일·마감일 추출
-  └─ notice_id = site_key + URL MD5 해시(8자리)
-
-중복 감지: seen_ids set으로 동일 페이지 내 중복 제거
-빈 페이지 감지: 공고 0건이면 마지막 페이지로 판단 → 순회 중단
-페이지 간 딜레이: random.uniform(0.5, 1.2)초 (서버 부하 방지)
-```
-
-### 2단계 — 상세 페이지 보강 (`_enrich_notices`)
-
-목록에서 수집한 공고의 상세 URL을 재방문해 본문·예산·첨부파일을 추가합니다.
+### 6-2. 2단계 수집 흐름
 
 ```
-상세 URL 방문 (ThreadPoolExecutor, 최대 3 워커 병렬)
-    └─ BeautifulSoup → script/style/nav/header/footer 태그 제거
-    └─ GNB/LNB/SNB div 네비게이션 제거 (메뉴 텍스트 오염 방지)
+1단계 — 목록 페이지 (_parse_page)
+  목록 URL 순회 (pageIndex=1, 2, 3 ...)
+    └─ requests: GET → BeautifulSoup lxml 파싱
+    └─ Playwright: headless Chromium 렌더링 후 innerHTML 파싱
 
-본문 텍스트 정제
-  └─ get_text(" ", strip=True) → 연속 공백 제거 → 최대 8,000자 저장
+  각 행(tr/li)에서 추출:
+    - 공고명 + 상세 URL (<a href>)
+    - 날짜 (정규식: \d{4}[-./]\d{1,2}[-./]\d{1,2})
+    - notice_id = site_code + URL MD5(8자리)
 
-예산 추출 (정규식 우선순위 순)
-  1. "지원금액 : N억원"
-  2. "총 사업비 : N백만원"
-  3. "과제당 : N억원"
-  4. "최대 N억원"
-  5. "N억원 이내/내외/규모"
+  종료 조건: 공고 0건 페이지 감지 시 순회 중단
+  딜레이: random.uniform(0.5, 1.2)초
 
-구조화 섹션 추출
-  └─ 사업목적 / 지원내용 / 지원대상 / 지원금액 / 신청방법 / 추진일정
-     각 섹션 헤더 키워드 탐지 → 다음 섹션까지 최대 300자 저장
+2단계 — 상세 페이지 보강 (_enrich_notices)
+  ThreadPoolExecutor (최대 3 워커) 병렬 방문
 
-첨부파일 추출
-  └─ <a href> 중 .pdf/.hwp/.docx/.xlsx 확장자 또는
-     download/fileDown/atchFile 패턴 URL → {name, url} 목록 수집
+  각 상세 URL에서 추출:
+    ① 본문 (body_text)
+       BeautifulSoup → script/style/nav/header/footer 제거
+       GNB/LNB/SNB div 메뉴 텍스트 오염 방지
+       get_text(" ") → 연속 공백 제거 → 최대 8,000자
 
-방문 간 딜레이: random.uniform(0.3, 0.8)초
+    ② 예산 (budget) — 우선순위 정규식:
+       1. "지원금액 : N억원"
+       2. "총 사업비 : N백만원"
+       3. "과제당 : N억원"
+       4. "최대 N억원"
+       5. "N억원 이내/내외/규모"
+
+    ③ 구조화 섹션 (structured)
+       사업목적 / 지원내용 / 지원대상 / 지원금액 / 신청방법 / 추진일정
+       섹션 헤더 키워드 탐지 → 다음 섹션까지 최대 300자
+
+    ④ 첨부파일 (attachments)
+       .pdf/.hwp/.hwpx/.docx/.xlsx 확장자 URL
+       download/fileDown/atchFile 패턴 URL
+       → {name, url} 목록
+
+  딜레이: random.uniform(0.3, 0.8)초
+```
+
+### 6-3. BaseCollector 핵심 속성
+
+```python
+class BaseCollector(ABC):
+    site_key: str          # 사이트 코드 (예: "bizinfo")
+    site_name: str         # 기관명 (예: "기업마당")
+    list_url: str          # 목록 페이지 URL 템플릿
+    max_pages: int         # 최대 수집 페이지 수 (settings.yaml)
+    execution_id: str      # 파이프라인 실행 ID (EXEC-YYYYMMDD-HHMMSS)
+
+    @abstractmethod
+    def _parse_page(self, page: int) -> List[Notice]: ...
+
+    def collect(self) -> List[Notice]:
+        # 목록 수집 → 상세 보강 → 반환
 ```
 
 ---
 
-## 스코어링 알고리즘
+## 7. 스코어링 알고리즘
 
 `PriorityScoringPolicy.calculate(notice)` → `ScoreCard` 반환
 
-### 점수 계산 구조
-
-```
-scored_text = 제목 + 요약 + 사업목적 + 지원내용   (body_text 제외 — 오염 방지)
-full_text   = scored_text + body_text              (코어 키워드 체크에만 사용)
-
-1. 코어 키워드 존재 여부 (full_text 기준)
-   └─ {제조, 스마트공장, AI, 데이터, 실증 ...} 중 하나라도 없으면 fitness=0
-
-2. 가점 계산 (scored_text 기준)
-   └─ POSITIVE_KEYWORDS 딕셔너리 순회
-      예: "스마트공장"=5, "AI"=3, "데이터"=2 ...
-      구조화 섹션(사업목적/지원내용)에서 히트 시 ×1.5 보너스
-      예산 정보 존재 시 +3.0 보너스
-
-3. 감점 계산 (scored_text 기준)
-   └─ NEGATIVE_KEYWORDS 딕셔너리 순회
-      예: "수요기업"=12, "일자리"=7, "세미나"=7, "소상공인"=6 ...
-      → 비제조·비조달 공고 필터링
-
-4. 적합도 (fitness) = pos_score×5 - neg_score×6 + struct_bonus
-   범위: 0.0 ~ 100.0
-
-5. 솔루션별 점수 (7개 솔루션)
-   ManufacturingDT / RecipeAI / QualityAI / InspectionAI
-   SafetyAI / GenAI / InfraDS / PdM
-   └─ 각 솔루션 키워드 합산 × scale(15) → 0~100점
-
-6. 산업 점수 (industry_score) = 비0점 솔루션 평균
-
-7. 우선순위 (priority) = fitness×0.6 + industry_score×0.4
-   └─ fitness=0이면 priority 강제 0 (industry 기여 차단)
-
-8. 등급 (grade)
-   A : priority ≥ 55   (최우선 영업 대상)
-   B : priority ≥ 40   (검토 대상)
-   C : priority ≥ 25   (모니터링)
-   D : priority <  25   (해당 없음)
-
-9. 제목 블랙리스트 강제 D
-   └─ 제목에 "수요기업", "육성과정", "시찰단" 포함 시
-      fitness=0, priority=0, grade=D 강제 설정
-
-10. L3 강공고 판정
-    └─ fitness ≥ 35 AND 제목에 L3 핵심 키워드 존재
-       (스마트공장/제조AI/디지털트윈/머신비전/예지보전 등)
-       → notice.l3_strong = "Y" → 즉시 Telegram/Slack 알림 대상
-```
-
-### 추천 솔루션 자동 매핑
-
-```
-sol_scores 상위 3개 솔루션 이름을 " / " 로 연결
-예: "ManufacturingDT / QualityAI / GenAI"
-    → Google Sheets 01_영업기회_정보 시트의 "추천솔루션" 컬럼에 자동 기재
-```
-
----
-
-## 수주 예측 (Win Prediction)
-
-### rule_v1 — 즉시 사용 가능 (외부 패키지 불필요)
+### 7-1. 스코어링 대상 텍스트
 
 ```python
-score = (
-    fitness_score  × 0.350   # 적합도 (가장 중요)
-  + priority_score × 0.195   # 우선순위 점수
-  + l3_flag        × 0.100   # L3 강공고 여부
-  + budget_억      × 0.045   # 예산 규모 (억원 단위)
-  + dday_urgency   × 0.030   # D-Day 긴급도
-  + industry_score × 0.023   # 솔루션 산업 점수
-) / 정규화 → 0~100%
-
-등급: A≥60% / B≥40% / C≥20% / D<20%
+scored_text = 제목 + 요약 + 사업목적 + 지원내용   # 가점/감점 계산에 사용
+full_text   = scored_text + body_text              # 코어 키워드 체크에만 사용
 ```
 
-### sklearn ML 모드 — 데이터 누적 후 자동 전환
+> **body_text를 scored_text에 포함하지 않는 이유**: 공고 본문에는 관련 없는 법령·안내문이 섞여 오염을 유발하기 때문.
+
+### 7-2. 점수 계산 단계
 
 ```
-파이프라인 실행마다:
-  data/exports/training/EXEC-YYYYMMDD-HHMMSS.jsonl 에 공고 데이터 자동 누적
+Step 1. 코어 키워드 존재 확인 (full_text 기준)
+        CORE_KEYWORDS = {제조, 스마트공장, AI, 데이터, 공정, 설비, 자동화, ...}
+        → 최소 1개 이상 없으면 fitness = 0 → 즉시 D등급
 
-충분한 데이터 쌓이면 학습 실행:
-  from interx_engine.application.use_cases.win_prediction import WinPredictionTrainer
-  WinPredictionTrainer().train()
-  → data/models/win_pred_lr.pkl 생성
+Step 2. 가점 계산 (scored_text 기준)
+        POSITIVE_KEYWORDS 딕셔너리 순회
+        구조화 섹션(사업목적/지원내용) 히트 시 ×1.5 보너스
+        예산 정보 존재 시 +3.0 보너스
+        pos_score = Σ(키워드 가중치) × struct_bonus
 
-이후 파이프라인 실행 시:
-  pkl 파일 감지 → LogisticRegression 모델 자동 로드 → rule_v1 대체
+Step 3. 감점 계산 (scored_text 기준)
+        NEGATIVE_KEYWORDS 딕셔너리 순회
+        neg_score = Σ(키워드 감점)
+
+Step 4. 적합도 계산
+        fitness = pos_score × 5.0 - neg_score × 6.0 + struct_bonus
+        범위: 0.0 ~ 100.0 (min(100, max(0, ...)) 클램핑)
+
+Step 5. 솔루션별 점수 (8개 솔루션)
+        SOLUTION_MAP 각 항목의 키워드 합산 × scale(15)
+        → 0~100점, 총 8개 값
+
+Step 6. 산업 점수
+        industry_score = 비0점 솔루션들의 평균
+
+Step 7. 우선순위 계산
+        priority = fitness × 0.6 + industry_score × 0.4
+        (fitness = 0이면 priority 강제 0)
+
+Step 8. 등급 분류
+        A: priority ≥ 48   (최우선 영업 대상)
+        B: priority ≥ 30   (검토 대상)
+        C: priority ≥ 18   (모니터링)
+        D: priority <  18  (해당 없음)
+
+Step 9. 제목 블랙리스트 강제 D
+        "수요기업" / "육성과정" / "시찰단" 포함 시
+        → fitness=0, priority=0, grade=D 강제
+
+Step 10. L3 강공고 확정
+         fitness ≥ 30 AND 제목에 L3 키워드 존재
+         → notice.l3_strong = "Y" (즉시 알림 대상)
+```
+
+### 7-3. 솔루션별 키워드 맵 (SOLUTION_MAP 요약)
+
+| 솔루션 | 대표 키워드 | 설명 |
+|--------|------------|------|
+| `ManufacturingDT` | 디지털트윈, 스마트공장, 자율형공장, AI팩토리 | 제조 디지털트윈 |
+| `RecipeAI` | 레시피, 배합, 품질예측, 공정최적화 | 제조 레시피 AI |
+| `QualityAI` | 품질관리, 불량검출, 이상탐지 | 품질 AI |
+| `InspectionAI` | 머신비전, 비전검사, 외관검사 | 비전 검사 AI |
+| `SafetyAI` | 중대재해, 안전관리, 작업자안전 | 안전 AI |
+| `GenAI` | 생성형AI, GPT, LLM, AI에이전트 | 제조 GenAI |
+| `InfraDS` | 데이터스페이스, AAS, Catena-X, 클라우드 | 데이터 인프라 |
+| `PdM` | 예지보전, 설비관리, 고장예측, PHM | 예지보전 |
+
+### 7-4. 가점/감점 키워드 예시 (scoring.yaml)
+
+```yaml
+# 가점 키워드 (점수 높을수록 인터엑스 적합)
+스마트공장: 5, 스마트팩토리: 5
+제조ai: 5,   제조AI: 5
+디지털트윈: 4, 예지보전: 4, 자율형공장: 4
+ai: 3,       머신비전: 3, 비전검사: 3
+데이터: 2,   자동화: 2
+
+# 감점 키워드 (비제조/비조달 필터)
+수요기업: 12   # 공급기업이 아님
+일자리: 7      # 취업 지원 공고
+세미나: 7      # 교육 행사
+소상공인: 6    # 대상 업종 불일치
+의료: 6
+바이오: 5
 ```
 
 ---
 
-## 엔진 출력 데이터 & BD 플랫폼 적용 가이드
+## 8. 정기공고 탐지
 
-### 공고 1건당 생성되는 핵심 필드
+`detect_recurring.py` — `configs/recurring.yaml` 패턴과 공고 제목을 매칭.
 
-| 필드 | 설명 | BD 활용 |
-|------|------|---------|
-| `fitness_score` | 키워드 매칭 기반 적합도 (0~100) | 영업 우선순위 판단 기준 |
-| `priority_grade` | A / B / C / D 종합 등급 | 리드 등급 분류 |
-| `win_probability` | 수주 가능성 0~1 (룰 또는 ML) | 파이프라인 기대 매출 계산 |
-| `l3_strong` | L3 강공고 여부 Y/N | "즉시 대응" 리드 분류 |
-| `recommended_solution` | ManufacturingDT / SafetyAI / InfraDS 등 | 어떤 제품으로 제안할지 |
-| `body_text` | 공고 원문 전체 | 제안서 자동 초안 근거 |
-| `deadline_date` / `D-day` | 마감일 및 남은 일수 | 영업 액션 타이밍 |
-| `budget` | 지원 예산 | 우선순위 및 기대 수주액 |
-| `agency` / `ministry` | 수행기관 / 주무부처 | 고객사 / 발주처 식별 |
-| `partner_candidate` | 파트너사 후보 Y/N | 컨소시엄 구성 판단 |
-| `milestone` | BD 진행 단계 M01~M05 자동 배정 | CRM 파이프라인 스테이지 |
-| `recurring` | 정기공고 여부 + 그룹명 | 재계약·연간 기회 예측 |
+### 8-1. 동작 방식
+
+```python
+title = "2025년 스마트공장 구축지원 사업 통합 공고"
+
+# recurring.yaml 패턴 순회
+for (group_name, aliases) in _PATTERNS:
+    for alias in aliases:
+        if alias.lower() in title.lower():
+            notice.recurring_flag  = "Y"
+            notice.recurring_group = group_name
+            break
+```
+
+### 8-2. recurring.yaml 주요 패턴
+
+| 그룹명 | 대표 aliases |
+|--------|-------------|
+| `스마트공장구축` | 스마트공장 구축, 스마트팩토리 구축, 스마트공장 보급, AI 스마트공장 |
+| `제조혁신스마트공장` | 스마트제조혁신, 제조혁신, 스마트팩토리 확산 |
+| `AX-Sprint` | AX-Sprint, AX Sprint, AX사업, AX 실증, 제조AI AX |
+| `제조AI특화사업` | 제조AI 특화, 산업AI솔루션, AI응용제품, 제조인공지능 |
+| `AI바우처` | AI 바우처, 인공지능 바우처, AI바우처 공급기업 |
+| `데이터바우처` | 데이터 바우처, 데이터바우처 공급기업 |
+| `클라우드바우처` | 클라우드 바우처 |
+| `중소기업기술개발` | 중소기업 기술개발, R&D 지원, 기술개발사업 공고 |
+| `디지털트윈R&D` | 디지털트윈 기술개발, 디지털 트윈 R&D, DT 실증 |
+
+> `recurring_flag = "Y"` 인 공고는 Google Sheets `01_영업기회_정보` 시트에 정기공고여부/정기공고그룹 컬럼에 자동 기재됩니다.
 
 ---
 
-### 자동 생성 대시보드 차트 (9패널)
+## 9. L3 강공고 정책
 
-파이프라인 실행마다 `data/analysis/dashboard_{execution_id}.png` 로 자동 저장됩니다.
+L3 = **직접 제안 대상** — 인터엑스가 직접 영업해야 하는 핵심 공고.
+
+### 9-1. 판정 2단계
+
+```
+[사전 필터] L3StrongPolicy.is_l3_strong(notice)
+  대상 텍스트: 제목 + 요약 + 사업유형 (소문자 변환)
+  scoring.yaml의 l3_keywords 목록 중 1개 이상 포함 시 후보 마킹
+
+[최종 확정] PriorityScoringPolicy.calculate()
+  fitness ≥ 30 AND 사전 필터 통과 → notice.l3_strong = "Y"
+```
+
+### 9-2. L3 키워드 목록 (주요)
+
+```
+스마트공장 / 스마트팩토리 / 자율제조 / 자율공장 / 자율형공장
+제조ai / 산업ai / 제조인공지능
+디지털트윈 / 디지털 트윈
+머신비전 / 비전검사 / 이상탐지
+중대재해 / 제조안전
+manufacturing-x / 공정최적화 / 예지보전
+ai팩토리 / ai공장
+산업ai에이전트 / ai에이전트 / ai응용제품 / 신속상용화
+제조dx / 데이터스페이스 / catena-x / aas
+```
+
+### 9-3. L3 처리 흐름
+
+```
+L3강공고 = "Y"
+    ├─ Sheets 02_L3강공고 시트에 별도 저장
+    ├─ BD 마일스톤 M01 (공고 발굴) 또는 M05 (즉시 컨셉 제안) 자동 배정
+    ├─ Telegram/Slack 즉시 알림 발송
+    └─ Claude API 요약 (--full + ANTHROPIC_API_KEY 설정 시)
+```
+
+---
+
+## 10. 수주 예측 (Win Prediction)
+
+`win_prediction.py` — 공고별 수주 가능성 0~100% 예측.
+
+### 10-1. 피처 가중치
+
+| 피처 | 가중치 | 설명 |
+|------|--------|------|
+| `fitness_score` | **35%** | 키워드 매칭 적합도 (0~100 정규화) |
+| `priority_score` | **25%** | 우선순위 점수 (0~100 정규화) |
+| `budget_억` | **15%** | 지원금액 규모 (10억 기준 정규화, 초과 시 감소) |
+| `dday_urgency` | **10%** | 마감 긴급도 (D-7이내 최고, 너무 여유있으면 낮음) |
+| `l3_flag` | **10%** | L3 강공고 여부 (Y=1.0, N=0.0) |
+| `industry_score` | **5%** | 솔루션 산업 적합도 점수 |
+
+### 10-2. 등급 기준
+
+| 등급 | win_probability | 의미 |
+|------|-----------------|------|
+| A | ≥ 75% | 즉시 투자 — 제안서 착수 |
+| B | ≥ 55% | 검토 — 세부 검토 후 결정 |
+| C | ≥ 35% | 관망 — 기회 모니터링 |
+| D | < 35% | 제외 |
+
+### 10-3. ML 모드 자동 전환
+
+```
+파이프라인 실행마다 data/exports/training/*.jsonl 누적
+    ↓
+영업팀 수주/탈락 결과 입력 (data/crm_memos.json)
+    ↓
+WinPredictionTrainer().train() 실행
+→ LogisticRegression 학습 → data/models/win_pred_lr.pkl 저장
+    ↓
+이후 파이프라인: pkl 감지 → ML 모드 자동 전환 (rule_v1 대체)
+```
+
+> 최소 20건 이상 수주/탈락 실적 필요. 데이터 부족 시 rule_v1 가중합으로 동작.
+
+---
+
+## 11. 담당자 자동 배정 & BD 마일스톤
+
+### 11-1. 담당자 자동 배정 (assign_manager.py)
+
+`manager_rules.yaml` 에 정의된 규칙을 위에서부터 순서대로 매칭, 첫 번째 매칭 적용.
+
+```yaml
+rules:
+  - name: "제조AI 전문"
+    manager: "김BD"
+    conditions:
+      keywords: ["스마트팩토리", "제조ai", "디지털트윈", "예지보전", "머신비전"]
+
+  - name: "R&D 사업"
+    manager: "이연구"
+    conditions:
+      keywords: ["r&d", "연구개발", "기술개발"]
+      ministry: ["과학기술정보통신부", "산업통상자원부"]
+
+  - name: "중기부 바우처"
+    manager: "박바우처"
+    conditions:
+      keywords: ["바우처", "중소기업", "창업"]
+      ministry: ["중소벤처기업부"]
+  ...
+```
+
+### 11-2. BD 마일스톤 자동 배정 (assign_milestone.py)
+
+| 코드 | 의미 | 배정 조건 |
+|------|------|----------|
+| `M01` | 공고 발굴·등록 | L3강공고=Y (기본) |
+| `M05` | 즉시 컨셉 제안 | L3강공고=Y + D-day ≤ 14 (A/B등급) 또는 D-day ≤ 7 (전등급) |
+| `P01` | 파트너 후보 발굴 | 파트너후보=Y (A/B/C등급) |
+| `M01\|P01` | BD + 파트너 동시 | 두 조건 모두 해당 |
+
+---
+
+## 12. 설정 파일 (configs/)
+
+모든 비즈니스 파라미터는 YAML 파일로 관리. **코드에 하드코딩 금지.**
+
+### scoring.yaml
+
+```yaml
+thresholds:
+  l3_strong:         30   # fitness ≥ 30 → L3 강공고
+  partner_candidate: 18   # priority ≥ 18 → 파트너 후보
+  grade_a:           48   # priority ≥ 48 → A등급
+  grade_b:           30   # priority ≥ 30 → B등급
+  grade_c:           18   # priority ≥ 18 → C등급
+  neg_multiplier:     6.0 # 감점 배율
+  pos_multiplier:     5.0 # 가점 배율
+  struct_bonus_factor:1.5 # 구조화 섹션 보너스 배율
+  budget_bonus:       3.0 # 예산 존재 시 보너스
+
+solutions:
+  scale_factor: 15.0
+  names: [ManufacturingDT, RecipeAI, QualityAI, InspectionAI, SafetyAI, GenAI, InfraDS, PdM]
+
+priority_formula:
+  w_fitness:  0.6
+  w_industry: 0.4
+
+l3_keywords:         # L3 강공고 키워드 목록
+  min_hits: 1
+  keywords: [스마트공장, 제조ai, 디지털트윈, ...]
+
+positive_keywords:   # 가점 키워드 딕셔너리
+  스마트공장: 5
+  제조ai: 5
+  ...
+
+negative_keywords:   # 감점 키워드 딕셔너리
+  수요기업: 12
+  일자리: 7
+  ...
+
+solution_keywords:   # 솔루션별 키워드 맵
+  ManufacturingDT:
+    디지털트윈: 4
+    스마트공장: 3
+    ...
+```
+
+### sites.yaml
+
+```yaml
+sites:
+  - code: bizinfo
+    name: 기업마당
+    enabled: true
+    collector_type: playwright   # requests or playwright
+  - code: kiat
+    enabled: true
+    collector_type: playwright
+  - code: smba
+    enabled: false   # 서버 차단
+  ...
+```
+
+### recurring.yaml
+
+```yaml
+patterns:
+  - name: 스마트공장구축
+    aliases:
+      - 스마트공장 구축
+      - 스마트팩토리 구축
+      - 스마트공장 보급
+  - name: AX-Sprint
+    aliases:
+      - AX-Sprint
+      - AX 실증
+      - 제조AI AX
+  ...
+```
+
+### manager_rules.yaml → [섹션 11-1 참조]
+
+### sheets.yaml → [섹션 13 참조]
+
+### settings.yaml
+
+```yaml
+pipeline:
+  max_pages_default: 5       # 사이트별 기본 최대 페이지 수
+  request_timeout: 15        # HTTP 타임아웃 (초)
+  enrich_workers: 3          # 상세 페이지 병렬 워커 수
+  collect_workers: 6         # 사이트 병렬 수집 워커 수
+  tfidf_sim_threshold: 0.85  # TF-IDF 중복 판단 유사도 임계값
+```
+
+---
+
+## 13. Google Sheets 9시트 구조
+
+파이프라인 실행 후 자동 업로드. Sheets를 백엔드 DB로 사용해 별도 DB 없이 플랫폼 연결 가능.
+
+| 시트명 | 용도 | 주요 컬럼 |
+|--------|------|----------|
+| `01_영업기회_정보` | 전체 수집 공고 마스터 | 공고명·마감일·D-day·등급·win_probability·추천솔루션·담당자·정기공고여부 |
+| `02_L3강공고` | L3강공고=Y 필터 | 01과 동일 구조 |
+| `03_파트너전달` | 파트너 후보 공고 | 01과 동일 구조 |
+| `05_긴급마감_공고` | D-7 이내 마감 | 공고명·마감일·D-day·기관·등급 |
+| `20_BD리포트` | 보고용 요약 | 실행일·총수집·등급별 건수·사이트별 현황 |
+| `22_KPI` | 실행별 성능 KPI | 실행ID·소요시간·수집수·A등급수·L3수 |
+| `93_통계` | 부처·솔루션·키워드 집계 | (시장 분석 참고용) |
+| `94_실행로그` | 파이프라인 실행 이력 | 실행ID·시작/종료시각·상태 |
+| `96_에러로그` | 수집 오류 사이트 | 사이트코드·오류메시지·발생시각 |
+
+---
+
+## 14. 새 컬렉터 추가 방법
+
+1. `infrastructure/collectors/sites/` 에 `{site}_collector.py` 생성
+
+```python
+from interx_engine.infrastructure.collectors.sites.base_collector import BaseCollector
+from interx_engine.core.entities.notice import Notice
+
+class NewSiteCollector(BaseCollector):
+    site_key  = "newsite"
+    site_name = "새 기관명"
+    list_url  = "https://newsite.go.kr/notices?page={page}"
+
+    def _parse_page(self, page: int) -> List[Notice]:
+        html = self._get(self.list_url.format(page=page))
+        soup = BeautifulSoup(html, "lxml")
+        notices = []
+        for tr in soup.select("table.board-list tr[data-id]"):
+            title = tr.select_one("td.title a").text.strip()
+            href  = tr.select_one("td.title a")["href"]
+            url   = urljoin("https://newsite.go.kr", href)
+            notices.append(Notice(
+                notice_id    = _notice_id("newsite", url),
+                title        = title,
+                site         = "newsite",
+                detail_url   = url,
+                execution_id = self.execution_id,
+            ))
+        return notices
+```
+
+2. `configs/sites.yaml` 에 추가
+
+```yaml
+- code: newsite
+  name: 새 기관명
+  enabled: true
+  collector_type: requests   # or playwright
+```
+
+3. `collector_factory.py` 에 매핑 추가
+
+```python
+from .sites.new_collector import NewSiteCollector
+_REGISTRY["newsite"] = NewSiteCollector
+```
+
+4. 테스트 실행
+
+```bash
+venv/Scripts/python run_engine.py --sites newsite --no-sheets --dry-run
+```
+
+---
+
+## 15. 테스트
+
+```bash
+# 단위 테스트 (엔티티·매퍼·스코어링 정책)
+venv/Scripts/python -m pytest tests/unit/ -v --tb=short
+
+# 통합 테스트 (파이프라인 dry-run, settings 검증)
+venv/Scripts/python -m pytest tests/ -v
+
+# 커버리지 측정
+venv/Scripts/python -m pytest tests/ --cov=src/interx_engine --cov-report=html
+```
+
+**단위 테스트 주요 항목**
+
+| 테스트 파일 | 검증 내용 |
+|------------|----------|
+| `test_scoring_policy.py` | 가점/감점/등급 계산 정확도 |
+| `test_l3_policy.py` | L3 키워드 매칭 |
+| `test_notice_mapper.py` | Notice → Sheets 행 변환 |
+| `test_budget_parser.py` | 예산 문자열 → 숫자 정규화 |
+| `test_recurring.py` | 정기공고 패턴 매칭 |
+
+---
+
+## 16. 핵심 원칙
+
+- **도메인 로직은 `core/`에만** — infrastructure에 비즈니스 로직 절대 금지
+- **설정값은 `configs/` YAML에** — 코드에 숫자/키워드 하드코딩 금지
+- **각 크롤러는 `BaseCollector` 상속** — `_parse_page()` 메서드만 구현
+- **`service_account.json`** — Git에 올리면 안 됨 (Google 인증키, .gitignore에 포함)
+- **Playwright 필요 사이트**: `bizinfo`, `kiat`, `dicia`, `smart_factory`
+  → 초기 실행 전 `playwright install chromium` 필수
+- **의존 방향**: infrastructure → application → core (역방향 절대 금지)
+- **중복 방지**: notice_id = site_code + URL MD5 / 스마트공장은 공고번호 기반 키 사용
+
+---
+
+## 자동 생성 대시보드 차트 (9패널)
+
+파이프라인 실행마다 `data/analysis/dashboard_{execution_id}.png` 자동 저장.
 
 ```
 ┌──────────────┬──────────────┬──────────────┐
@@ -421,82 +866,14 @@ score = (
 └──────────────┴──────────────┴──────────────┘
 ```
 
-| 차트 | 의미 | 플랫폼 활용 |
-|------|------|------------|
-| ① 우선순위 등급 분포 (도넛) | 전체 공고 중 A/B/C/D 비율 | 파이프라인 상단 등급 필터 버튼 기준 |
-| ② PCA 2D 산점도 | 6개 피처를 2차원으로 압축한 공고 분포, 색깔=클러스터 빨간 테두리=이상치 | "비슷한 공고 묶음" 그룹 탭 설계 기준 |
-| ③ 적합도 분포 히스토그램 | C기준(18) / B기준(30) / A기준(48) 수직선 표시 | 적합도 슬라이더 필터 구간 기준 |
-| ④ 사이트별 수집 현황 | 전체(파랑) · A/B등급(노랑) · L3강공고(빨강) 막대 | 발굴 채널 효율성 KPI |
-| ⑤ 솔루션 수요 분포 | 공고에서 추천된 우리 솔루션별 공고 수 | 제품별 파이프라인 규모 / 영업 인력 배치 |
-| ⑥ 적합 키워드 빈도 Top-12 | 공고 본문 키워드 등장 빈도 | 월별 누적 시 시장 키워드 트렌딩 |
-| ⑦ 클러스터별 평균 적합도 | K-Means 그룹별 우리 적합도 평균 | 집중 공략 세그먼트 선정 |
-| ⑧ D-day 긴급도 분포 | 오늘/D1~3/D4~7 등 구간별 마감 임박 공고 수 | 긴급 알림 배지 설계 기준 |
-| ⑨ Isolation Forest 이상치 | 적합도×D-day 기준 비정형 공고 (상위 5%) 탐지 | ⚠️ 검토 요망 리드 자동 플래그 |
-
----
-
-### BD 플랫폼 구조 제안
-
-```
-BD 플랫폼
-├── 오늘의 브리핑
-│   ├── 신규 공고 N건 (new_count)
-│   ├── 긴급 마감 공고 (D-day ≤ 3)
-│   └── L3 강공고 목록 (l3_strong = Y)
-│
-├── 파이프라인 뷰 (등급 탭: A / B / C / D)
-│   ├── 리드 카드 — 제목 · 기관 · 마감 · 추천솔루션 · 담당자
-│   ├── 수주확률 바 (win_probability 0~100%)
-│   └── BD 마일스톤 스테이지 (M01 → M05)
-│
-├── 제안서 뷰
-│   └── data/proposals/*.docx 목록 + 다운로드 (A/B 등급 자동 생성)
-│
-└── 설정
-    └── CRM 결과 입력 (수주/탈락 → data/crm_memos.json → ML 재학습 트리거)
-```
-
-### Google Sheets → 플랫폼 연결 포인트
-
-현재 파이프라인은 실행 후 Google Sheets에 아래 7개 시트를 자동 업로드합니다.
-별도 DB 구축 없이 **Sheets API를 백엔드로 읽어 플랫폼 UI를 구성**하는 방식이 가장 빠릅니다.
-
-| Sheets 시트 | 포함 데이터 | 플랫폼 화면 |
-|------------|------------|------------|
-| 01_영업기회_정보 | 전체 공고 + 등급·점수·담당자 | 파이프라인 뷰 메인 테이블 |
-| 02_L3강공고 | L3강공고 필터 결과 | 오늘의 브리핑 L3 섹션 |
-| 03_긴급마감 | D-day ≤ 7 공고 | 오늘의 브리핑 긴급 섹션 |
-| 04_KPI | 실행별 수집·등급·소요시간 통계 | 운영 대시보드 KPI 위젯 |
-| 05_통계 | 부처·솔루션·키워드 집계 | (시장 분석 참고용) |
-| 06_실행로그 | 파이프라인 실행 이력 | 관리자 운영 로그 |
-| 07_에러로그 | 수집 오류 사이트 목록 | 장애 모니터링 |
-
-### 수주확률 ML 피드백 루프
-
-```
-파이프라인 실행
-    └─ training/*.jsonl 자동 누적
-          ↓
- 영업팀이 수주/탈락 결과 입력
- (data/crm_memos.json)
-          ↓
- WinPredictionTrainer().train()
- → LogisticRegression 학습
- → data/models/win_pred_lr.pkl
-          ↓
- 다음 실행부터 ML 모델 자동 사용
- (rule_v1 → ML 모드 자동 전환)
-```
-
-> 최소 20건 이상의 수주/탈락 실적이 누적되면 학습 가능합니다.
-> 실적 데이터가 없을 경우 rule_v1 가중합 모드로 동작합니다.
-
----
-
-## 핵심 원칙
-
-- **도메인 규칙은 `core/`에만** — infrastructure에 비즈니스 로직 넣지 말 것
-- **설정값은 `configs/` YAML에** — 코드에 하드코딩 금지
-- **각 크롤러는 `base_collector.py` 상속** — `collect()` 메서드 구현
-- `service_account.json` — Git에 올리면 안 됨 (Google 인증키)
-- Playwright 필요 사이트: `kiat`, `dicia`, `bizinfo` (`playwright install chromium`)
+| 차트 | 의미 | BD 활용 |
+|------|------|---------|
+| ① 등급 분포 (도넛) | A/B/C/D 비율 | 파이프라인 등급 필터 기준 |
+| ② PCA 2D 산점도 | 6개 피처 2차원 압축, 색깔=클러스터, 빨간테두리=이상치 | 유사 공고 그룹 탭 설계 |
+| ③ 적합도 히스토그램 | C/B/A 컷라인 수직선 표시 | 적합도 슬라이더 필터 구간 |
+| ④ 사이트별 수집 현황 | 전체(파랑)·A/B등급(노랑)·L3(빨강) 막대 | 채널 효율 KPI |
+| ⑤ 솔루션 수요 분포 | 8개 솔루션별 공고 수 | 제품별 파이프라인 규모 |
+| ⑥ 키워드 빈도 Top-12 | 공고 본문 키워드 빈도 | 시장 키워드 트렌딩 |
+| ⑦ 클러스터별 적합도 | KMeans 그룹별 평균 적합도 | 집중 공략 세그먼트 |
+| ⑧ D-day 긴급도 분포 | 마감 구간별 공고 수 | 긴급 알림 배지 기준 |
+| ⑨ Isolation Forest 이상치 | 비정형 공고 상위 5% 탐지 | ⚠️ 검토 요망 자동 플래그 |
