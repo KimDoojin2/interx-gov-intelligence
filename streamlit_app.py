@@ -199,10 +199,12 @@ st.markdown(f"""
         overflow-y: auto;
     }}
 
-    /* 숨김 */
+    /* 숨김 — header는 사이드바 토글 버튼 포함이라 유지 */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    header {{visibility: hidden;}}
+    /* 사이드바 접기(<<) 후 다시 열 수 있도록 header는 숨기지 않음 */
+    header [data-testid="stToolbar"] {{visibility: hidden;}}
+    header {{background: transparent !important;}}
 </style>
 """, unsafe_allow_html=True)
 
