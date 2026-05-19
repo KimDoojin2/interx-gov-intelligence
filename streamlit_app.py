@@ -561,17 +561,18 @@ with tab2:
 
                 progress.progress(100, text="완료!")
                 st.session_state.pipeline_result = result
+                st.session_state.pipeline_running = False
                 status.update(label=f"완료! {len(notices)}건 수집", state="complete")
+
+                # 완료 후 페이지 새로고침 → 대시보드에 결과 표시
+                time.sleep(1)
+                st.rerun()
 
             except Exception as e:
                 status.update(label=f"오류: {e}", state="error")
                 st.error(f"파이프라인 실행 실패: {e}")
                 import traceback
                 st.code(traceback.format_exc())
-
-            finally:
-                st.session_state.pipeline_running = False
-
     # 마지막 실행 결과 요약
     if st.session_state.pipeline_result and not run_clicked:
         result = st.session_state.pipeline_result
