@@ -24,7 +24,8 @@ google-auth-oauthlib>=1.2.0
 PyYAML>=6.0.1
 
 # ── Playwright (JS 렌더링 — kiat·dicia 필수) ─────────────────────────────────
-playwright>=1.43.0    # 설치 후: playwright install chromium
+# Streamlit Cloud에서는 설치 불가 → 로컬/Colab 전용
+# playwright>=1.43.0    # 설치 후: playwright install chromium
 
 # ── Colab asyncio 충돌 방지 ───────────────────────────────────────────────────
 nest-asyncio>=1.6.0
