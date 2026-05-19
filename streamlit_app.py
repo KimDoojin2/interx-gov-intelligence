@@ -46,7 +46,7 @@ GRADE_COLORS = {"A": GREEN_A, "B": CYAN_400, "C": GOLD_400, "D": RED_D}
 
 # ── 페이지 설정 ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="InterX Gov Intelligence",
+    page_title="InterX 정부지원사업 인텔리전스",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -241,25 +241,25 @@ with st.sidebar:
     st.markdown(f"""
     <div style="text-align:center; padding: 1rem 0;">
         <h2 style="color:{CYAN_400}; margin:0;">InterX</h2>
-        <p style="color:{TEXT}; opacity:0.5; font-size:0.85rem;">Gov Intelligence Engine</p>
+        <p style="color:{TEXT}; opacity:0.5; font-size:0.85rem;">정부지원사업 인텔리전스 엔진</p>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
 
     page = st.radio(
-        "Menu",
-        ["Dashboard", "Pipeline", "Notices", "Proposals", "Competitors"],
+        "메뉴",
+        ["대시보드", "수집 실행", "공고 목록", "제안서", "경쟁사 분석"],
         label_visibility="collapsed",
     )
 
     st.markdown("---")
 
     # 실행 설정
-    st.markdown(f'<p style="color:{CYAN_400}; font-weight:600;">Pipeline Settings</p>',
+    st.markdown(f'<p style="color:{CYAN_400}; font-weight:600;">파이프라인 설정</p>',
                 unsafe_allow_html=True)
 
-    run_mode = st.selectbox("Mode", ["Daily (Fast)", "Full (All Features)", "Dry Run (Test)"])
+    run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"])
 
     # 사이트 선택
     all_sites = [
@@ -268,20 +268,20 @@ with st.sidebar:
         "koiia", "jejutp", "smart_factory", "iitp",
     ]
     selected_sites = st.multiselect(
-        "Sites",
+        "수집 사이트",
         all_sites,
         default=all_sites,
-        help="Select sites to collect",
+        help="수집할 사이트를 선택하세요",
     )
 
-    max_pages = st.slider("Max Pages / Site", 1, 10, 5)
-    enable_sheets = st.toggle("Google Sheets Upload", value=True)
+    max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5)
+    enable_sheets = st.toggle("Google Sheets 업로드", value=True)
 
     st.markdown("---")
     st.markdown(f"""
     <div style="text-align:center; opacity:0.4; font-size:0.75rem;">
         <p>InterX Engine v4.5</p>
-        <p>16 Sites | 23 Use Cases | 106 Tests</p>
+        <p>16개 사이트 | 23개 분석 | 106개 테스트</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -307,8 +307,8 @@ def run_pipeline(sites, max_pg, mode, sheets_on):
     from interx_engine.infrastructure.config.settings_loader import settings
     settings.ensure_dirs()
 
-    dry_run = "Dry Run" in mode
-    full = "Full" in mode
+    dry_run = "테스트" in mode
+    full = "전체" in mode
 
     from run_engine import build_collectors, build_sheet_gateway, MultiCollectorAdapter, main as run_main
 
@@ -324,14 +324,14 @@ def run_pipeline(sites, max_pg, mode, sheets_on):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: Dashboard
+#  페이지: 대시보드
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if page == "Dashboard":
-    st.markdown("""
+if page == "대시보드":
+    st.markdown(f"""
     <div class="interx-header">
-        <h1>InterX Gov Intelligence</h1>
-        <p>Government Procurement Intelligence Engine for BD Team</p>
+        <h1>InterX 정부지원사업 인텔리전스</h1>
+        <p>BD팀을 위한 정부지원사업 공고 자동 수집 및 분석 플랫폼</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -361,12 +361,12 @@ if page == "Dashboard":
         # KPI 카드
         cols = st.columns(6)
         kpis = [
-            (total, "Total Notices"),
-            (f'<span style="color:{GREEN_A}">{grades["A"]}</span>', "A Grade"),
-            (f'<span style="color:{CYAN_400}">{grades["B"]}</span>', "B Grade"),
-            (f'<span style="color:{MAGENTA}">{l3_count}</span>', "L3 Strong"),
-            (f'<span style="color:{RED_D}">{urgent_count}</span>', "D-7 Urgent"),
-            (len(result.get("proposal_files", [])), "Proposals"),
+            (total, "전체 공고"),
+            (f'<span style="color:{GREEN_A}">{grades["A"]}</span>', "A등급"),
+            (f'<span style="color:{CYAN_400}">{grades["B"]}</span>', "B등급"),
+            (f'<span style="color:{MAGENTA}">{l3_count}</span>', "L3 강공고"),
+            (f'<span style="color:{RED_D}">{urgent_count}</span>', "7일내 마감"),
+            (len(result.get("proposal_files", [])), "제안서 생성"),
         ]
         for col, (val, label) in zip(cols, kpis):
             col.markdown(_kpi_card(val, label), unsafe_allow_html=True)
@@ -380,7 +380,7 @@ if page == "Dashboard":
             import plotly.graph_objects as go
 
             fig = go.Figure(data=[go.Pie(
-                labels=["A", "B", "C", "D"],
+                labels=["A등급", "B등급", "C등급", "D등급"],
                 values=[grades["A"], grades["B"], grades["C"], grades["D"]],
                 marker_colors=[GREEN_A, CYAN_400, GOLD_400, RED_D],
                 hole=0.55,
@@ -388,7 +388,7 @@ if page == "Dashboard":
                 textfont=dict(color="white", size=14),
             )])
             fig.update_layout(
-                title=dict(text="Grade Distribution", font=dict(color=CYAN_400, size=16)),
+                title=dict(text="등급 분포", font=dict(color=CYAN_400, size=16)),
                 paper_bgcolor=NAVY_800,
                 plot_bgcolor=NAVY_800,
                 font_color=TEXT,
@@ -400,7 +400,7 @@ if page == "Dashboard":
 
         with col_list:
             st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">'
-                        f'A-Grade Opportunities ({grades["A"]})</p>',
+                        f'A등급 핵심 공고 ({grades["A"]}건)</p>',
                         unsafe_allow_html=True)
 
             a_notices = []
@@ -413,7 +413,7 @@ if page == "Dashboard":
 
             for n, sc in a_notices[:10]:
                 dday = _calc_dday(n.deadline_date or "")
-                dday_str = f"D-{dday}" if dday >= 0 else "Expired"
+                dday_str = f"D-{dday}" if dday >= 0 else "마감"
                 l3 = ' <span style="color:#FF0064; font-weight:700;">[L3]</span>' if getattr(n, "l3_strong", "N") == "Y" else ""
 
                 st.markdown(f"""
@@ -423,7 +423,7 @@ if page == "Dashboard":
                     </div>
                     <div class="notice-meta">
                         {n.site} | {n.agency or n.ministry or '-'} |
-                        Score: {sc.priority_score:.0f} |
+                        점수: {sc.priority_score:.0f} |
                         {dday_str} | {n.deadline_date or '-'}
                     </div>
                 </div>
@@ -431,7 +431,7 @@ if page == "Dashboard":
 
         # 사이트별 수집 현황
         st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem; margin-top:1rem;">'
-                    f'Collection by Site</p>', unsafe_allow_html=True)
+                    f'사이트별 수집 현황</p>', unsafe_allow_html=True)
 
         from collections import Counter
         site_counter = Counter(n.site for n in notices)
@@ -452,7 +452,7 @@ if page == "Dashboard":
                 height=300,
                 margin=dict(t=20, b=40, l=40, r=20),
                 xaxis=dict(gridcolor=NAVY_700),
-                yaxis=dict(gridcolor=NAVY_700, title="Notices"),
+                yaxis=dict(gridcolor=NAVY_700, title="공고 수"),
             )
             st.plotly_chart(fig2, use_container_width=True)
 
@@ -462,30 +462,35 @@ if page == "Dashboard":
         <div style="text-align:center; padding:4rem 0;">
             <p style="font-size:4rem; margin:0;">&#x1F50D;</p>
             <p style="color:{TEXT}; font-size:1.2rem; opacity:0.6;">
-                No data yet. Go to <b>Pipeline</b> tab and click <b>Start Collection</b>
+                아직 데이터가 없습니다. 왼쪽 메뉴에서 <b>수집 실행</b>을 눌러 시작하세요
             </p>
         </div>
         """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: Pipeline (수집 실행)
+#  페이지: 수집 실행
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "Pipeline":
-    st.markdown("""
+elif page == "수집 실행":
+    st.markdown(f"""
     <div class="interx-header">
-        <h1>Pipeline Execution</h1>
-        <p>Click the button to start collecting government procurement notices</p>
+        <h1>공고 수집 실행</h1>
+        <p>버튼을 누르면 정부지원사업 공고를 자동으로 수집합니다</p>
     </div>
     """, unsafe_allow_html=True)
 
     # 설정 요약
     col1, col2, col3 = st.columns(3)
-    col1.markdown(_kpi_card(len(selected_sites), "Sites Selected"), unsafe_allow_html=True)
-    col2.markdown(_kpi_card(max_pages, "Max Pages"), unsafe_allow_html=True)
-    mode_label = "Daily" if "Daily" in run_mode else "Full" if "Full" in run_mode else "Dry Run"
-    col3.markdown(_kpi_card(mode_label, "Run Mode"), unsafe_allow_html=True)
+    col1.markdown(_kpi_card(len(selected_sites), "선택된 사이트"), unsafe_allow_html=True)
+    col2.markdown(_kpi_card(max_pages, "최대 페이지"), unsafe_allow_html=True)
+    if "일반" in run_mode:
+        mode_label = "일반 수집"
+    elif "전체" in run_mode:
+        mode_label = "전체 분석"
+    else:
+        mode_label = "테스트"
+    col3.markdown(_kpi_card(mode_label, "실행 모드"), unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -494,7 +499,7 @@ elif page == "Pipeline":
 
     with col_btn:
         run_clicked = st.button(
-            "Start Collection",
+            "수집 시작",
             type="primary",
             use_container_width=True,
             disabled=st.session_state.pipeline_running,
@@ -504,34 +509,34 @@ elif page == "Pipeline":
         if st.session_state.pipeline_result:
             r = st.session_state.pipeline_result
             n_count = len(r.get("notices", []))
-            st.success(f"Last run: {n_count} notices collected")
+            st.success(f"마지막 실행: {n_count}건 수집 완료")
 
     if run_clicked:
         st.session_state.pipeline_running = True
         st.session_state.run_log = []
 
-        with st.status("Collecting notices...", expanded=True) as status:
-            st.write(f"Mode: **{run_mode}**")
-            st.write(f"Sites: **{len(selected_sites)}** selected")
-            st.write(f"Max pages: **{max_pages}**/site")
+        with st.status("공고 수집 중...", expanded=True) as status:
+            st.write(f"실행 모드: **{run_mode}**")
+            st.write(f"수집 사이트: **{len(selected_sites)}**개 선택")
+            st.write(f"사이트당 최대: **{max_pages}**페이지")
             st.write("---")
 
-            progress = st.progress(0, text="Initializing engine...")
+            progress = st.progress(0, text="엔진 초기화 중...")
 
             try:
                 # Step 1: 초기화
-                progress.progress(5, text="Loading settings...")
-                st.write("Loading settings & configs...")
+                progress.progress(5, text="설정 로딩 중...")
+                st.write("설정 및 구성 파일 로드...")
 
                 from interx_engine.infrastructure.config.settings_loader import settings
                 settings.ensure_dirs()
 
                 # Step 2: 빌드
-                progress.progress(10, text="Building collectors...")
-                st.write(f"Building {len(selected_sites)} collectors...")
+                progress.progress(10, text="수집기 구성 중...")
+                st.write(f"{len(selected_sites)}개 수집기 생성 중...")
 
-                dry_run = "Dry Run" in run_mode
-                full = "Full" in run_mode
+                dry_run = "테스트" in run_mode
+                full = "전체" in run_mode
 
                 from run_engine import build_collectors, build_sheet_gateway, MultiCollectorAdapter
 
@@ -540,14 +545,14 @@ elif page == "Pipeline":
                     max_pages,
                     dry_run=dry_run,
                 )
-                st.write(f"Built **{len(collectors)}** collectors")
+                st.write(f"**{len(collectors)}**개 수집기 생성 완료")
 
                 multi = MultiCollectorAdapter(collectors, max_workers=8)
                 sheet_gw = build_sheet_gateway(enable_sheets)
 
                 # Step 3: 파이프라인 실행
-                progress.progress(20, text="Running pipeline...")
-                st.write("Starting pipeline execution...")
+                progress.progress(20, text="파이프라인 실행 중...")
+                st.write("파이프라인 실행 시작...")
 
                 execution_id = datetime.now().strftime("EXEC-%Y%m%d-%H%M%S")
 
@@ -571,7 +576,7 @@ elif page == "Pipeline":
 
                 result = orch.run(execution_id)
 
-                progress.progress(90, text="Finalizing results...")
+                progress.progress(90, text="결과 정리 중...")
 
                 notices = result.get("notices", [])
                 score_cards = result.get("score_cards", [])
@@ -584,21 +589,21 @@ elif page == "Pipeline":
                     if sc:
                         grade_counts[sc.priority_grade] = grade_counts.get(sc.priority_grade, 0) + 1
 
-                st.write(f"**{len(notices)}** notices collected")
-                st.write(f"Grades: A={grade_counts['A']} | B={grade_counts['B']} "
-                         f"| C={grade_counts['C']} | D={grade_counts['D']}")
+                st.write(f"**{len(notices)}**건 공고 수집 완료")
+                st.write(f"등급: A={grade_counts['A']}건 | B={grade_counts['B']}건 "
+                         f"| C={grade_counts['C']}건 | D={grade_counts['D']}건")
 
                 proposals = result.get("proposal_files", [])
                 if proposals:
-                    st.write(f"**{len(proposals)}** proposal drafts generated")
+                    st.write(f"**{len(proposals)}**건 제안서 초안 생성")
 
-                progress.progress(100, text="Done!")
+                progress.progress(100, text="완료!")
                 st.session_state.pipeline_result = result
-                status.update(label=f"Complete! {len(notices)} notices", state="complete")
+                status.update(label=f"완료! {len(notices)}건 수집", state="complete")
 
             except Exception as e:
-                status.update(label=f"Error: {e}", state="error")
-                st.error(f"Pipeline failed: {e}")
+                status.update(label=f"오류: {e}", state="error")
+                st.error(f"파이프라인 실행 실패: {e}")
                 import traceback
                 st.code(traceback.format_exc())
 
@@ -614,28 +619,28 @@ elif page == "Pipeline":
         st.markdown(f"""
         <div style="background:{NAVY_800}; border:1px solid {NAVY_700}; border-radius:12px;
              padding:1.5rem; margin-top:1rem;">
-            <p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">Last Run Summary</p>
-            <p style="color:{TEXT};">Notices: <b>{len(notices)}</b> | Score Cards: <b>{len(score_cards)}</b></p>
+            <p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">마지막 실행 요약</p>
+            <p style="color:{TEXT};">수집 공고: <b>{len(notices)}</b>건 | 스코어카드: <b>{len(score_cards)}</b>건</p>
         </div>
         """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: Notices (공고 목록)
+#  페이지: 공고 목록
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "Notices":
-    st.markdown("""
+elif page == "공고 목록":
+    st.markdown(f"""
     <div class="interx-header">
-        <h1>Collected Notices</h1>
-        <p>Browse and filter all collected procurement notices</p>
+        <h1>수집된 공고 목록</h1>
+        <p>수집된 정부지원사업 공고를 필터링하고 검색할 수 있습니다</p>
     </div>
     """, unsafe_allow_html=True)
 
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("No data. Run Pipeline first.")
+        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
     else:
         notices = result.get("notices", [])
         score_cards = result.get("score_cards", [])
@@ -644,11 +649,11 @@ elif page == "Notices":
         # 필터
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            grade_filter = st.multiselect("Grade", ["A", "B", "C", "D"], default=["A", "B", "C", "D"])
+            grade_filter = st.multiselect("등급 필터", ["A", "B", "C", "D"], default=["A", "B", "C", "D"])
         with col_f2:
-            site_filter = st.multiselect("Site", sorted(set(n.site for n in notices)))
+            site_filter = st.multiselect("사이트 필터", sorted(set(n.site for n in notices)))
         with col_f3:
-            search = st.text_input("Search", placeholder="Keyword search...")
+            search = st.text_input("검색", placeholder="키워드를 입력하세요...")
 
         # 필터 적용
         filtered = []
@@ -668,7 +673,7 @@ elif page == "Notices":
         filtered.sort(key=lambda x: (grade_order.get(x[1].priority_grade if x[1] else "D", 3),
                                       -(x[1].priority_score if x[1] else 0)))
 
-        st.markdown(f'<p style="color:{TEXT}; opacity:0.6;">{len(filtered)} / {len(notices)} notices</p>',
+        st.markdown(f'<p style="color:{TEXT}; opacity:0.6;">필터 결과: {len(filtered)} / {len(notices)}건</p>',
                     unsafe_allow_html=True)
 
         # 데이터프레임으로 표시
@@ -678,15 +683,15 @@ elif page == "Notices":
         for n, sc in filtered:
             dday = _calc_dday(n.deadline_date or "")
             rows.append({
-                "Grade": sc.priority_grade if sc else "D",
-                "Score": f"{sc.priority_score:.0f}" if sc else "-",
-                "Title": n.title[:70] if n.title else "-",
-                "Agency": n.agency or n.ministry or "-",
-                "Site": n.site,
-                "Deadline": n.deadline_date or "-",
-                "D-day": dday if dday >= 0 else "Expired",
+                "등급": sc.priority_grade if sc else "D",
+                "점수": f"{sc.priority_score:.0f}" if sc else "-",
+                "공고명": n.title[:70] if n.title else "-",
+                "주관기관": n.agency or n.ministry or "-",
+                "사이트": n.site,
+                "마감일": n.deadline_date or "-",
+                "D-day": dday if dday >= 0 else "마감",
                 "L3": "Y" if getattr(n, "l3_strong", "N") == "Y" else "",
-                "Budget": n.budget or "-",
+                "예산": n.budget or "-",
             })
 
         if rows:
@@ -696,9 +701,9 @@ elif page == "Notices":
                 use_container_width=True,
                 height=600,
                 column_config={
-                    "Grade": st.column_config.TextColumn(width="small"),
-                    "Score": st.column_config.TextColumn(width="small"),
-                    "Title": st.column_config.TextColumn(width="large"),
+                    "등급": st.column_config.TextColumn(width="small"),
+                    "점수": st.column_config.TextColumn(width="small"),
+                    "공고명": st.column_config.TextColumn(width="large"),
                     "L3": st.column_config.TextColumn(width="small"),
                 },
             )
@@ -706,39 +711,39 @@ elif page == "Notices":
             # CSV 다운로드
             csv_data = df.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
-                "Download CSV",
+                "CSV 다운로드",
                 csv_data,
-                file_name=f"interx_notices_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"interx_공고목록_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
             )
         else:
-            st.warning("No notices match the filters.")
+            st.warning("필터 조건에 맞는 공고가 없습니다.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: Proposals (제안서)
+#  페이지: 제안서
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "Proposals":
-    st.markdown("""
+elif page == "제안서":
+    st.markdown(f"""
     <div class="interx-header">
-        <h1>Generated Proposals</h1>
-        <p>Auto-generated proposal drafts for A/B grade notices</p>
+        <h1>자동 생성 제안서</h1>
+        <p>A/B 등급 공고에 대해 자동 생성된 제안서 초안을 다운로드하세요</p>
     </div>
     """, unsafe_allow_html=True)
 
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("No data. Run Pipeline first.")
+        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
     else:
         proposals = result.get("proposal_files", [])
 
         if not proposals:
-            st.warning("No proposals generated. Run pipeline with A/B grade notices.")
+            st.warning("생성된 제안서가 없습니다. A/B 등급 공고가 포함된 수집을 실행해주세요.")
         else:
             st.markdown(f'<p style="color:{CYAN_400}; font-weight:600;">'
-                        f'{len(proposals)} Proposals Generated</p>',
+                        f'총 {len(proposals)}건 제안서 생성 완료</p>',
                         unsafe_allow_html=True)
 
             for p in proposals:
@@ -754,7 +759,7 @@ elif page == "Proposals":
 
                     with open(fp, "rb") as f:
                         col_dl.download_button(
-                            "Download",
+                            "다운로드",
                             f.read(),
                             file_name=fp.name,
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -763,21 +768,21 @@ elif page == "Proposals":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: Competitors (경쟁사 분석)
+#  페이지: 경쟁사 분석
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "Competitors":
-    st.markdown("""
+elif page == "경쟁사 분석":
+    st.markdown(f"""
     <div class="interx-header">
-        <h1>Competitor Intelligence</h1>
-        <p>Track competitor activity across government procurement notices</p>
+        <h1>경쟁사 인텔리전스</h1>
+        <p>정부지원사업 공고에서 경쟁사 활동을 추적하고 분석합니다</p>
     </div>
     """, unsafe_allow_html=True)
 
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("No data. Run Pipeline first.")
+        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
     else:
         notices = result.get("notices", [])
         score_cards = result.get("score_cards", [])
@@ -786,7 +791,7 @@ elif page == "Competitors":
             try:
                 from interx_engine.application.use_cases.competitor_report import generate_competitor_report
 
-                with st.spinner("Generating competitor report..."):
+                with st.spinner("경쟁사 리포트 생성 중..."):
                     comp_result = generate_competitor_report(notices, score_cards)
 
                 summary = comp_result.get("summary", {})
@@ -794,10 +799,10 @@ elif page == "Competitors":
 
                 # KPI
                 c1, c2, c3, c4 = st.columns(4)
-                c1.markdown(_kpi_card(summary.get("total_notices", 0), "Total Notices"), unsafe_allow_html=True)
-                c2.markdown(_kpi_card(summary.get("competitor_related", 0), "Competitor Related"), unsafe_allow_html=True)
-                c3.markdown(_kpi_card(f'{summary.get("competitor_ratio", 0)}%', "Overlap Rate"), unsafe_allow_html=True)
-                c4.markdown(_kpi_card(summary.get("tier1_count", 0), "Tier1 Hits"), unsafe_allow_html=True)
+                c1.markdown(_kpi_card(summary.get("total_notices", 0), "전체 공고"), unsafe_allow_html=True)
+                c2.markdown(_kpi_card(summary.get("competitor_related", 0), "경쟁사 관련"), unsafe_allow_html=True)
+                c3.markdown(_kpi_card(f'{summary.get("competitor_ratio", 0)}%', "경쟁 비율"), unsafe_allow_html=True)
+                c4.markdown(_kpi_card(summary.get("tier1_count", 0), "Tier1 탐지"), unsafe_allow_html=True)
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -816,21 +821,40 @@ elif page == "Competitors":
                         marker_color=CYAN_400,
                     )])
                     fig.update_layout(
-                        title=dict(text="Top Competitors", font=dict(color=CYAN_400)),
+                        title=dict(text="경쟁사 탐지 순위 TOP 10", font=dict(color=CYAN_400)),
                         paper_bgcolor=NAVY_800,
                         plot_bgcolor=NAVY_900,
                         font_color=TEXT,
                         height=400,
                         margin=dict(l=120, r=20, t=50, b=20),
                         yaxis=dict(autorange="reversed"),
-                        xaxis=dict(gridcolor=NAVY_700, title="Detections"),
+                        xaxis=dict(gridcolor=NAVY_700, title="탐지 횟수"),
                     )
                     st.plotly_chart(fig, use_container_width=True)
+
+                # 경쟁사 관련 공고 목록
+                if comp_notices:
+                    st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">'
+                                f'경쟁사 관련 공고 ({len(comp_notices)}건)</p>',
+                                unsafe_allow_html=True)
+
+                    import pandas as pd
+                    comp_rows = []
+                    for cn in comp_notices:
+                        comp_rows.append({
+                            "등급": cn["grade"],
+                            "공고명": cn["title"][:60],
+                            "사이트": cn["site"],
+                            "마감일": cn["deadline"] or "-",
+                            "경쟁사": " / ".join(cn["competitors"]),
+                            "Tier": " / ".join(cn["tiers"]),
+                        })
+                    st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, height=400)
 
                 # 차트 이미지
                 chart_path = comp_result.get("chart_path", "")
                 if chart_path and Path(chart_path).exists():
-                    st.image(str(chart_path), caption="Competition Intelligence Report")
+                    st.image(str(chart_path), caption="경쟁사 종합 분석 차트")
 
             except Exception as e:
-                st.error(f"Failed to generate competitor report: {e}")
+                st.error(f"경쟁사 리포트 생성 실패: {e}")
