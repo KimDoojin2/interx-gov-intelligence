@@ -25,6 +25,7 @@
 18. [경쟁사 분석 리포트](#18-경쟁사-분석-리포트)
 19. [제안서 자동 생성 v2](#19-제안서-자동-생성-v2)
 20. [ML 수주예측 학습 파이프라인](#20-ml-수주예측-학습-파이프라인)
+21. [Streamlit 팀 배포 앱](#21-streamlit-팀-배포-앱)
 
 ---
 
@@ -54,6 +55,7 @@
 | 수주 예측 | Rule 가중합 + ML(LogisticRegression) 자동 전환 |
 | Sheets 시트 수 | 10개 (97_상태변경로그 포함) |
 | 웹 플랫폼 | FastAPI + Tailwind (4페이지 + 6 API) |
+| 팀 배포 앱 | Streamlit Cloud (10개 탭, 무료 호스팅) |
 | 단위 테스트 | 106 passed, 0 failed |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
 
@@ -1190,3 +1192,58 @@ venv/Scripts/python scripts/train_win_model.py
 ```
 
 > 영업팀이 수주/탈락 결과를 20건 이상 입력하면 ML 모드가 활성화되어 예측 정확도가 향상됩니다.
+
+---
+
+## 21. Streamlit 팀 배포 앱
+
+팀원에게 **링크 하나**로 공유하는 원클릭 파이프라인 실행 웹앱.
+Streamlit Cloud 무료 호스팅, 별도 서버 비용 없음.
+
+### 21-1. 접속 URL
+
+```
+https://interx-gov-intel.streamlit.app
+```
+
+### 21-2. 10개 탭 구성
+
+| 탭 | 기능 | 주요 내용 |
+|----|------|----------|
+| **대시보드** | 종합 현황 | KPI 6개 + 등급 도넛 차트 + A등급 TOP10 + 사이트별 바 차트 |
+| **수집 실행** | 파이프라인 실행 | 버튼 하나로 16개 사이트 수집 → 실시간 프로그레스 |
+| **공고 목록** | 전체 공고 조회 | 등급/사이트/키워드 필터 + CSV/Excel 다운로드 |
+| **제안서** | 자동 제안서 | A/B 등급 공고 .docx 다운로드 |
+| **경쟁사 분석** | 경쟁사 추적 | TOP10 바 차트 + 경쟁사 관련 공고 테이블 |
+| **수주 예측** | 수주 확률 | 공고별 수주 확률 분포 히스토그램 + 유망 TOP10 |
+| **마감 캘린더** | 마감 관리 | D-3/D-7/D-30 KPI + 타임라인 차트 + 긴급 리스트 |
+| **솔루션 매칭** | 솔루션 분석 | 8개 솔루션 레이더 차트 + 점수/공고수 비교 |
+| **키워드 트렌드** | 시장 동향 | 매칭 키워드 TOP20 + 제목 빈출 단어 TOP20 |
+| **담당자 현황** | 업무 배분 | 담당자별 등급 분포 스택 차트 + 상세 테이블 |
+
+### 21-3. 기술 스택
+
+```
+Streamlit 1.57 + Plotly + Pandas
+├── streamlit_app.py          # 메인 앱 (10탭, ~500줄)
+├── .streamlit/config.toml     # 테마 설정 (화이트 + 시안 포인트)
+└── Streamlit Cloud            # 무료 호스팅 (GitHub 연동 자동 배포)
+```
+
+### 21-4. 배포 방법
+
+1. [share.streamlit.io](https://share.streamlit.io) → GitHub 로그인
+2. Repository: `KimDoojin2/interx-gov-intelligence`, Branch: `master`, Main file: `streamlit_app.py`
+3. Deploy 클릭 → 2~3분 후 고정 URL 생성
+
+### 21-5. 비용
+
+| 항목 | 비용 |
+|------|------|
+| Streamlit Cloud 호스팅 | **무료** (Community Plan) |
+| 수집 실행 (크롤링) | **무료** (requests + BeautifulSoup) |
+| 스코어링/분석 | **무료** (Python + scikit-learn) |
+| 차트/시각화 | **무료** (Plotly) |
+| Google Sheets 연동 | **무료** (API 일일 한도 내) |
+
+> 외부 유료 API(GPT, Claude 등) 미사용. 전 기능 0원 운영.
