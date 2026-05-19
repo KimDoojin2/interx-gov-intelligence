@@ -30,117 +30,136 @@ try:
 except ImportError:
     pass
 
-# ── InterX 브랜드 색상 ────────────────────────────────────────────────────────
-NAVY_900 = "#0A1628"
-NAVY_800 = "#0F1E35"
-NAVY_700 = "#152742"
+# ── InterX 브랜드 색상 (화이트 테마) ──────────────────────────────────────────
 CYAN_400 = "#00CFFF"
 CYAN_500 = "#00B8E6"
+CYAN_600 = "#009FCC"
+NAVY_900 = "#0A1628"
+NAVY_800 = "#0F1E35"
 GOLD_400 = "#FFD700"
-GREEN_A  = "#00FF88"
-RED_D    = "#FF6B6B"
+GREEN_A  = "#22C55E"
+RED_D    = "#EF4444"
 MAGENTA  = "#FF0064"
-TEXT     = "#E2E8F0"
+TEXT_DARK = "#1F2937"
+TEXT_MID  = "#6B7280"
+TEXT_LIGHT = "#9CA3AF"
+BG_WHITE = "#FFFFFF"
+BG_GRAY  = "#F9FAFB"
+BORDER   = "#E5E7EB"
 
-GRADE_COLORS = {"A": GREEN_A, "B": CYAN_400, "C": GOLD_400, "D": RED_D}
+GRADE_COLORS = {"A": GREEN_A, "B": CYAN_500, "C": "#F59E0B", "D": RED_D}
 
 # ── 페이지 설정 ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="InterX 정부지원사업 인텔리전스",
     page_icon="",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ── 커스텀 CSS (InterX 다크 테마) ─────────────────────────────────────────────
+# ── 커스텀 CSS (화이트 + InterX 시안 포인트) ──────────────────────────────────
 st.markdown(f"""
 <style>
     /* 메인 배경 */
     .stApp {{
-        background: linear-gradient(180deg, {NAVY_900} 0%, {NAVY_800} 100%);
+        background: {BG_WHITE};
     }}
 
-    /* 사이드바 */
+    /* 사이드바 숨김 — 탭으로 대체 */
     section[data-testid="stSidebar"] {{
-        background: {NAVY_800};
-        border-right: 1px solid {NAVY_700};
+        display: none;
     }}
 
-    /* 헤더 영역 */
-    .interx-header {{
-        background: linear-gradient(135deg, {NAVY_800}, {NAVY_700});
-        border: 1px solid {NAVY_700};
-        border-radius: 16px;
-        padding: 2rem;
+    /* 상단 헤더 바 */
+    .interx-topbar {{
+        background: {NAVY_900};
+        padding: 1rem 2rem;
+        border-radius: 12px;
         margin-bottom: 1.5rem;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }}
-    .interx-header h1 {{
+    .interx-topbar h1 {{
         color: {CYAN_400};
-        font-size: 2rem;
+        font-size: 1.5rem;
         margin: 0;
+        font-weight: 800;
     }}
-    .interx-header p {{
-        color: {TEXT};
-        opacity: 0.7;
-        margin: 0.5rem 0 0;
+    .interx-topbar .subtitle {{
+        color: white;
+        opacity: 0.5;
+        font-size: 0.8rem;
+        margin: 0;
     }}
 
     /* KPI 카드 */
     .kpi-card {{
-        background: rgba(15,30,53,0.8);
-        backdrop-filter: blur(12px);
-        border: 1px solid {NAVY_700};
+        background: {BG_WHITE};
+        border: 1px solid {BORDER};
         border-radius: 12px;
         padding: 1.2rem;
         text-align: center;
         transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }}
     .kpi-card:hover {{
         border-color: {CYAN_400};
-        box-shadow: 0 0 20px rgba(0,207,255,0.15);
+        box-shadow: 0 4px 12px rgba(0,207,255,0.12);
+        transform: translateY(-2px);
     }}
     .kpi-value {{
-        font-size: 2.2rem;
+        font-size: 2rem;
         font-weight: 800;
-        color: {CYAN_400};
+        color: {NAVY_900};
         line-height: 1.2;
     }}
     .kpi-label {{
-        font-size: 0.85rem;
-        color: {TEXT};
-        opacity: 0.6;
+        font-size: 0.8rem;
+        color: {TEXT_MID};
         margin-top: 0.3rem;
     }}
 
     /* 등급 뱃지 */
     .grade-a {{ color: {GREEN_A}; font-weight: 800; }}
-    .grade-b {{ color: {CYAN_400}; font-weight: 700; }}
-    .grade-c {{ color: {GOLD_400}; font-weight: 600; }}
+    .grade-b {{ color: {CYAN_500}; font-weight: 700; }}
+    .grade-c {{ color: #F59E0B; font-weight: 600; }}
     .grade-d {{ color: {RED_D}; font-weight: 600; }}
 
     /* 공고 카드 */
     .notice-card {{
-        background: rgba(15,30,53,0.6);
-        border: 1px solid {NAVY_700};
+        background: {BG_WHITE};
+        border: 1px solid {BORDER};
         border-radius: 10px;
-        padding: 1rem 1.2rem;
-        margin-bottom: 0.8rem;
-        transition: border-color 0.2s;
+        padding: 0.9rem 1.2rem;
+        margin-bottom: 0.6rem;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }}
     .notice-card:hover {{
         border-color: {CYAN_400};
+        box-shadow: 0 2px 8px rgba(0,207,255,0.1);
     }}
     .notice-title {{
-        color: white;
+        color: {TEXT_DARK};
         font-weight: 600;
         font-size: 0.95rem;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.3rem;
     }}
     .notice-meta {{
-        color: {TEXT};
-        opacity: 0.5;
-        font-size: 0.8rem;
+        color: {TEXT_LIGHT};
+        font-size: 0.78rem;
+    }}
+
+    /* 섹션 타이틀 */
+    .section-title {{
+        color: {TEXT_DARK};
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin: 1.5rem 0 0.8rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid {CYAN_400};
+        display: inline-block;
     }}
 
     /* 프로그레스 */
@@ -151,7 +170,7 @@ st.markdown(f"""
     /* 버튼 */
     .stButton > button {{
         background: linear-gradient(135deg, {CYAN_500}, {CYAN_400});
-        color: {NAVY_900};
+        color: white;
         font-weight: 700;
         border: none;
         border-radius: 8px;
@@ -159,52 +178,43 @@ st.markdown(f"""
         transition: all 0.3s;
     }}
     .stButton > button:hover {{
-        box-shadow: 0 0 25px rgba(0,207,255,0.4);
+        box-shadow: 0 4px 15px rgba(0,207,255,0.35);
         transform: translateY(-1px);
     }}
 
-    /* 탭 */
+    /* 탭 스타일 */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 4px;
-        background: {NAVY_800};
+        gap: 0;
+        background: {BG_GRAY};
         border-radius: 10px;
         padding: 4px;
+        border: 1px solid {BORDER};
     }}
     .stTabs [data-baseweb="tab"] {{
-        color: {TEXT};
+        color: {TEXT_MID};
         border-radius: 8px;
-        padding: 8px 20px;
+        padding: 10px 24px;
+        font-weight: 600;
     }}
     .stTabs [aria-selected="true"] {{
-        background: {NAVY_700};
-        color: {CYAN_400};
+        background: {BG_WHITE};
+        color: {CYAN_600};
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }}
 
-    /* 테이블 */
-    .stDataFrame {{
-        border-radius: 10px;
-        overflow: hidden;
+    /* 설정 패널 */
+    .settings-panel {{
+        background: {BG_GRAY};
+        border: 1px solid {BORDER};
+        border-radius: 12px;
+        padding: 1.2rem;
+        margin-bottom: 1rem;
     }}
 
-    /* 로그 영역 */
-    .log-area {{
-        background: {NAVY_900};
-        border: 1px solid {NAVY_700};
-        border-radius: 8px;
-        padding: 1rem;
-        font-family: 'Consolas', monospace;
-        font-size: 0.8rem;
-        color: {TEXT};
-        max-height: 400px;
-        overflow-y: auto;
-    }}
-
-    /* 숨김 — header는 사이드바 토글 버튼 포함이라 유지 */
+    /* 숨김 */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    /* 사이드바 접기(<<) 후 다시 열 수 있도록 header는 숨기지 않음 */
-    header [data-testid="stToolbar"] {{visibility: hidden;}}
-    header {{background: transparent !important;}}
+    header {{visibility: hidden;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -212,11 +222,6 @@ st.markdown(f"""
 # ═══════════════════════════════════════════════════════════════════════════════
 #  유틸 함수
 # ═══════════════════════════════════════════════════════════════════════════════
-
-def _grade_badge(grade: str) -> str:
-    css = f"grade-{grade.lower()}" if grade in "ABCD" else "grade-d"
-    return f'<span class="{css}">{grade}</span>'
-
 
 def _calc_dday(deadline: str) -> int:
     try:
@@ -236,57 +241,29 @@ def _kpi_card(value, label):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  사이드바
+#  상단 헤더
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with st.sidebar:
-    st.markdown(f"""
-    <div style="text-align:center; padding: 1rem 0;">
-        <h2 style="color:{CYAN_400}; margin:0;">InterX</h2>
-        <p style="color:{TEXT}; opacity:0.5; font-size:0.85rem;">정부지원사업 인텔리전스 엔진</p>
+st.markdown(f"""
+<div class="interx-topbar">
+    <div>
+        <h1>InterX 정부지원사업 인텔리전스</h1>
+        <p class="subtitle">BD팀 공고 자동 수집 및 분석 플랫폼</p>
     </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    page = st.radio(
-        "메뉴",
-        ["대시보드", "수집 실행", "공고 목록", "제안서", "경쟁사 분석"],
-        label_visibility="collapsed",
-    )
-
-    st.markdown("---")
-
-    # 실행 설정
-    st.markdown(f'<p style="color:{CYAN_400}; font-weight:600;">파이프라인 설정</p>',
-                unsafe_allow_html=True)
-
-    run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"])
-
-    # 사이트 선택
-    all_sites = [
-        "bizinfo", "kiat", "nipa", "innopolis", "bipa", "uipa",
-        "gicon", "ttp", "dicia", "gjtp", "kised", "ketep",
-        "koiia", "jejutp", "smart_factory", "iitp",
-    ]
-    selected_sites = st.multiselect(
-        "수집 사이트",
-        all_sites,
-        default=all_sites,
-        help="수집할 사이트를 선택하세요",
-    )
-
-    max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5)
-    enable_sheets = st.toggle("Google Sheets 업로드", value=True)
-
-    st.markdown("---")
-    st.markdown(f"""
-    <div style="text-align:center; opacity:0.4; font-size:0.75rem;">
-        <p>InterX Engine v4.5</p>
-        <p>16개 사이트 | 23개 분석 | 106개 테스트</p>
+    <div style="color:white; opacity:0.3; font-size:0.75rem;">
+        v4.5 | 16개 사이트 | 23개 분석
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  탭 네비게이션 (사이드바 대체)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "대시보드", "수집 실행", "공고 목록", "제안서", "경쟁사 분석"
+])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  세션 상태 초기화
@@ -296,47 +273,20 @@ if "pipeline_result" not in st.session_state:
     st.session_state.pipeline_result = None
 if "pipeline_running" not in st.session_state:
     st.session_state.pipeline_running = False
-if "run_log" not in st.session_state:
-    st.session_state.run_log = []
+
+# 사이트 목록
+all_sites = [
+    "bizinfo", "kiat", "nipa", "innopolis", "bipa", "uipa",
+    "gicon", "ttp", "dicia", "gjtp", "kised", "ketep",
+    "koiia", "jejutp", "smart_factory", "iitp",
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  파이프라인 실행 함수
+#  탭 1: 대시보드
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_pipeline(sites, max_pg, mode, sheets_on):
-    """파이프라인을 실행하고 결과를 session_state에 저장."""
-    from interx_engine.infrastructure.config.settings_loader import settings
-    settings.ensure_dirs()
-
-    dry_run = "테스트" in mode
-    full = "전체" in mode
-
-    from run_engine import build_collectors, build_sheet_gateway, MultiCollectorAdapter, main as run_main
-
-    result = run_main(
-        site_keys=sites if len(sites) < len(all_sites) else None,
-        max_pages=max_pg,
-        enable_sheets=sheets_on,
-        full_pipeline=full,
-        dry_run=dry_run,
-        no_alert=True,
-    )
-    return result
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: 대시보드
-# ═══════════════════════════════════════════════════════════════════════════════
-
-if page == "대시보드":
-    st.markdown(f"""
-    <div class="interx-header">
-        <h1>InterX 정부지원사업 인텔리전스</h1>
-        <p>BD팀을 위한 정부지원사업 공고 자동 수집 및 분석 플랫폼</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+with tab1:
     result = st.session_state.pipeline_result
 
     if result:
@@ -365,7 +315,7 @@ if page == "대시보드":
         kpis = [
             (total, "전체 공고"),
             (f'<span style="color:{GREEN_A}">{grades["A"]}</span>', "A등급"),
-            (f'<span style="color:{CYAN_400}">{grades["B"]}</span>', "B등급"),
+            (f'<span style="color:{CYAN_500}">{grades["B"]}</span>', "B등급"),
             (f'<span style="color:{MAGENTA}">{l3_count}</span>', "L3 강공고"),
             (f'<span style="color:{RED_D}">{urgent_count}</span>', "7일내 마감"),
             (len(result.get("proposal_files", [])), "제안서 생성"),
@@ -384,16 +334,16 @@ if page == "대시보드":
             fig = go.Figure(data=[go.Pie(
                 labels=["A등급", "B등급", "C등급", "D등급"],
                 values=[grades["A"], grades["B"], grades["C"], grades["D"]],
-                marker_colors=[GREEN_A, CYAN_400, GOLD_400, RED_D],
+                marker_colors=[GREEN_A, CYAN_500, "#F59E0B", RED_D],
                 hole=0.55,
                 textinfo="label+value",
-                textfont=dict(color="white", size=14),
+                textfont=dict(color=TEXT_DARK, size=13),
             )])
             fig.update_layout(
-                title=dict(text="등급 분포", font=dict(color=CYAN_400, size=16)),
-                paper_bgcolor=NAVY_800,
-                plot_bgcolor=NAVY_800,
-                font_color=TEXT,
+                title=dict(text="등급 분포", font=dict(color=TEXT_DARK, size=16)),
+                paper_bgcolor=BG_WHITE,
+                plot_bgcolor=BG_WHITE,
+                font_color=TEXT_DARK,
                 showlegend=False,
                 height=350,
                 margin=dict(t=50, b=20, l=20, r=20),
@@ -401,8 +351,7 @@ if page == "대시보드":
             st.plotly_chart(fig, use_container_width=True)
 
         with col_list:
-            st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">'
-                        f'A등급 핵심 공고 ({grades["A"]}건)</p>',
+            st.markdown(f'<div class="section-title">A등급 핵심 공고 ({grades["A"]}건)</div>',
                         unsafe_allow_html=True)
 
             a_notices = []
@@ -432,8 +381,7 @@ if page == "대시보드":
                 """, unsafe_allow_html=True)
 
         # 사이트별 수집 현황
-        st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem; margin-top:1rem;">'
-                    f'사이트별 수집 현황</p>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">사이트별 수집 현황</div>', unsafe_allow_html=True)
 
         from collections import Counter
         site_counter = Counter(n.site for n in notices)
@@ -448,43 +396,60 @@ if page == "대시보드":
                 marker_line_width=1,
             )])
             fig2.update_layout(
-                paper_bgcolor=NAVY_800,
-                plot_bgcolor=NAVY_900,
-                font_color=TEXT,
+                paper_bgcolor=BG_WHITE,
+                plot_bgcolor=BG_GRAY,
+                font_color=TEXT_DARK,
                 height=300,
                 margin=dict(t=20, b=40, l=40, r=20),
-                xaxis=dict(gridcolor=NAVY_700),
-                yaxis=dict(gridcolor=NAVY_700, title="공고 수"),
+                xaxis=dict(gridcolor=BORDER),
+                yaxis=dict(gridcolor=BORDER, title="공고 수"),
             )
             st.plotly_chart(fig2, use_container_width=True)
 
     else:
-        # 파이프라인 미실행 상태
         st.markdown(f"""
-        <div style="text-align:center; padding:4rem 0;">
-            <p style="font-size:4rem; margin:0;">&#x1F50D;</p>
-            <p style="color:{TEXT}; font-size:1.2rem; opacity:0.6;">
-                아직 데이터가 없습니다. 왼쪽 메뉴에서 <b>수집 실행</b>을 눌러 시작하세요
+        <div style="text-align:center; padding:5rem 0;">
+            <p style="font-size:3.5rem; margin:0;">&#x1F50D;</p>
+            <p style="color:{TEXT_MID}; font-size:1.1rem; margin-top:1rem;">
+                아직 데이터가 없습니다
+            </p>
+            <p style="color:{TEXT_LIGHT}; font-size:0.9rem;">
+                위의 <b>수집 실행</b> 탭을 눌러 공고 수집을 시작하세요
             </p>
         </div>
         """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: 수집 실행
+#  탭 2: 수집 실행
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "수집 실행":
-    st.markdown(f"""
-    <div class="interx-header">
-        <h1>공고 수집 실행</h1>
-        <p>버튼을 누르면 정부지원사업 공고를 자동으로 수집합니다</p>
-    </div>
-    """, unsafe_allow_html=True)
+with tab2:
+    # 설정 패널
+    st.markdown('<div class="section-title">수집 설정</div>', unsafe_allow_html=True)
 
-    # 설정 요약
+    col_s1, col_s2, col_s3 = st.columns(3)
+    with col_s1:
+        run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"])
+    with col_s2:
+        max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5)
+    with col_s3:
+        enable_sheets = st.toggle("Google Sheets 업로드", value=True)
+
+    with st.expander("수집 사이트 선택 (기본: 전체 16개)", expanded=False):
+        selected_sites = st.multiselect(
+            "사이트",
+            all_sites,
+            default=all_sites,
+            help="수집할 사이트를 선택하세요",
+            label_visibility="collapsed",
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 설정 요약 KPI
     col1, col2, col3 = st.columns(3)
-    col1.markdown(_kpi_card(len(selected_sites), "선택된 사이트"), unsafe_allow_html=True)
+    col1.markdown(_kpi_card(len(selected_sites) if 'selected_sites' in dir() else 16, "선택된 사이트"), unsafe_allow_html=True)
     col2.markdown(_kpi_card(max_pages, "최대 페이지"), unsafe_allow_html=True)
     if "일반" in run_mode:
         mode_label = "일반 수집"
@@ -515,27 +480,25 @@ elif page == "수집 실행":
 
     if run_clicked:
         st.session_state.pipeline_running = True
-        st.session_state.run_log = []
+        sites_to_use = selected_sites if 'selected_sites' in dir() else all_sites
 
         with st.status("공고 수집 중...", expanded=True) as status:
             st.write(f"실행 모드: **{run_mode}**")
-            st.write(f"수집 사이트: **{len(selected_sites)}**개 선택")
+            st.write(f"수집 사이트: **{len(sites_to_use)}**개")
             st.write(f"사이트당 최대: **{max_pages}**페이지")
             st.write("---")
 
             progress = st.progress(0, text="엔진 초기화 중...")
 
             try:
-                # Step 1: 초기화
                 progress.progress(5, text="설정 로딩 중...")
                 st.write("설정 및 구성 파일 로드...")
 
                 from interx_engine.infrastructure.config.settings_loader import settings
                 settings.ensure_dirs()
 
-                # Step 2: 빌드
                 progress.progress(10, text="수집기 구성 중...")
-                st.write(f"{len(selected_sites)}개 수집기 생성 중...")
+                st.write(f"{len(sites_to_use)}개 수집기 생성 중...")
 
                 dry_run = "테스트" in run_mode
                 full = "전체" in run_mode
@@ -543,7 +506,7 @@ elif page == "수집 실행":
                 from run_engine import build_collectors, build_sheet_gateway, MultiCollectorAdapter
 
                 collectors = build_collectors(
-                    selected_sites if len(selected_sites) < 16 else None,
+                    sites_to_use if len(sites_to_use) < 16 else None,
                     max_pages,
                     dry_run=dry_run,
                 )
@@ -552,7 +515,6 @@ elif page == "수집 실행":
                 multi = MultiCollectorAdapter(collectors, max_workers=8)
                 sheet_gw = build_sheet_gateway(enable_sheets)
 
-                # Step 3: 파이프라인 실행
                 progress.progress(20, text="파이프라인 실행 중...")
                 st.write("파이프라인 실행 시작...")
 
@@ -572,7 +534,6 @@ elif page == "수집 실행":
                         sheet_gateway=sheet_gw,
                     )
 
-                # 알림 비활성화
                 os.environ.pop("TELEGRAM_BOT_TOKEN", None)
                 os.environ.pop("SLACK_WEBHOOK_URL", None)
 
@@ -583,7 +544,6 @@ elif page == "수집 실행":
                 notices = result.get("notices", [])
                 score_cards = result.get("score_cards", [])
 
-                # 등급 카운트
                 grade_counts = {"A": 0, "B": 0, "C": 0, "D": 0}
                 sc_map = {s.notice_id: s for s in score_cards}
                 for n in notices:
@@ -619,41 +579,35 @@ elif page == "수집 실행":
         score_cards = result.get("score_cards", [])
 
         st.markdown(f"""
-        <div style="background:{NAVY_800}; border:1px solid {NAVY_700}; border-radius:12px;
+        <div style="background:{BG_GRAY}; border:1px solid {BORDER}; border-radius:12px;
              padding:1.5rem; margin-top:1rem;">
-            <p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">마지막 실행 요약</p>
-            <p style="color:{TEXT};">수집 공고: <b>{len(notices)}</b>건 | 스코어카드: <b>{len(score_cards)}</b>건</p>
+            <p style="color:{TEXT_DARK}; font-weight:700; font-size:1rem;">마지막 실행 요약</p>
+            <p style="color:{TEXT_MID};">수집 공고: <b>{len(notices)}</b>건 | 스코어카드: <b>{len(score_cards)}</b>건</p>
         </div>
         """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: 공고 목록
+#  탭 3: 공고 목록
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "공고 목록":
-    st.markdown(f"""
-    <div class="interx-header">
-        <h1>수집된 공고 목록</h1>
-        <p>수집된 정부지원사업 공고를 필터링하고 검색할 수 있습니다</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+with tab3:
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
+        st.info("데이터가 없습니다. 먼저 수집 실행 탭에서 수집을 시작해주세요.")
     else:
         notices = result.get("notices", [])
         score_cards = result.get("score_cards", [])
         sc_map = {s.notice_id: s for s in score_cards}
 
         # 필터
+        st.markdown('<div class="section-title">필터</div>', unsafe_allow_html=True)
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            grade_filter = st.multiselect("등급 필터", ["A", "B", "C", "D"], default=["A", "B", "C", "D"])
+            grade_filter = st.multiselect("등급", ["A", "B", "C", "D"], default=["A", "B", "C", "D"])
         with col_f2:
-            site_filter = st.multiselect("사이트 필터", sorted(set(n.site for n in notices)))
+            site_filter = st.multiselect("사이트", sorted(set(n.site for n in notices)))
         with col_f3:
             search = st.text_input("검색", placeholder="키워드를 입력하세요...")
 
@@ -670,15 +624,13 @@ elif page == "공고 목록":
                 continue
             filtered.append((n, sc))
 
-        # 정렬: 등급 → 점수 순
         grade_order = {"A": 0, "B": 1, "C": 2, "D": 3}
         filtered.sort(key=lambda x: (grade_order.get(x[1].priority_grade if x[1] else "D", 3),
                                       -(x[1].priority_score if x[1] else 0)))
 
-        st.markdown(f'<p style="color:{TEXT}; opacity:0.6;">필터 결과: {len(filtered)} / {len(notices)}건</p>',
+        st.markdown(f'<p style="color:{TEXT_MID}; font-size:0.85rem;">필터 결과: {len(filtered)} / {len(notices)}건</p>',
                     unsafe_allow_html=True)
 
-        # 데이터프레임으로 표시
         import pandas as pd
 
         rows = []
@@ -710,7 +662,6 @@ elif page == "공고 목록":
                 },
             )
 
-            # CSV 다운로드
             csv_data = df.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 "CSV 다운로드",
@@ -723,35 +674,27 @@ elif page == "공고 목록":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: 제안서
+#  탭 4: 제안서
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "제안서":
-    st.markdown(f"""
-    <div class="interx-header">
-        <h1>자동 생성 제안서</h1>
-        <p>A/B 등급 공고에 대해 자동 생성된 제안서 초안을 다운로드하세요</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+with tab4:
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
+        st.info("데이터가 없습니다. 먼저 수집 실행 탭에서 수집을 시작해주세요.")
     else:
         proposals = result.get("proposal_files", [])
 
         if not proposals:
             st.warning("생성된 제안서가 없습니다. A/B 등급 공고가 포함된 수집을 실행해주세요.")
         else:
-            st.markdown(f'<p style="color:{CYAN_400}; font-weight:600;">'
-                        f'총 {len(proposals)}건 제안서 생성 완료</p>',
+            st.markdown(f'<div class="section-title">자동 생성 제안서 ({len(proposals)}건)</div>',
                         unsafe_allow_html=True)
 
             for p in proposals:
                 fp = Path(p)
                 if fp.exists():
-                    col_name, col_size, col_dl = st.columns([4, 1, 1])
+                    col_name, col_dl = st.columns([5, 1])
                     col_name.markdown(f"""
                     <div class="notice-card">
                         <div class="notice-title">{fp.name}</div>
@@ -770,21 +713,14 @@ elif page == "제안서":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  페이지: 경쟁사 분석
+#  탭 5: 경쟁사 분석
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "경쟁사 분석":
-    st.markdown(f"""
-    <div class="interx-header">
-        <h1>경쟁사 인텔리전스</h1>
-        <p>정부지원사업 공고에서 경쟁사 활동을 추적하고 분석합니다</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+with tab5:
     result = st.session_state.pipeline_result
 
     if not result:
-        st.info("데이터가 없습니다. 먼저 수집 실행을 해주세요.")
+        st.info("데이터가 없습니다. 먼저 수집 실행 탭에서 수집을 시작해주세요.")
     else:
         notices = result.get("notices", [])
         score_cards = result.get("score_cards", [])
@@ -808,7 +744,6 @@ elif page == "경쟁사 분석":
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # TOP 경쟁사
                 top_comps = summary.get("top_competitors", [])
                 if top_comps:
                     import plotly.graph_objects as go
@@ -823,21 +758,19 @@ elif page == "경쟁사 분석":
                         marker_color=CYAN_400,
                     )])
                     fig.update_layout(
-                        title=dict(text="경쟁사 탐지 순위 TOP 10", font=dict(color=CYAN_400)),
-                        paper_bgcolor=NAVY_800,
-                        plot_bgcolor=NAVY_900,
-                        font_color=TEXT,
+                        title=dict(text="경쟁사 탐지 순위 TOP 10", font=dict(color=TEXT_DARK)),
+                        paper_bgcolor=BG_WHITE,
+                        plot_bgcolor=BG_GRAY,
+                        font_color=TEXT_DARK,
                         height=400,
                         margin=dict(l=120, r=20, t=50, b=20),
                         yaxis=dict(autorange="reversed"),
-                        xaxis=dict(gridcolor=NAVY_700, title="탐지 횟수"),
+                        xaxis=dict(gridcolor=BORDER, title="탐지 횟수"),
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-                # 경쟁사 관련 공고 목록
                 if comp_notices:
-                    st.markdown(f'<p style="color:{CYAN_400}; font-weight:700; font-size:1.1rem;">'
-                                f'경쟁사 관련 공고 ({len(comp_notices)}건)</p>',
+                    st.markdown(f'<div class="section-title">경쟁사 관련 공고 ({len(comp_notices)}건)</div>',
                                 unsafe_allow_html=True)
 
                     import pandas as pd
@@ -853,7 +786,6 @@ elif page == "경쟁사 분석":
                         })
                     st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, height=400)
 
-                # 차트 이미지
                 chart_path = comp_result.get("chart_path", "")
                 if chart_path and Path(chart_path).exists():
                     st.image(str(chart_path), caption="경쟁사 종합 분석 차트")
