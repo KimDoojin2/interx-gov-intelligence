@@ -22,6 +22,9 @@
 15. [테스트](#15-테스트)
 16. [핵심 원칙](#16-핵심-원칙)
 17. [BD Intelligence 웹 플랫폼](#17-bd-intelligence-웹-플랫폼)
+18. [경쟁사 분석 리포트](#18-경쟁사-분석-리포트)
+19. [제안서 자동 생성 v2](#19-제안서-자동-생성-v2)
+20. [ML 수주예측 학습 파이프라인](#20-ml-수주예측-학습-파이프라인)
 
 ---
 
@@ -41,11 +44,17 @@
 |------|------|
 | 수집 사이트 | 20개+ (requests 18개, Playwright 2개) |
 | 파이프라인 단계 | 17단계 |
+| 유즈케이스 | 25개 (스코어링, 중복제거, 경쟁사, 제안서, ML예측 등) |
 | 정기공고 패턴 | 18그룹, 120+ aliases (priority 1/2/3 등급) |
 | 콤보 키워드 | 38쌍 (두 키워드 동시 출현 시 가점) |
 | 감점 분류 | 3단계 (strong 6.0 / medium 4.0 / weak 2.0) |
 | 등급 | A / B / C / D |
+| 경쟁사 추적 | Tier1(6사) + Tier2(10사) + 파트너(7곳) |
+| 솔루션 프로필 | 8개 (ManufacturingDT ~ PdM) |
+| 수주 예측 | Rule 가중합 + ML(LogisticRegression) 자동 전환 |
 | Sheets 시트 수 | 10개 (97_상태변경로그 포함) |
+| 웹 플랫폼 | FastAPI + Tailwind (4페이지 + 6 API) |
+| 단위 테스트 | 106 passed, 0 failed |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
 
 ---
@@ -1017,3 +1026,167 @@ python platform/colab_sync.py --url http://YOUR_SERVER:8001
 - **강조**: cyan `#00CFFF`, gold `#FFD700`
 - **카드**: glass-morphism (반투명 블러 + 글로우 테두리)
 - **등급 배지**: A=초록, B=시안, C=골드, D=빨강, L3=핑크
+
+---
+
+## 18. 경쟁사 분석 리포트
+
+`competitor_report.py` — 경쟁사 공고 참여 현황을 자동 분석하여 4패널 차트 PNG + CSV 생성.
+
+### 18-1. 분석 대상
+
+| 구분 | 기업 수 | 주요 기업 |
+|------|---------|----------|
+| **Tier1 (직접 경쟁)** | 6개 | 삼성SDS, LG CNS, SK C&C, 포스코DX, 현대오토에버, 롯데정보통신 |
+| **Tier2 (간접 경쟁)** | 10개 | 한국IBM, 오라클, SAP, 다쏘시스템, 지멘스, 씨메스, 수아랩 등 |
+| **Partners** | 7개 | 성균관대, KAIST, 한국생산기술연구원, ETRI 등 |
+
+### 18-2. 생성 출력물
+
+```
+data/analysis/
+├── competitor_chart_{execution_id}.png   # 4패널 차트
+└── competitor_report_{execution_id}.csv  # 상세 데이터
+```
+
+### 18-3. 4패널 차트 구성
+
+```
+┌────────────────────┬────────────────────┐
+│ ① TOP10 경쟁사     │ ② Tier 분포 도넛   │
+│   (가로 막대)       │   (Tier1/Tier2/파트너) │
+├────────────────────┼────────────────────┤
+│ ③ 경쟁사×등급 분포  │ ④ 월별 활동 트렌드  │
+│   (스택 바)         │   (라인 차트)       │
+└────────────────────┴────────────────────┘
+```
+
+| 차트 | 설명 | BD 활용 |
+|------|------|---------|
+| ① TOP10 경쟁사 | 공고 출현 빈도 상위 10개 | 주요 경쟁사 식별 |
+| ② Tier 분포 | 직접/간접/파트너 비율 | 경쟁 강도 파악 |
+| ③ 경쟁사×등급 | 경쟁사별 A/B/C/D 분포 | 고등급 공고 경쟁 현황 |
+| ④ 월별 트렌드 | 최근 6개월 경쟁사 활동량 | 시장 경쟁 추이 |
+
+### 18-4. 사용 방법
+
+```python
+from interx_engine.application.use_cases.competitor_report import generate_competitor_report
+
+result = generate_competitor_report(notices, score_cards, execution_id="EXEC-001")
+# result["summary"]           → 통계 요약
+# result["chart_path"]        → PNG 경로
+# result["csv_path"]          → CSV 경로
+# result["competitor_notices"] → 경쟁사 관련 공고 목록
+```
+
+---
+
+## 19. 제안서 자동 생성 v2
+
+`generate_proposal_v2.py` — A/B 등급 공고에 대해 **솔루션 맞춤형** Word 제안서 초안 자동 생성.
+
+### 19-1. v1 대비 개선점
+
+| 항목 | v1 | v2 |
+|------|----|----|
+| 솔루션 상세 | 이름만 표시 | **8개 솔루션별 역량 프로필 자동 반영** |
+| 점수 분석 | 등급만 | **솔루션 점수 테이블** (솔루션명/점수/적합도) |
+| 경쟁 분석 | 없음 | **경쟁사 감지 시 경쟁 환경 섹션 추가** |
+| 공고 플래그 | 없음 | **L3 강공고 / 정기공고 / D-day 표시** |
+| 공고 본문 | 없음 | **요약 또는 본문 2000자 자동 포함** |
+
+### 19-2. 8개 솔루션 역량 프로필
+
+제안서에 자동 삽입되는 InterX 솔루션별 상세 내용:
+
+| 솔루션 | 설명 | 기술 스택 |
+|--------|------|----------|
+| **ManufacturingDT** | 실시간 공정 시뮬레이션 디지털트윈 | Unity 3D / OPC-UA / Azure IoT |
+| **RecipeAI** | 공정 조건 최적화 AI | XGBoost / LSTM / Bayesian Opt |
+| **QualityAI** | 불량 검출 및 품질 예측 | CNN / YOLO / Anomaly Detection |
+| **InspectionAI** | 머신비전 자동 외관 검사 | YOLO v8 / Detectron2 / OpenCV |
+| **SafetyAI** | 중대재해 예방 안전 AI | Pose Estimation / IoT Gateway |
+| **GenAI** | 제조 생성형 AI | GPT-4 / Claude / LangChain / RAG |
+| **InfraDS** | 데이터 스페이스 인프라 | Catena-X / K8s / Kafka / MinIO |
+| **PdM** | 설비 고장 예측 예지보전 | LSTM / Transformer / Edge Computing |
+
+### 19-3. 생성 문서 구조
+
+```
+[제안서 초안] {공고명}
+├── 핵심 지표 카드 (등급/적합도/우선순위/D-day)
+├── 1. 사업 개요 (공고 기본 정보)
+├── 2. InterX 적합도 분석 (점수 + 솔루션 테이블)
+├── 3. 추천 솔루션 및 역량 (상위 3개 솔루션 상세)
+├── 4. 제안 전략 ([작성 필요] 차별화 포인트)
+├── 5. 경쟁 환경 분석 (경쟁사 감지 시)
+├── 6. 추진 일정 (D-day 기반 타임라인)
+├── 7. 공고 원문 링크
+└── 8. 공고 본문 요약
+```
+
+### 19-4. 사용 방법
+
+```python
+from interx_engine.application.use_cases.generate_proposal_v2 import generate_proposals_v2
+
+paths = generate_proposals_v2(notices, score_cards, output_dir="output/proposals")
+# ["output/proposals/A_bizinfo_스마트공장AI구축.docx", ...]
+```
+
+---
+
+## 20. ML 수주예측 학습 파이프라인
+
+기존 rule_v1 가중합 → **sklearn LogisticRegression ML 모델**로 자동 전환.
+
+### 20-1. 학습 데이터 소스 (우선순위)
+
+| 순위 | 소스 | 라벨 기준 | 설명 |
+|------|------|----------|------|
+| 1 | `data/crm_memos.json` | "수주"=1, "탈락"=0 | 영업팀 실적 입력 (최우선) |
+| 2 | `data/exports/training/*.jsonl` | grade A/B=1, C/D=0 | 파이프라인 자동 Export |
+| 3 | `data/interx_engine.db` | grade A/B=1, C/D=0 | SQLite 누적 데이터 |
+
+### 20-2. 학습 흐름
+
+```
+데이터 로드 (최소 20건 필요)
+  ↓
+피처 추출 (fitness, priority, budget, dday, l3, industry)
+  ↓
+StandardScaler 정규화
+  ↓
+LogisticRegression 학습
+  ↓
+5-fold Cross Validation (n≥30 시 train/test 70/30 split)
+  ↓
+data/models/win_pred_lr.pkl 저장
+  ↓
+다음 파이프라인 실행 → pkl 감지 → ML 모드 자동 전환
+```
+
+### 20-3. 실행 방법
+
+```bash
+# 학습 실행
+venv/Scripts/python scripts/train_win_model.py
+
+# CRM 데이터 형식 (data/crm_memos.json)
+[
+  {"notice_id": "bizinfo-a1b2c3d4", "result": "수주"},
+  {"notice_id": "kiat-e5f6g7h8",   "result": "탈락"}
+]
+```
+
+### 20-4. 모드 자동 전환
+
+```
+파이프라인 실행 시:
+  data/models/win_pred_lr.pkl 존재?
+    ├── YES → ML 모드 (LogisticRegression 예측)
+    └── NO  → Rule 모드 (기존 6가지 가중합)
+```
+
+> 영업팀이 수주/탈락 결과를 20건 이상 입력하면 ML 모드가 활성화되어 예측 정확도가 향상됩니다.
