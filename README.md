@@ -21,6 +21,7 @@
 14. [새 컬렉터 추가 방법](#14-새-컬렉터-추가-방법)
 15. [테스트](#15-테스트)
 16. [핵심 원칙](#16-핵심-원칙)
+17. [BD Intelligence 웹 플랫폼](#17-bd-intelligence-웹-플랫폼)
 
 ---
 
@@ -938,3 +939,81 @@ venv/Scripts/python -m pytest tests/ --cov=src/interx_engine --cov-report=html
 | ⑦ 클러스터별 적합도 | KMeans 그룹별 평균 적합도 | 집중 공략 세그먼트 |
 | ⑧ D-day 긴급도 분포 | 마감 구간별 공고 수 | 긴급 알림 배지 기준 |
 | ⑨ Isolation Forest 이상치 | 비정형 공고 상위 5% 탐지 | ⚠️ 검토 요망 자동 플래그 |
+
+---
+
+## 17. BD Intelligence 웹 플랫폼
+
+엔진 파이프라인 결과를 실시간으로 확인·관리하는 웹 대시보드.
+**FastAPI + Jinja2 + Tailwind CSS + Chart.js** 기반, 다크 네이비 테마.
+
+### 17-1. 실행 방법
+
+```bash
+# 플랫폼 서버 시작
+cd platform && python start_server.py    # http://localhost:8001
+
+# 엔진 DB → 플랫폼 수동 싱크
+python platform/colab_sync.py --url http://localhost:8001
+```
+
+### 17-2. 플랫폼 구조
+
+```
+platform/
+├── app.py               # FastAPI 앱 (4 페이지 + 6 API 엔드포인트)
+├── database.py           # SQLite ORM (notices, pipeline_results, status_changes, user_memos)
+├── colab_sync.py         # Colab → 플랫폼 자동 싱크 모듈
+├── start_server.py       # 서버 실행 스크립트
+├── static/css/style.css  # 커스텀 스타일 (대부분 Tailwind)
+└── templates/
+    ├── base.html          # 레이아웃 (사이드바 + 다크 테마)
+    ├── dashboard.html     # 대시보드 (KPI 6개 + 차트 3개 + TOP5)
+    ├── notices.html       # 공고 목록 (필터·정렬·페이지네이션)
+    ├── notice_detail.html # 공고 상세 (스코어링 분석 + BD 상태 편집)
+    └── pipeline.html      # 파이프라인 실행 이력
+```
+
+### 17-3. 페이지 & API 엔드포인트
+
+| 타입 | 경로 | 설명 |
+|------|------|------|
+| 페이지 | `/` | 대시보드 — KPI 카드 6개, 등급 도넛/사이트 바/솔루션 레이더 차트, 우선순위 TOP5 |
+| 페이지 | `/notices` | 공고 목록 — 등급·사이트·L3·긴급 필터, 검색, 정렬, 페이지네이션 |
+| 페이지 | `/notice/{id}` | 공고 상세 — 스코어링 분석(fitness/priority/win%), 본문, BD 상태 편집 |
+| 페이지 | `/pipeline` | 파이프라인 — 실행 이력 테이블, Colab 연동 코드 안내 |
+| API | `GET /api/stats` | 대시보드 KPI 데이터 (JSON) |
+| API | `GET /api/notices` | 공고 목록 (필터·페이지네이션 파라미터) |
+| API | `GET /api/notice/{id}` | 공고 상세 (JSON) |
+| API | `POST /api/notice/{id}/update` | BD 상태 변경 (status/manager/milestone/memo) |
+| API | `POST /api/pipeline/sync` | Colab 파이프라인 결과 수신 |
+| API | `GET /api/health` | 헬스 체크 |
+
+### 17-4. Colab 자동 싱크 연동
+
+파이프라인 실행 후 결과를 플랫폼에 자동 전송. Colab 노트북 끝에 아래 코드 추가:
+
+```python
+from platform.colab_sync import sync_pipeline_result
+
+# 파이프라인 실행 후:
+sync_pipeline_result(
+    result=final_result,          # 파이프라인 결과 딕셔너리
+    notices=scored_notices,       # Notice 객체 리스트
+    score_cards=score_card_dict,  # {notice_id: ScoreCard} 딕셔너리
+    platform_url="http://YOUR_SERVER:8001",
+)
+```
+
+또는 엔진 SQLite DB에서 직접 싱크:
+
+```bash
+python platform/colab_sync.py --url http://YOUR_SERVER:8001
+```
+
+### 17-5. UI 테마
+
+- **배경**: navy `#0A1628`
+- **강조**: cyan `#00CFFF`, gold `#FFD700`
+- **카드**: glass-morphism (반투명 블러 + 글로우 테두리)
+- **등급 배지**: A=초록, B=시안, C=골드, D=빨강, L3=핑크
