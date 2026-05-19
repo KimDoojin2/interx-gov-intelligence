@@ -25,16 +25,16 @@ def _notices():
         "중소기업 연구개발 지원사업 공고",
     ]
     return [
-        Notice(notice_id=f"C{i}", site="test", title=t, body_text=t)
+        Notice(execution_id="TEST", notice_id=f"C{i}", site="test", title=t, body_text=t)
         for i, t in enumerate(titles)
     ]
 
 def _cards(notices):
     return [
         ScoreCard(
-            notice_id=n.notice_id, fitness_score=60,
-            priority_score=55, industry_score=50,
-            priority_grade="B",
+            execution_id="TEST", notice_id=n.notice_id, site="test",
+            fitness_score=60, priority_score=55,
+            priority_grade="B", industry_score=50,
             positive_keywords=["스마트공장", "AI"],
         )
         for n in notices
@@ -86,11 +86,11 @@ class TestTfidfClusterer:
             assert len(c.notice_ids) >= self.clusterer.min_cluster_size
 
     def test_single_notice_no_cluster(self):
-        notices = [Notice(notice_id="ONLY", site="test",
+        notices = [Notice(execution_id="TEST", notice_id="ONLY", site="test",
                           title="유일한 공고", body_text="특수한 내용")]
-        cards   = [ScoreCard(notice_id="ONLY", fitness_score=50,
-                             priority_score=50, industry_score=50,
-                             priority_grade="C")]
+        cards   = [ScoreCard(execution_id="TEST", notice_id="ONLY", site="test",
+                             fitness_score=50, priority_score=50,
+                             priority_grade="C", industry_score=50)]
         result  = self.clusterer.cluster(notices, cards)
         assert result == []
 

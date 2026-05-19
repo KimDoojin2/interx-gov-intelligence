@@ -28,11 +28,9 @@ def _notice(notice_id="N-001", budget="5억원", deadline="2026-12-31", l3="N"):
 
 def _card(notice_id="N-001", fitness=70, priority=65, industry=55, grade="B"):
     return ScoreCard(
-        notice_id=notice_id,
-        fitness_score=fitness,
-        priority_score=priority,
-        industry_score=industry,
-        priority_grade=grade,
+        execution_id="TEST", notice_id=notice_id, site="test",
+        fitness_score=fitness, priority_score=priority,
+        priority_grade=grade, industry_score=industry,
     )
 
 
