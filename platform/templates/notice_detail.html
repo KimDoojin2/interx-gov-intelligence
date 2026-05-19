@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% set active = "notices" %}
+{% block title %}{{ notice.title[:40] }} - InterX BD{% endblock %}
+{% block header %}Notice Detail{% endblock %}
+
+{% block content %}
+<a href="/notices" class="text-xs text-gray-600 hover:text-cyan-400 mb-4 inline-block">&larr; Back to list</a>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <!-- Left: Main Info -->
+    <div class="lg:col-span-2 space-y-4">
+        <!-- Title Card -->
+        <div class="glass glow rounded-xl p-5">
+            <div class="flex items-start gap-3 mb-3">
+                <span class="badge-{{ notice.grade|lower }} px-3 py-1 rounded-lg text-sm font-bold shrink-0">{{ notice.grade }}</span>
+                {% if notice.l3_strong == 'Y' %}
+                <span class="badge-l3 px-2 py-1 rounded text-xs font-bold shrink-0">L3 Strong</span>
+                {% endif %}
+                {% if notice.recurring_flag == 'Y' %}
+                <span class="px-2 py-1 rounded text-xs bg-purple-500/15 text-purple-400 border border-purple-500/30 shrink-0">{{ notice.recurring_group }}</span>
+                {% endif %}
+            </div>
+            <h1 class="text-lg font-bold text-white leading-snug mb-3">{{ notice.title }}</h1>
+            <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500">
+                <span>{{ notice.ministry or '-' }}</span>
+                <span>{{ notice.agency or '-' }}</span>
+                <span>Site: <span class="text-cyan-400">{{ notice.site }}</span></span>
+                {% if notice.detail_url %}
+                <a href="{{ notice.detail_url }}" target="_blank" class="text-cyan-400 hover:text-cyan-300 underline">Original Link &nearr;</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Scoring Detail -->
+        <div class="glass glow rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-4">Scoring Analysis</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <p class="text-[10px] text-gray-600 uppercase">Fitness</p>
+                    <p class="text-xl font-bold text-cyan-400">{{ '%.1f' % notice.fitness_score }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-gray-600 uppercase">Priority</p>
+                    <p class="text-xl font-bold text-white">{{ '%.1f' % notice.priority_score }}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-gray-600 uppercase">Win Probability</p>
+                    <p class="text-xl font-bold {% if notice.win_probability >= 0.55 %}grade-a{% elif notice.win_probability >= 0.35 %}grade-b{% else %}grade-d{% endif %}">
+                        {{ '%.0f' % (notice.win_probability * 100) }}%
+                    </p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-gray-600 uppercase">Win Grade</p>
+                    <p class="text-xl font-bold badge-{{ notice.win_grade|lower }} inline-block px-3 py-0.5 rounded">{{ notice.win_grade }}</p>
+                </div>
+            </div>
+
+            <!-- Score Bar -->
+            <div class="mt-4">
+                <div class="flex justify-between text-[10px] text-gray-600 mb-1">
+                    <span>Priority Score</span>
+                    <span>{{ '%.1f' % notice.priority_score }} / 100</span>
+                </div>
+                <div class="h-2 bg-navy-700 rounded-full overflow-hidden">
+                    <div class="progress-bar h-full rounded-full transition-all" style="width: {{ [notice.priority_score, 100] | min }}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-gray-700 mt-1">
+                    <span>D(&lt;18)</span><span>C(18)</span><span>B(30)</span><span>A(48)</span><span>100</span>
+                </div>
+            </div>
+
+            <!-- Keywords -->
+            {% if notice.matched_keywords %}
+            <div class="mt-4">
+                <p class="text-[10px] text-gray-600 uppercase mb-2">Matched Keywords</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for kw in notice.matched_keywords.split(' | ') %}
+                    <span class="px-2 py-0.5 rounded-full bg-cyan-400/10 text-cyan-400 text-[10px] border border-cyan-400/20">{{ kw }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if notice.recommended_solutions %}
+            <div class="mt-3">
+                <p class="text-[10px] text-gray-600 uppercase mb-2">Recommended Solutions</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for sol in notice.recommended_solutions.split(' / ') %}
+                    <span class="px-2 py-0.5 rounded-full bg-gold-400/10 text-gold-400 text-[10px] border border-gold-400/20">{{ sol }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Summary / Body -->
+        {% if notice.summary or notice.body_text %}
+        <div class="glass glow rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">Summary</h3>
+            <p class="text-xs text-gray-400 leading-relaxed">{{ notice.summary or notice.body_text[:500] }}</p>
+            {% if notice.body_text and notice.body_text|length > 500 %}
+            <details class="mt-3">
+                <summary class="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300">Show full body text ({{ notice.body_text|length }} chars)</summary>
+                <pre class="mt-2 text-[10px] text-gray-500 whitespace-pre-wrap max-h-96 overflow-y-auto bg-navy-900 p-3 rounded-lg">{{ notice.body_text }}</pre>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: Meta & Actions -->
+    <div class="space-y-4">
+        <!-- Deadline Card -->
+        <div class="glass glow rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">Deadline</h3>
+            <div class="text-center">
+                {% if notice.dday is not none and notice.dday >= 0 %}
+                <p class="text-4xl font-bold {% if notice.dday <= 7 %}text-red-400{% elif notice.dday <= 14 %}grade-c{% else %}text-white{% endif %}">
+                    D-{{ notice.dday }}
+                </p>
+                {% else %}
+                <p class="text-2xl text-gray-600">-</p>
+                {% endif %}
+                <p class="text-sm text-gray-500 mt-1">{{ notice.deadline or 'No deadline' }}</p>
+                {% if notice.apply_status %}
+                <span class="inline-block mt-2 px-3 py-1 rounded-full text-xs
+                    {% if notice.apply_status == '접수중' %}bg-green-500/15 text-green-400 border border-green-500/30
+                    {% elif notice.apply_status == '접수예정' %}bg-yellow-500/15 text-yellow-400 border border-yellow-500/30
+                    {% else %}bg-red-500/15 text-red-400 border border-red-500/30{% endif %}">
+                    {{ notice.apply_status }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Budget -->
+        <div class="glass glow rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-2">Budget</h3>
+            <p class="text-xl font-bold text-gold-400">{{ notice.budget or '-' }}</p>
+        </div>
+
+        <!-- BD Status -->
+        <div class="glass glow rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">BD Status</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[10px] text-gray-600 uppercase">Status</label>
+                    <select id="statusSelect" class="w-full mt-1 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none">
+                        {% for s in ['new', 'reviewing', 'proposal', 'submitted', 'won', 'lost', 'skipped'] %}
+                        <option value="{{ s }}" {% if notice.status == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-600 uppercase">Manager</label>
+                    <input id="managerInput" value="{{ notice.manager or '' }}" placeholder="Assign manager..."
+                           class="w-full mt-1 bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none">
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-600 uppercase">BD Milestone</label>
+                    <p class="text-sm font-mono text-cyan-400 mt-1">{{ notice.bd_milestone or '-' }}</p>
+                </div>
+                <button onclick="saveStatus()" class="w-full bg-cyan-400/20 text-cyan-400 hover:bg-cyan-400/30 px-4 py-2 rounded-lg text-xs font-medium transition mt-2">
+                    Save Changes
+                </button>
+                <div id="saveMsg" class="text-[10px] text-green-400 text-center hidden">Saved!</div>
+            </div>
+        </div>
+
+        <!-- Action Recommendation -->
+        {% if notice.recommended_action %}
+        <div class="glass glow rounded-xl p-5 border-l-2 border-cyan-400">
+            <h3 class="text-sm font-semibold text-gray-400 mb-2">Recommended Action</h3>
+            <p class="text-xs text-white">{{ notice.recommended_action }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function saveStatus() {
+    const nid = '{{ notice.notice_id }}';
+    const status = document.getElementById('statusSelect').value;
+    const manager = document.getElementById('managerInput').value;
+
+    await fetch(`/api/notice/${nid}/update`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({field: 'status', value: status})
+    });
+    await fetch(`/api/notice/${nid}/update`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({field: 'manager', value: manager})
+    });
+
+    const msg = document.getElementById('saveMsg');
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 2000);
+}
+</script>
+{% endblock %}

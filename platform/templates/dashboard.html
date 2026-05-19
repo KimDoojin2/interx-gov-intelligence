@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Dashboard - InterX BD{% endblock %}
+{% block header %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Total Notices</p>
+        <p class="text-2xl font-bold text-white">{{ stats.total }}</p>
+    </div>
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">A Grade</p>
+        <p class="text-2xl font-bold grade-a">{{ stats.a_count }}</p>
+    </div>
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">B Grade</p>
+        <p class="text-2xl font-bold grade-b">{{ stats.b_count }}</p>
+    </div>
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">L3 Strong</p>
+        <p class="text-2xl font-bold text-red-400">{{ stats.l3_count }}</p>
+    </div>
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Urgent (D-7)</p>
+        <p class="text-2xl font-bold grade-c">{{ stats.urgent }}</p>
+    </div>
+    <div class="kpi-card glass glow rounded-xl p-4">
+        <p class="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Recurring</p>
+        <p class="text-2xl font-bold text-purple-400">{{ stats.recurring }}</p>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <!-- Grade Distribution -->
+    <div class="glass glow rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-gray-400 mb-4">Grade Distribution</h3>
+        <div class="flex justify-center">
+            <canvas id="gradeChart" width="220" height="220"></canvas>
+        </div>
+    </div>
+    <!-- Site Collection -->
+    <div class="glass glow rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-gray-400 mb-4">Collection by Site</h3>
+        <canvas id="siteChart" height="220"></canvas>
+    </div>
+    <!-- Solution Demand -->
+    <div class="glass glow rounded-xl p-5">
+        <h3 class="text-sm font-semibold text-gray-400 mb-4">Solution Demand</h3>
+        <canvas id="solutionChart" height="220"></canvas>
+    </div>
+</div>
+
+<!-- Top Notices Table -->
+<div class="glass glow rounded-xl p-5">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-400">Top Priority Notices</h3>
+        <a href="/notices" class="text-xs text-cyan-400 hover:text-cyan-300">View All &rarr;</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-[11px] text-gray-500 uppercase border-b border-navy-600">
+                    <th class="pb-3 pr-4">Grade</th>
+                    <th class="pb-3 pr-4">Notice</th>
+                    <th class="pb-3 pr-4">Site</th>
+                    <th class="pb-3 pr-4">Deadline</th>
+                    <th class="pb-3 pr-4">Score</th>
+                    <th class="pb-3 pr-4">Win%</th>
+                    <th class="pb-3">L3</th>
+                </tr>
+            </thead>
+            <tbody id="topNotices">
+                <tr class="text-gray-500"><td colspan="7" class="py-8 text-center text-xs">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent Pipeline Runs -->
+{% if stats.recent_runs %}
+<div class="glass glow rounded-xl p-5 mt-4">
+    <h3 class="text-sm font-semibold text-gray-400 mb-4">Recent Pipeline Runs</h3>
+    <div class="space-y-2">
+        {% for run in stats.recent_runs %}
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-navy-800/50 text-xs">
+            <span class="text-cyan-400 font-mono">{{ run.execution_id }}</span>
+            <span class="text-gray-500">{{ run.run_at }}</span>
+            <span class="text-white">{{ run.notice_count }} notices</span>
+            <span class="grade-a">A:{{ run.a_count }}</span>
+            <span class="text-red-400">L3:{{ run.l3_count }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const grades = {{ stats.grades | tojson }};
+const sites = {{ stats.sites | tojson }};
+const solutions = {{ stats.solutions | tojson }};
+
+// Grade Donut
+new Chart(document.getElementById('gradeChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['A', 'B', 'C', 'D'],
+        datasets: [{
+            data: [grades.A||0, grades.B||0, grades.C||0, grades.D||0],
+            backgroundColor: ['#00FF88', '#00CFFF', '#FFD700', '#FF6B6B'],
+            borderWidth: 0,
+            hoverOffset: 8,
+        }]
+    },
+    options: {
+        responsive: false,
+        cutout: '65%',
+        plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: '#888', font: { size: 11 }, padding: 12 } }
+        }
+    }
+});
+
+// Site Bar
+new Chart(document.getElementById('siteChart'), {
+    type: 'bar',
+    data: {
+        labels: sites.map(s => s.site),
+        datasets: [{
+            label: 'Notices',
+            data: sites.map(s => s.count),
+            backgroundColor: '#00CFFF44',
+            borderColor: '#00CFFF',
+            borderWidth: 1,
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: '#1B305033' }, ticks: { color: '#666', font: { size: 10 } } },
+            y: { grid: { display: false }, ticks: { color: '#999', font: { size: 10 } } }
+        }
+    }
+});
+
+// Solution Radar
+const solLabels = Object.keys(solutions);
+const solData = Object.values(solutions);
+new Chart(document.getElementById('solutionChart'), {
+    type: 'radar',
+    data: {
+        labels: solLabels,
+        datasets: [{
+            label: 'Demand',
+            data: solData,
+            backgroundColor: 'rgba(0,207,255,0.15)',
+            borderColor: '#00CFFF',
+            pointBackgroundColor: '#00CFFF',
+            pointRadius: 3,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            r: {
+                angleLines: { color: '#1B3050' },
+                grid: { color: '#1B3050' },
+                ticks: { display: false },
+                pointLabels: { color: '#999', font: { size: 9 } }
+            }
+        }
+    }
+});
+
+// Top notices via API
+fetch('/api/notices?sort=priority_score&dir=DESC&per_page=8')
+    .then(r => r.json())
+    .then(data => {
+        const tbody = document.getElementById('topNotices');
+        if (!data.notices || data.notices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-xs text-gray-600">No notices yet. Run the pipeline to sync data.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.notices.map(n => `
+            <tr class="table-row border-b border-navy-700/50 cursor-pointer" onclick="location.href='/notice/${n.notice_id}'">
+                <td class="py-3 pr-4"><span class="badge-${n.grade.toLowerCase()} px-2 py-0.5 rounded text-xs font-semibold">${n.grade}</span></td>
+                <td class="py-3 pr-4 max-w-xs truncate text-white text-xs">${n.title}</td>
+                <td class="py-3 pr-4 text-xs text-gray-500">${n.site}</td>
+                <td class="py-3 pr-4 text-xs ${n.dday <= 7 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${n.deadline || '-'} ${n.dday >= 0 ? '(D-'+n.dday+')' : ''}</td>
+                <td class="py-3 pr-4 text-xs text-cyan-400">${n.priority_score?.toFixed(1) || '0'}</td>
+                <td class="py-3 pr-4 text-xs">${(n.win_probability*100)?.toFixed(0) || '0'}%</td>
+                <td class="py-3">${n.l3_strong === 'Y' ? '<span class="badge-l3 px-1.5 py-0.5 rounded text-[10px]">L3</span>' : ''}</td>
+            </tr>
+        `).join('');
+    });
+</script>
+{% endblock %}

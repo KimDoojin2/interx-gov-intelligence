@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active = "pipeline" %}
+{% block title %}Pipeline - InterX BD{% endblock %}
+{% block header %}Pipeline Runs{% endblock %}
+
+{% block content %}
+<!-- Sync Info -->
+<div class="glass glow rounded-xl p-5 mb-6">
+    <h3 class="text-sm font-semibold text-gray-400 mb-3">Colab Sync Setup</h3>
+    <p class="text-xs text-gray-500 mb-3">
+        Add this code at the end of your Colab pipeline to auto-sync results to this platform:
+    </p>
+    <div class="bg-navy-900 rounded-lg p-4 overflow-x-auto">
+        <pre class="text-xs text-cyan-400 font-mono whitespace-pre">import requests, json
+
+PLATFORM_URL = "http://YOUR_SERVER:8000"  # Replace with your platform URL
+
+def sync_to_platform(result, notices_data):
+    """Send pipeline results to BD Platform."""
+    payload = {
+        "execution_id": result.get("execution_id", ""),
+        "notice_count": result.get("notice_count", 0),
+        "l3_count": len(result.get("l3_rows", [])),
+        "a_count": sum(1 for n in notices_data if n.get("grade") == "A"),
+        "b_count": sum(1 for n in notices_data if n.get("grade") == "B"),
+        "error_count": result.get("error_count", 0),
+        "notices": notices_data,
+    }
+    resp = requests.post(f"{PLATFORM_URL}/api/pipeline/sync", json=payload)
+    print(f"Platform sync: {resp.json()}")
+
+# Call after pipeline run:
+# sync_to_platform(final_result, notices_list)</pre>
+    </div>
+</div>
+
+<!-- Pipeline History -->
+<div class="glass glow rounded-xl p-5">
+    <h3 class="text-sm font-semibold text-gray-400 mb-4">Run History</h3>
+    {% if runs %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-[11px] text-gray-500 uppercase border-b border-navy-600">
+                    <th class="pb-3 pr-4">Execution ID</th>
+                    <th class="pb-3 pr-4">Run Time</th>
+                    <th class="pb-3 pr-4 text-right">Notices</th>
+                    <th class="pb-3 pr-4 text-right">A</th>
+                    <th class="pb-3 pr-4 text-right">B</th>
+                    <th class="pb-3 pr-4 text-right">L3</th>
+                    <th class="pb-3 text-right">Errors</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr class="table-row border-b border-navy-700/30">
+                    <td class="py-3 pr-4 text-xs font-mono text-cyan-400">{{ run.execution_id }}</td>
+                    <td class="py-3 pr-4 text-xs text-gray-500">{{ run.run_at }}</td>
+                    <td class="py-3 pr-4 text-xs text-white text-right font-mono">{{ run.notice_count }}</td>
+                    <td class="py-3 pr-4 text-xs grade-a text-right font-mono">{{ run.a_count }}</td>
+                    <td class="py-3 pr-4 text-xs grade-b text-right font-mono">{{ run.b_count }}</td>
+                    <td class="py-3 pr-4 text-xs text-red-400 text-right font-mono">{{ run.l3_count }}</td>
+                    <td class="py-3 text-xs text-right font-mono {% if run.error_count > 0 %}text-red-400{% else %}text-gray-600{% endif %}">{{ run.error_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <svg class="w-12 h-12 text-gray-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <p class="text-xs text-gray-600">No pipeline runs yet.</p>
+        <p class="text-xs text-gray-700 mt-1">Run the engine on Colab and sync to see results here.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

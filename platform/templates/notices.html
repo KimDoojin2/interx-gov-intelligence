@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set active = "notices" %}
+{% block title %}Notices - InterX BD{% endblock %}
+{% block header %}
+    Notices
+    <span class="text-sm font-normal text-gray-500 ml-2">({{ result.total }} total)</span>
+{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="glass glow rounded-xl p-4 mb-4">
+    <form method="get" action="/notices" class="flex flex-wrap items-center gap-3">
+        <input type="text" name="search" value="{{ filters.search }}" placeholder="Search title / keywords..."
+               class="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-cyan-400 focus:outline-none w-64">
+
+        <select name="grade" class="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-gray-400 focus:border-cyan-400 focus:outline-none">
+            <option value="">All Grades</option>
+            {% for g in ['A','B','C','D'] %}
+            <option value="{{ g }}" {% if filters.grade == g %}selected{% endif %}>{{ g }} Grade</option>
+            {% endfor %}
+        </select>
+
+        <select name="site" class="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-gray-400 focus:border-cyan-400 focus:outline-none">
+            <option value="">All Sites</option>
+            {% for s in sites %}
+            <option value="{{ s }}" {% if filters.site == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="sort" class="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-sm text-gray-400 focus:border-cyan-400 focus:outline-none">
+            <option value="priority_score" {% if filters.sort == 'priority_score' %}selected{% endif %}>Priority Score</option>
+            <option value="fitness_score" {% if filters.sort == 'fitness_score' %}selected{% endif %}>Fitness</option>
+            <option value="win_probability" {% if filters.sort == 'win_probability' %}selected{% endif %}>Win %</option>
+            <option value="deadline" {% if filters.sort == 'deadline' %}selected{% endif %}>Deadline</option>
+            <option value="collected_at" {% if filters.sort == 'collected_at' %}selected{% endif %}>Recent</option>
+        </select>
+
+        <label class="flex items-center gap-1.5 text-xs text-gray-500">
+            <input type="checkbox" name="l3" value="true" {% if filters.l3 %}checked{% endif %} class="accent-red-400"> L3 Only
+        </label>
+        <label class="flex items-center gap-1.5 text-xs text-gray-500">
+            <input type="checkbox" name="urgent" value="true" {% if filters.urgent %}checked{% endif %} class="accent-yellow-400"> Urgent
+        </label>
+
+        <button type="submit" class="bg-cyan-400/20 text-cyan-400 hover:bg-cyan-400/30 px-4 py-2 rounded-lg text-sm font-medium transition">
+            Filter
+        </button>
+        <a href="/notices" class="text-xs text-gray-600 hover:text-gray-400 ml-1">Reset</a>
+    </form>
+</div>
+
+<!-- Notice Table -->
+<div class="glass glow rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-[11px] text-gray-500 uppercase border-b border-navy-600 bg-navy-800/50">
+                    <th class="p-3 w-14">Grade</th>
+                    <th class="p-3">Notice Title</th>
+                    <th class="p-3 w-24">Site</th>
+                    <th class="p-3 w-28">Deadline</th>
+                    <th class="p-3 w-16 text-right">Score</th>
+                    <th class="p-3 w-16 text-right">Win%</th>
+                    <th class="p-3 w-14 text-center">L3</th>
+                    <th class="p-3 w-20">Status</th>
+                    <th class="p-3 w-24">Solutions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in result.notices %}
+                <tr class="table-row border-b border-navy-700/30 cursor-pointer" onclick="location.href='/notice/{{ n.notice_id }}'">
+                    <td class="p-3">
+                        <span class="badge-{{ n.grade|lower }} px-2 py-0.5 rounded text-xs font-bold">{{ n.grade }}</span>
+                    </td>
+                    <td class="p-3">
+                        <div class="text-white text-xs font-medium max-w-md truncate">{{ n.title }}</div>
+                        <div class="text-[10px] text-gray-600 mt-0.5">{{ n.ministry }} {{ '| ' + n.agency if n.agency else '' }}</div>
+                    </td>
+                    <td class="p-3 text-xs text-gray-500">{{ n.site }}</td>
+                    <td class="p-3 text-xs {% if n.dday is not none and n.dday <= 7 and n.dday >= 0 %}text-red-400 font-semibold{% else %}text-gray-500{% endif %}">
+                        {{ n.deadline or '-' }}
+                        {% if n.dday is not none and n.dday >= 0 %}<span class="ml-1 text-[10px]">(D-{{ n.dday }})</span>{% endif %}
+                    </td>
+                    <td class="p-3 text-xs text-cyan-400 text-right font-mono">{{ '%.1f' % n.priority_score if n.priority_score else '0' }}</td>
+                    <td class="p-3 text-xs text-right font-mono">{{ '%.0f' % (n.win_probability * 100) if n.win_probability else '0' }}%</td>
+                    <td class="p-3 text-center">
+                        {% if n.l3_strong == 'Y' %}<span class="badge-l3 px-1.5 py-0.5 rounded text-[10px] font-bold">L3</span>{% endif %}
+                    </td>
+                    <td class="p-3">
+                        {% if n.recurring_flag == 'Y' %}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30">Recurring</span>
+                        {% endif %}
+                        {% if n.apply_status %}
+                        <span class="text-[10px] text-gray-500">{{ n.apply_status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-3 text-[10px] text-gray-500 max-w-[120px] truncate">{{ n.recommended_solutions or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="p-12 text-center text-gray-600 text-xs">
+                    No notices found. Run the pipeline and sync to see data here.
+                </td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if result.total_pages > 1 %}
+    <div class="flex items-center justify-between p-4 border-t border-navy-600">
+        <span class="text-xs text-gray-600">
+            Page {{ result.page }} of {{ result.total_pages }} ({{ result.total }} notices)
+        </span>
+        <div class="flex gap-1">
+            {% if result.page > 1 %}
+            <a href="?page={{ result.page - 1 }}&grade={{ filters.grade }}&site={{ filters.site }}&search={{ filters.search }}&sort={{ filters.sort }}&l3={{ filters.l3 }}&urgent={{ filters.urgent }}"
+               class="px-3 py-1 text-xs rounded bg-navy-700 hover:bg-navy-600 text-gray-400">Prev</a>
+            {% endif %}
+            {% if result.page < result.total_pages %}
+            <a href="?page={{ result.page + 1 }}&grade={{ filters.grade }}&site={{ filters.site }}&search={{ filters.search }}&sort={{ filters.sort }}&l3={{ filters.l3 }}&urgent={{ filters.urgent }}"
+               class="px-3 py-1 text-xs rounded bg-navy-700 hover:bg-navy-600 text-gray-400">Next</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -39,3 +39,11 @@ build/
 *.tmp
 *.bak
 *.swp
+
+# Platform runtime files
+platform/platform.db
+platform/server_out.log
+platform/server_err.log
+platform/_test_all.py
+platform/_check_db.py
+.coverage
