@@ -20,8 +20,11 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-if hasattr(sys.stdout, "buffer") and not isinstance(sys.stdout, io.TextIOWrapper):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+try:
+    if hasattr(sys.stdout, "buffer") and not sys.stdout.buffer.closed:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+except (ValueError, AttributeError):
+    pass
 
 try:
     from dotenv import load_dotenv
