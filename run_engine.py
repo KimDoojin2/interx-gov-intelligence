@@ -25,10 +25,14 @@ import os
 import sys
 
 # Windows 콘솔 UTF-8 강제 (em-dash 등 BMP 문자 깨짐 방지)
-if hasattr(sys.stdout, "buffer"):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "buffer"):
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+# Streamlit Cloud에서는 stdout.buffer가 닫혀있을 수 있으므로 try/except
+try:
+    if hasattr(sys.stdout, "buffer") and not sys.stdout.buffer.closed:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "buffer") and not sys.stderr.buffer.closed:
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+except (ValueError, AttributeError):
+    pass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
