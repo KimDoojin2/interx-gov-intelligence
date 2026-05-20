@@ -27,21 +27,23 @@ except ImportError:
     pass
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Design System
+#  Design System — interxlab.com 공식 팔레트 기반
 # ═══════════════════════════════════════════════════════════════════════════════
-P = "#F5921B"       # primary orange
-P_L = "#FFA940"     # primary light
-P_D = "#E07D0A"     # primary dark
-P_BG = "rgba(245,146,27,0.06)"
-CH = "#2D2D2D"      # charcoal
-S8 = "#1E293B"      # slate 800
-S7 = "#334155"
-S5 = "#64748B"
-S4 = "#94A3B8"
-S3 = "#CBD5E1"
-S2 = "#E2E8F0"
-S1 = "#F1F5F9"
-S0 = "#F8FAFC"
+P = "#FF8000"       # --accent-color (interxlab.com 공식 오렌지)
+P_L = "#FF9F2E"     # accent light
+P_D = "#E67300"     # accent dark
+P_BG = "rgba(255,128,0,0.05)"
+A2 = "#3A7BEE"      # --accent2-color (interxlab.com 공식 블루)
+BK = "#000000"      # --primary-color (블랙)
+CH = "#333333"      # --secondary-color
+S8 = "#1A1A1A"      # near-black
+S7 = "#444444"
+S5 = "#666666"      # muted text
+S4 = "#999999"
+S3 = "#CCCCCC"
+S2 = "#DDDDDD"      # border
+S1 = "#F5F5F5"      # --bg-sub-color 근사
+S0 = "#F7F7F7"      # --bg-sub-color
 W = "#FFFFFF"
 GA = "#059669"; GB = "#2563EB"; GC = "#D97706"; GD = "#DC2626"
 GRADE = {"A": GA, "B": GB, "C": GC, "D": GD}
@@ -55,11 +57,11 @@ if "intro_shown" not in st.session_state:
     st.markdown("""<style>
     @keyframes ix{0%{opacity:0;transform:scale(.8) translateY(16px)}35%{opacity:1;transform:scale(1.02)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.97) translateY(-8px)}}
     @keyframes ixbg{0%{opacity:1}75%{opacity:1}100%{opacity:0;pointer-events:none}}
-    .ix-intro{position:fixed;inset:0;z-index:99999;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;animation:ixbg 2.4s ease forwards}
-    .ix-intro .logo{animation:ix 2.4s ease forwards;text-align:center}
-    .ix-intro .mark{font-size:2.8rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif}
-    .ix-intro .mark b{color:#F5921B} .ix-intro .mark span{color:#2D2D2D}
-    .ix-intro .sub{color:#94A3B8;font-size:.82rem;letter-spacing:3px;margin-top:8px;font-weight:500}
+    .ix-intro{position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;animation:ixbg 2.6s ease forwards}
+    .ix-intro .logo{animation:ix 2.6s ease forwards;text-align:center}
+    .ix-intro .mark{font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif}
+    .ix-intro .mark b{color:#FF8000} .ix-intro .mark span{color:#fff}
+    .ix-intro .sub{color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500}
     </style><div class="ix-intro"><div class="logo"><div class="mark"><span>INTER</span><b>X</b></div><div class="sub">INTELLIGENCE ENGINE</div></div></div>""", unsafe_allow_html=True)
 
 # ── Enterprise CSS ──
@@ -71,28 +73,26 @@ st.markdown(f"""<style>
 section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
 
-/* ── Top Navigation Bar ── */
+/* ── Top Navigation Bar — interxlab.com 스타일 ── */
 .nav-bar{{
-    background:{CH};border-radius:14px;padding:14px 28px;margin-bottom:24px;
+    background:{BK};border-radius:0;padding:16px 32px;margin:-1rem -1rem 28px;
     display:flex;align-items:center;justify-content:space-between;
-    box-shadow:0 1px 3px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.04);
 }}
-.nav-bar .brand{{font-size:1.25rem;font-weight:900;letter-spacing:-1px}}
+.nav-bar .brand{{font-size:1.3rem;font-weight:900;letter-spacing:-1px}}
 .nav-bar .brand span{{color:#fff}} .nav-bar .brand b{{color:{P}}}
-.nav-bar .meta{{color:rgba(255,255,255,.35);font-size:.72rem;font-weight:500;letter-spacing:.5px}}
+.nav-bar .meta{{color:rgba(255,255,255,.3);font-size:.72rem;font-weight:500;letter-spacing:.8px}}
 
-/* ── Metric Card — Elevation 1 ── */
+/* ── Metric Card — interxlab.com 호버 글로우 ── */
 .m-card{{
-    background:{W};border:1px solid {S2};border-radius:14px;padding:20px 18px;
-    box-shadow:0 1px 2px rgba(0,0,0,.04);position:relative;overflow:hidden;
-    transition:all .25s cubic-bezier(.4,0,.2,1);
+    background:{W};border:1px solid {S2};border-radius:12px;padding:20px 18px;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);position:relative;overflow:hidden;
+    transition:all .3s ease;
 }}
 .m-card::after{{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,{P},{P_L});transform:scaleX(0);
-    transform-origin:left;transition:transform .3s ease;
+    background:{P};transform:scaleX(0);transform-origin:left;transition:transform .3s ease;
 }}
-.m-card:hover{{border-color:{P};box-shadow:0 4px 16px rgba(245,146,27,.10);transform:translateY(-2px)}}
+.m-card:hover{{border-color:{P};box-shadow:2px 2px 20px rgba(255,128,0,.15);transform:translateY(-2px)}}
 .m-card:hover::after{{transform:scaleX(1)}}
 .m-val{{font-size:1.75rem;font-weight:800;color:{CH};line-height:1.15;letter-spacing:-.5px}}
 .m-label{{font-size:.7rem;color:{S5};margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.8px}}
@@ -135,12 +135,12 @@ section[data-testid="stSidebar"]{{display:none}}
 .stTabs [data-baseweb="tab"]:hover{{color:{P};background:{P_BG}}}
 .stTabs [aria-selected="true"]{{background:{W};color:{P_D};font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.06)}}
 
-/* ── Button ── */
+/* ── Button — interxlab.com 스타일 ── */
 .stButton>button{{
-    background:linear-gradient(135deg,{P_D},{P});color:{W};font-weight:700;border:none;border-radius:10px;
-    padding:.6rem 2rem;font-size:.85rem;letter-spacing:.3px;transition:all .25s ease;
+    background:{BK};color:{W};font-weight:700;border:none;border-radius:8px;
+    padding:.65rem 2rem;font-size:.85rem;letter-spacing:.3px;transition:all .3s ease;
 }}
-.stButton>button:hover{{box-shadow:0 4px 16px rgba(245,146,27,.30);transform:translateY(-1px)}}
+.stButton>button:hover{{background:{P};box-shadow:2px 2px 20px rgba(255,128,0,.3);transform:translateY(-1px)}}
 
 /* ── Progress ── */
 .stProgress>div>div>div>div{{background:linear-gradient(90deg,{P},{P_L});border-radius:4px}}
