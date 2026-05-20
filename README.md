@@ -32,7 +32,20 @@
 
 ## 📋 최근 업데이트
 
-### v4.5 — 2025-05-20
+### v5.0 — 2025-05-20
+
+**🏢 Enterprise UI v5 + 프로젝트 대규모 정리**
+- **interxlab.com 공식 디자인 시스템 적용**
+  - `--accent-color: #FF8000` (공식 오렌지)
+  - `--accent2-color: #3A7BEE` (공식 블루)
+  - `--primary-color: #000` (블랙 네비게이션, 버튼)
+  - 버튼: 블랙 → 호버 시 오렌지 전환 / 카드: 오렌지 글로우 호버
+  - 인트로: 블랙 배경 + 화이트 INTER + 오렌지 X
+- **Enterprise 컴포넌트 시스템**: Metric Card, Notice Row, Status Pill, Section Header, Empty State
+- **프로젝트 정리 (-12,000줄)**: archive/ 전체 삭제, 레거시 루트 파일 제거
+- **코드 48% 압축**: 1,076줄 → 563줄 (기능 100% 유지)
+
+### v4.5
 
 **🎨 프리미엄 UI 리디자인**
 - InterX 브랜드 테마 적용: 화이트 배경 + 오렌지(`#F5921B`) + 다크그레이(`#3C3C3C`)
@@ -1281,25 +1294,28 @@ https://interx-gov-intel.streamlit.app
 | **담당자 현황** | 업무 배분 | 담당자별 등급 분포 스택 차트 + 상세 테이블 |
 | **수집 히스토리** | 실행 이력 추적 | 수집 트렌드 차트 + 등급 비교 + 사이트별 변화 + 히스토리 Excel 다운로드 |
 
-### 21-3. UI 디자인
+### 21-3. UI 디자인 — interxlab.com 공식 팔레트
 
 ```
-InterX 프리미엄 화이트 테마 (v4)
-├── 브랜드: INTER(#3C3C3C) + X(#F5921B) 오렌지
-├── 배경: 화이트 + Inter 폰트 (Google Fonts)
-├── 인트로: INTERX 로고 fadeIn/fadeOut 애니메이션 (2.8초)
-├── KPI 카드: 오렌지 호버 상단바 + 그림자 리프트
-├── 공고 카드: 왼쪽 보더 오렌지 호버 애니메이션
-├── 버튼: 오렌지 그라디언트 + 호버 쉐도우
-└── 탭: 라운드 + 오렌지 액센트
+InterX Enterprise Dashboard v5 — 공식 사이트 동일 디자인 시스템
+├── --accent-color: #FF8000 (공식 오렌지)
+├── --accent2-color: #3A7BEE (공식 블루)
+├── --primary-color: #000 (블랙)
+├── 네비게이션: 블랙 풀너비 바 (공식 사이트 헤더 동일)
+├── 인트로: 블랙 배경 + INTER(화이트) + X(오렌지) 2.6초 애니메이션
+├── Metric Card: 오렌지 글로우 호버 (2px 2px 20px rgba(255,128,0,.15))
+├── Notice Row: 배지 + 제목 + 메타 + Status Pill 컴포넌트
+├── 버튼: 블랙 기본 → 호버 시 오렌지 전환
+├── Status Pill: 시맨틱 색상 (A=초록, L3=핑크, 긴급=빨강)
+└── Empty State: 아이콘 + 제목 + 설명 + 액션 가이드
 ```
 
 ### 21-4. 기술 스택
 
 ```
 Streamlit 1.57 + Plotly + Pandas
-├── streamlit_app.py          # 메인 앱 (11탭, ~1000줄)
-├── .streamlit/config.toml     # 테마 설정 (화이트 + 오렌지 포인트)
+├── streamlit_app.py          # Enterprise Dashboard (11탭, ~560줄)
+├── .streamlit/config.toml     # 테마 설정 (primaryColor: #FF8000)
 └── Streamlit Cloud            # 무료 호스팅 (GitHub 연동 자동 배포)
 ```
 
