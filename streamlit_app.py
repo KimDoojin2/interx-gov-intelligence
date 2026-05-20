@@ -1,6 +1,6 @@
 """
 InterX Government Intelligence Engine — Streamlit Team App
-팀원 배포용 원클릭 파이프라인 실행 앱 (v2 — 9개 탭)
+팀원 배포용 원클릭 파이프라인 실행 앱 (v3 — 11개 탭)
 """
 from __future__ import annotations
 
@@ -136,15 +136,19 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
-tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager = st.tabs([
+tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history = st.tabs([
     "대시보드", "수집 실행", "공고 목록", "제안서", "경쟁사 분석",
-    "수주 예측", "마감 캘린더", "솔루션 매칭", "키워드 트렌드", "담당자 현황",
+    "수주 예측", "마감 캘린더", "솔루션 매칭", "키워드 트렌드", "담당자 현황", "수집 히스토리",
 ])
 
 if "pipeline_result" not in st.session_state:
     st.session_state.pipeline_result = None
 if "pipeline_running" not in st.session_state:
     st.session_state.pipeline_running = False
+if "collection_history" not in st.session_state:
+    st.session_state.collection_history = []  # [{timestamp, result_summary, notices_count, grades, sites}]
+if "selected_notice_id" not in st.session_state:
+    st.session_state.selected_notice_id = None
 
 all_sites = [
     "bizinfo", "kiat", "nipa", "innopolis", "bipa", "uipa",
@@ -288,6 +292,19 @@ with tab_run:
                 progress.progress(100, text="완료!")
                 st.session_state.pipeline_result = result
                 st.session_state.pipeline_running = False
+                # ── 수집 히스토리 저장 ──
+                site_cnt = Counter(n.site for n in nn)
+                history_entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "execution_id": execution_id,
+                    "total": len(nn),
+                    "grades": dict(gc),
+                    "sites": dict(site_cnt),
+                    "proposals": len(pp),
+                    "mode": ml,
+                    "l3_count": sum(1 for n in nn if getattr(n, "l3_strong", "N") == "Y"),
+                }
+                st.session_state.collection_history.append(history_entry)
                 status.update(label=f"완료! {len(nn)}건 수집", state="complete")
                 time.sleep(1); st.rerun()
             except Exception as e:
@@ -298,7 +315,7 @@ with tab_run:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  탭 3: 공고 목록
+#  탭 3: 공고 목록 + 상세 보기
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_notices:
@@ -331,19 +348,124 @@ with tab_notices:
                          "L3": "Y" if getattr(n,"l3_strong","N")=="Y" else "", "예산": n.budget or "-"})
         if rows:
             df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, height=600)
+            st.dataframe(df, use_container_width=True, height=450)
 
-            # 다운로드 버튼 (CSV + Excel)
+            # ── 다운로드 버튼 (CSV + Excel) ──
             dl1, dl2, _ = st.columns([1,1,4])
             dl1.download_button("CSV 다운로드", df.to_csv(index=False).encode("utf-8-sig"),
                                 f"interx_공고_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
             try:
                 buf = io.BytesIO()
-                with pd.ExcelWriter(buf, engine="openpyxl") as w: df.to_excel(w, index=False, sheet_name="공고목록")
-                dl2.download_button("Excel 다운로드", buf.getvalue(),
+                with pd.ExcelWriter(buf, engine="openpyxl") as w:
+                    df.to_excel(w, index=False, sheet_name="공고목록")
+                    # 컬럼 너비 자동 조정
+                    ws = w.sheets["공고목록"]
+                    for col_idx, col_name in enumerate(df.columns, 1):
+                        max_len = max(len(str(col_name)), df[col_name].astype(str).str.len().max())
+                        ws.column_dimensions[chr(64+col_idx) if col_idx<=26 else "A"].width = min(max_len + 4, 40)
+                dl2.download_button("Excel 다운로드 (.xlsx)", buf.getvalue(),
                                     f"interx_공고_{datetime.now().strftime('%Y%m%d')}.xlsx",
                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             except Exception: pass
+
+            # ── 공고 상세 보기 ──
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'<div class="section-title">공고 상세 보기</div>', unsafe_allow_html=True)
+            notice_titles = {f"[{sc.priority_grade if sc else 'D'}] {n.title[:60]} ({n.site})": (n, sc) for n, sc in filtered}
+            selected_title = st.selectbox("공고를 선택하세요", ["선택하세요..."] + list(notice_titles.keys()),
+                                           label_visibility="collapsed")
+            if selected_title != "선택하세요..." and selected_title in notice_titles:
+                sel_n, sel_sc = notice_titles[selected_title]
+                dd = _calc_dday(sel_n.deadline_date or "")
+                grade = sel_sc.priority_grade if sel_sc else "D"
+                grade_color = GRADE_COLORS.get(grade, TEXT_MID)
+
+                # 상세 헤더
+                st.markdown(f"""
+                <div style="background:{BG_GRAY}; border:2px solid {grade_color}; border-radius:12px; padding:1.5rem; margin:0.5rem 0;">
+                    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
+                        <span style="background:{grade_color}; color:white; padding:0.3rem 0.8rem; border-radius:6px; font-weight:800; font-size:1.2rem;">{grade}등급</span>
+                        <span style="font-size:1.1rem; font-weight:700; color:{TEXT_DARK};">{sel_n.title}</span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+                # 기본 정보 + 점수 정보 2컬럼
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    st.markdown("**기본 정보**")
+                    info_items = [
+                        ("주관기관", sel_n.agency or sel_n.ministry or "-"),
+                        ("부처", getattr(sel_n, "ministry", "-") or "-"),
+                        ("사이트", sel_n.site),
+                        ("마감일", f"{sel_n.deadline_date or '-'}  (D-{dd})" if dd >= 0 else f"{sel_n.deadline_date or '-'} (마감)"),
+                        ("예산", sel_n.budget or "-"),
+                        ("공고일", getattr(sel_n, "notice_date", "-") or "-"),
+                        ("신청기간", getattr(sel_n, "apply_period", "-") or "-"),
+                        ("링크", sel_n.link or "-"),
+                    ]
+                    for label, val in info_items:
+                        if label == "링크" and val != "-":
+                            st.markdown(f"- **{label}**: [{val[:50]}...]({val})")
+                        else:
+                            st.markdown(f"- **{label}**: {val}")
+
+                with dc2:
+                    if sel_sc:
+                        st.markdown("**점수 상세**")
+                        st.markdown(f"- **적합도 (fitness)**: {sel_sc.fitness_score:.1f}")
+                        st.markdown(f"- **우선순위 (priority)**: {sel_sc.priority_score:.1f}")
+                        st.markdown(f"- **산업 적합도 (industry)**: {sel_sc.industry_score:.1f}")
+                        st.markdown(f"- **L3 강공고**: {'Y' if getattr(sel_n, 'l3_strong', 'N') == 'Y' else 'N'}")
+
+                        # 수주 확률 계산
+                        fitness = sel_sc.fitness_score or 0
+                        priority = sel_sc.priority_score or 0
+                        industry = sel_sc.industry_score or 0
+                        l3v = 1 if getattr(sel_n, "l3_strong", "N") == "Y" else 0
+                        urg = max(0, min(100, (30 - dd) * 3.33)) if dd >= 0 else 0
+                        wp = min(100, max(0, fitness*0.35 + priority*0.25 + 50*0.15 + urg*0.10 + l3v*10 + industry*0.05))
+                        wp_color = GREEN_A if wp >= 60 else CYAN_500 if wp >= 40 else "#F59E0B" if wp >= 20 else RED_D
+                        st.markdown(f"- **수주 확률**: <span style='color:{wp_color};font-weight:800;'>{wp:.0f}%</span>", unsafe_allow_html=True)
+
+                        # 매칭 키워드
+                        if sel_sc.positive_keywords:
+                            kw_tags = " ".join(f'<span style="background:{CYAN_400};color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem;margin:2px;">{k}</span>' for k in sel_sc.positive_keywords[:15])
+                            st.markdown(f"**매칭 키워드**: {kw_tags}", unsafe_allow_html=True)
+
+                        # 솔루션 점수
+                        if sel_sc.solution_scores:
+                            st.markdown("**솔루션별 점수**")
+                            SOL_NAMES_D = {"ManufacturingDT":"제조DT", "RecipeAI":"레시피AI", "QualityAI":"품질AI",
+                                          "InspectionAI":"비전검사", "SafetyAI":"안전AI", "GenAI":"GenAI",
+                                          "InfraDS":"데이터인프라", "PdM":"예지보전"}
+                            sol_items = [(SOL_NAMES_D.get(k,k), v) for k,v in sel_sc.solution_scores.items() if v > 0]
+                            if sol_items:
+                                sol_items.sort(key=lambda x: -x[1])
+                                sol_text = " | ".join(f"**{name}** {score:.0f}" for name, score in sol_items)
+                                st.markdown(sol_text)
+                            else:
+                                st.markdown("_매칭 솔루션 없음_")
+
+                # 본문 (body_text)
+                body = getattr(sel_n, "body_text", "") or ""
+                if body:
+                    with st.expander("공고 본문 보기", expanded=False):
+                        st.text(body[:5000])
+                        if len(body) > 5000:
+                            st.caption(f"... (전체 {len(body):,}자 중 5,000자 표시)")
+
+                # 구조화 정보
+                structured = {}
+                for field in ["purpose", "support_content", "target", "apply_method"]:
+                    val = getattr(sel_n, field, None)
+                    if val: structured[field] = val
+                if structured:
+                    field_labels = {"purpose": "사업 목적", "support_content": "지원 내용",
+                                    "target": "지원 대상", "apply_method": "신청 방법"}
+                    with st.expander("구조화 정보 보기", expanded=False):
+                        for field, val in structured.items():
+                            st.markdown(f"**{field_labels.get(field, field)}**")
+                            st.text(val[:2000])
         else: st.warning("필터 조건에 맞는 공고가 없습니다.")
 
 
@@ -707,3 +829,129 @@ with tab_manager:
                 "A비율": f'{data["A"]/max(1,data["total"])*100:.0f}%'
             })
         st.dataframe(pd.DataFrame(mgr_rows), use_container_width=True, height=400)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  탭 11: 수집 히스토리
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab_history:
+    history = st.session_state.get("collection_history", [])
+    if not history:
+        st.markdown(f"""
+        <div style="text-align:center; padding:5rem 0;">
+            <p style="font-size:3.5rem; margin:0;">&#x1F4C5;</p>
+            <p style="color:{TEXT_MID}; font-size:1.1rem; margin-top:1rem;">수집 히스토리가 없습니다</p>
+            <p style="color:{TEXT_LIGHT}; font-size:0.9rem;">수집을 실행하면 결과가 여기에 기록됩니다</p>
+        </div>""", unsafe_allow_html=True)
+    else:
+        import plotly.graph_objects as go
+
+        st.markdown(f'<div class="section-title">수집 히스토리 ({len(history)}회)</div>', unsafe_allow_html=True)
+
+        # KPI: 최근 수집 vs 이전 수집 비교
+        latest = history[-1]
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown(_kpi(len(history), "총 수집 횟수"), unsafe_allow_html=True)
+        k2.markdown(_kpi(latest["total"], "최근 수집건수"), unsafe_allow_html=True)
+        k3.markdown(_kpi(latest["grades"].get("A", 0), "최근 A등급"), unsafe_allow_html=True)
+
+        if len(history) >= 2:
+            prev = history[-2]
+            diff = latest["total"] - prev["total"]
+            diff_str = f'+{diff}' if diff >= 0 else str(diff)
+            diff_color = GREEN_A if diff > 0 else RED_D if diff < 0 else TEXT_MID
+            k4.markdown(_kpi(f'<span style="color:{diff_color}">{diff_str}</span>', "이전 대비 증감"), unsafe_allow_html=True)
+        else:
+            k4.markdown(_kpi("-", "이전 대비 증감"), unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── 히스토리 테이블 ──
+        hist_rows = []
+        for i, h in enumerate(reversed(history), 1):
+            hist_rows.append({
+                "#": i,
+                "수집일시": h["timestamp"],
+                "모드": h.get("mode", "-"),
+                "전체": h["total"],
+                "A등급": h["grades"].get("A", 0),
+                "B등급": h["grades"].get("B", 0),
+                "C등급": h["grades"].get("C", 0),
+                "D등급": h["grades"].get("D", 0),
+                "L3": h.get("l3_count", 0),
+                "제안서": h.get("proposals", 0),
+                "사이트수": len(h.get("sites", {})),
+            })
+        st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, height=300)
+
+        # ── Excel 다운로드 ──
+        try:
+            hist_df = pd.DataFrame(hist_rows)
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine="openpyxl") as w:
+                hist_df.to_excel(w, index=False, sheet_name="수집히스토리")
+            st.download_button("히스토리 Excel 다운로드", buf.getvalue(),
+                               f"interx_히스토리_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        except Exception:
+            pass
+
+        # ── 수집 추이 차트 (2회 이상일 때) ──
+        if len(history) >= 2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_trend, col_grade = st.columns(2)
+
+            with col_trend:
+                timestamps = [h["timestamp"][:16] for h in history]
+                totals = [h["total"] for h in history]
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=timestamps, y=totals, mode='lines+markers',
+                                          name='전체 공고', line=dict(color=CYAN_400, width=3),
+                                          marker=dict(size=10, color=CYAN_400)))
+                a_counts = [h["grades"].get("A", 0) for h in history]
+                fig.add_trace(go.Scatter(x=timestamps, y=a_counts, mode='lines+markers',
+                                          name='A등급', line=dict(color=GREEN_A, width=2),
+                                          marker=dict(size=8, color=GREEN_A)))
+                fig.update_layout(title=dict(text="수집 건수 추이", font=dict(color=TEXT_DARK)),
+                                  height=350, xaxis=dict(title="수집 일시", gridcolor=BORDER),
+                                  yaxis=dict(title="공고 수", gridcolor=BORDER),
+                                  legend=dict(orientation="h", y=1.12), **_layout())
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col_grade:
+                # 최근 2회 등급 비교 바 차트
+                latest_g = history[-1]["grades"]
+                prev_g = history[-2]["grades"]
+                grades_list = ["A", "B", "C", "D"]
+                fig = go.Figure()
+                fig.add_trace(go.Bar(name="이전 수집", x=grades_list,
+                                      y=[prev_g.get(g, 0) for g in grades_list],
+                                      marker_color=TEXT_LIGHT))
+                fig.add_trace(go.Bar(name="최근 수집", x=grades_list,
+                                      y=[latest_g.get(g, 0) for g in grades_list],
+                                      marker_color=[GREEN_A, CYAN_500, "#F59E0B", RED_D]))
+                fig.update_layout(title=dict(text="최근 vs 이전 등급 비교", font=dict(color=TEXT_DARK)),
+                                  height=350, barmode='group',
+                                  xaxis=dict(title="등급", gridcolor=BORDER),
+                                  yaxis=dict(title="공고 수", gridcolor=BORDER),
+                                  legend=dict(orientation="h", y=1.12), **_layout())
+                st.plotly_chart(fig, use_container_width=True)
+
+            # ── 사이트별 변화 비교 ──
+            if len(history) >= 2:
+                st.markdown(f'<div class="section-title">사이트별 수집 변화 (최근 vs 이전)</div>', unsafe_allow_html=True)
+                latest_sites = history[-1].get("sites", {})
+                prev_sites = history[-2].get("sites", {})
+                all_site_names = sorted(set(list(latest_sites.keys()) + list(prev_sites.keys())))
+                if all_site_names:
+                    site_rows = []
+                    for s in all_site_names:
+                        cur = latest_sites.get(s, 0)
+                        prv = prev_sites.get(s, 0)
+                        diff = cur - prv
+                        site_rows.append({
+                            "사이트": s, "최근": cur, "이전": prv,
+                            "변화": f"+{diff}" if diff > 0 else str(diff) if diff < 0 else "0",
+                        })
+                    st.dataframe(pd.DataFrame(site_rows), use_container_width=True, height=300)
