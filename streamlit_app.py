@@ -320,7 +320,7 @@ with tab_dash:
                 hole=0.55, textinfo="label+value", textfont=dict(color=TEXT_DARK, size=13)))
             fig.update_layout(title=dict(text="등급 분포", font=dict(color=TEXT_DARK, size=16)),
                               showlegend=False, height=350, **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         with c_list:
             st.markdown(f'<div class="section-title">A등급 핵심 공고 ({grades["A"]}건)</div>', unsafe_allow_html=True)
             a_list = sorted([(n, score_map[n.notice_id]) for n in notices
@@ -338,7 +338,7 @@ with tab_dash:
             fig2 = go.Figure(go.Bar(x=[s[0] for s in sc_cnt], y=[s[1] for s in sc_cnt],
                                     marker_color=ORANGE_500, marker_line_color=ORANGE_600, marker_line_width=1))
             fig2.update_layout(height=300, xaxis=dict(gridcolor=BORDER), yaxis=dict(gridcolor=BORDER, title="공고 수"), **_layout())
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width="stretch")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -363,7 +363,7 @@ with tab_run:
     st.markdown("<br>", unsafe_allow_html=True)
 
     cb, cs = st.columns([1, 2])
-    with cb: run_clicked = st.button("수집 시작", type="primary", use_container_width=True, disabled=st.session_state.pipeline_running)
+    with cb: run_clicked = st.button("수집 시작", type="primary", width="stretch", disabled=st.session_state.pipeline_running)
     with cs:
         if st.session_state.pipeline_result:
             st.success(f"마지막 실행: {len(st.session_state.pipeline_result.get('notices',[]))}건 수집 완료")
@@ -464,7 +464,7 @@ with tab_notices:
                          "L3": "Y" if getattr(n,"l3_strong","N")=="Y" else "", "예산": n.budget or "-"})
         if rows:
             df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, height=450)
+            st.dataframe(df, width="stretch", height=450)
 
             # ── 다운로드 버튼 (CSV + Excel) ──
             dl1, dl2, _ = st.columns([1,1,4])
@@ -635,13 +635,13 @@ with tab_compete:
                     fig = go.Figure(go.Bar(x=[c[1] for c in tc[:10]], y=[c[0] for c in tc[:10]], orientation='h', marker_color=CYAN_400))
                     fig.update_layout(title=dict(text="경쟁사 탐지 TOP 10", font=dict(color=TEXT_DARK)),
                                       height=400, yaxis=dict(autorange="reversed"), xaxis=dict(gridcolor=BORDER, title="탐지 횟수"), **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 if cn:
                     st.markdown(f'<div class="section-title">경쟁사 관련 공고 ({len(cn)}건)</div>', unsafe_allow_html=True)
                     st.dataframe(pd.DataFrame([{"등급":c["grade"],"공고명":c["title"][:60],"사이트":c["site"],
                                                 "마감일":c["deadline"] or "-","경쟁사":" / ".join(c["competitors"]),
                                                 "Tier":" / ".join(c["tiers"])} for c in cn]),
-                                 use_container_width=True, height=400)
+                                 width="stretch", height=400)
             except Exception as e: st.error(f"경쟁사 리포트 생성 실패: {e}")
 
 
@@ -700,7 +700,7 @@ with tab_predict:
                                    marker_color=[RED_D, AMBER_C, "#FBBF24", BLUE_B, GREEN_A]))
             fig.update_layout(title=dict(text="수주 확률 분포", font=dict(color=TEXT_DARK)),
                               height=350, xaxis=dict(title="확률 구간"), yaxis=dict(title="공고 수", gridcolor=BORDER), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col_top:
             st.markdown('<div class="section-title">수주 유망 TOP 10</div>', unsafe_allow_html=True)
@@ -759,7 +759,7 @@ with tab_calendar:
                 RED_D if _calc_dday(d) <= 3 else AMBER_C if _calc_dday(d) <= 7 else ORANGE_500 for d in dates]))
             fig.update_layout(title=dict(text="마감일별 공고 수 (30일)", font=dict(color=TEXT_DARK)),
                               height=300, xaxis=dict(title="마감일"), yaxis=dict(title="공고 수", gridcolor=BORDER), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         # 긴급 마감 리스트
         st.markdown(f'<div class="section-title">긴급 마감 공고 (D-7 이내, {d7}건)</div>', unsafe_allow_html=True)
@@ -822,7 +822,7 @@ with tab_solution:
                                   polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=BORDER),
                                              bgcolor=BG_GRAY, angularaxis=dict(gridcolor=BORDER)),
                                   height=400, **_layout())
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             with col_bar:
                 names = [SOL_NAMES.get(k, k) for k, _ in sorted_sols]
@@ -834,7 +834,7 @@ with tab_solution:
                 fig.update_layout(title=dict(text="솔루션별 점수 & 공고 수", font=dict(color=TEXT_DARK)),
                                   barmode='group', height=400, xaxis=dict(gridcolor=BORDER),
                                   yaxis=dict(gridcolor=BORDER), legend=dict(orientation="h", y=1.12), **_layout())
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
         else:
             st.info("솔루션 점수 데이터가 없습니다.")
 
@@ -882,7 +882,7 @@ with tab_keyword:
                                        orientation='h', marker_color=ORANGE_500))
                 fig.update_layout(title=dict(text="매칭 키워드 TOP 20 (스코어링)", font=dict(color=TEXT_DARK)),
                                   height=500, xaxis=dict(title="출현 횟수", gridcolor=BORDER), **_layout(margin=dict(l=120,r=20,t=50,b=40)))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         with col_title:
             if title_words:
@@ -891,7 +891,7 @@ with tab_keyword:
                                        orientation='h', marker_color=BLUE_B))
                 fig.update_layout(title=dict(text="공고 제목 빈출 단어 TOP 20", font=dict(color=TEXT_DARK)),
                                   height=500, xaxis=dict(title="출현 횟수", gridcolor=BORDER), **_layout(margin=dict(l=120,r=20,t=50,b=40)))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -933,7 +933,7 @@ with tab_manager:
             fig.update_layout(title=dict(text="담당자별 공고 등급 분포", font=dict(color=TEXT_DARK)),
                               barmode='stack', height=400, legend=dict(orientation="h", y=1.12),
                               xaxis=dict(gridcolor=BORDER), yaxis=dict(title="공고 수", gridcolor=BORDER), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         # 담당자별 상세 테이블
         st.markdown('<div class="section-title">담당자별 상세</div>', unsafe_allow_html=True)
@@ -944,7 +944,7 @@ with tab_manager:
                 "A등급": data["A"], "B등급": data["B"], "C등급": data["C"], "D등급": data["D"],
                 "A비율": f'{data["A"]/max(1,data["total"])*100:.0f}%'
             })
-        st.dataframe(pd.DataFrame(mgr_rows), use_container_width=True, height=400)
+        st.dataframe(pd.DataFrame(mgr_rows), width="stretch", height=400)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1001,7 +1001,7 @@ with tab_history:
                 "제안서": h.get("proposals", 0),
                 "사이트수": len(h.get("sites", {})),
             })
-        st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, height=300)
+        st.dataframe(pd.DataFrame(hist_rows), width="stretch", height=300)
 
         # ── Excel 다운로드 ──
         try:
@@ -1035,7 +1035,7 @@ with tab_history:
                                   height=350, xaxis=dict(title="수집 일시", gridcolor=BORDER),
                                   yaxis=dict(title="공고 수", gridcolor=BORDER),
                                   legend=dict(orientation="h", y=1.12), **_layout())
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             with col_grade:
                 # 최근 2회 등급 비교 바 차트
@@ -1054,7 +1054,7 @@ with tab_history:
                                   xaxis=dict(title="등급", gridcolor=BORDER),
                                   yaxis=dict(title="공고 수", gridcolor=BORDER),
                                   legend=dict(orientation="h", y=1.12), **_layout())
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
             # ── 사이트별 변화 비교 ──
             if len(history) >= 2:
@@ -1072,4 +1072,4 @@ with tab_history:
                             "사이트": s, "최근": cur, "이전": prv,
                             "변화": f"+{diff}" if diff > 0 else str(diff) if diff < 0 else "0",
                         })
-                    st.dataframe(pd.DataFrame(site_rows), use_container_width=True, height=300)
+                    st.dataframe(pd.DataFrame(site_rows), width="stretch", height=300)
