@@ -47,7 +47,7 @@ NAVY_900 = CHARCOAL; NAVY_800 = SLATE_700; GOLD_400 = "#FFD700"; MAGENTA = "#FF0
 # ── 페이지 설정 ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="InterX Gov Intelligence",
-    page_icon="https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence/master/.streamlit/interx_icon.png",
+    page_icon="🔶",
     layout="wide", initial_sidebar_state="collapsed",
 )
 
