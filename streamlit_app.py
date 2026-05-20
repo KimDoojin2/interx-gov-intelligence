@@ -32,66 +32,168 @@ try:
 except ImportError:
     pass
 
-# ── InterX 브랜드 색상 (화이트 테마) ──────────────────────────────────────────
-CYAN_400 = "#00CFFF"; CYAN_500 = "#00B8E6"; CYAN_600 = "#009FCC"
-NAVY_900 = "#0A1628"; NAVY_800 = "#0F1E35"
-GOLD_400 = "#FFD700"; GREEN_A = "#22C55E"; RED_D = "#EF4444"; MAGENTA = "#FF0064"
-TEXT_DARK = "#1F2937"; TEXT_MID = "#6B7280"; TEXT_LIGHT = "#9CA3AF"
-BG_WHITE = "#FFFFFF"; BG_GRAY = "#F9FAFB"; BORDER = "#E5E7EB"
-GRADE_COLORS = {"A": GREEN_A, "B": CYAN_500, "C": "#F59E0B", "D": RED_D}
+# ── InterX 브랜드 색상 (v4 — 화이트+오렌지 프리미엄) ─────────────────────────
+# 로고 기준: INTER(다크그레이 #3C3C3C) + X(오렌지 #F5921B)
+ORANGE_500 = "#F5921B"; ORANGE_400 = "#FF9F2E"; ORANGE_600 = "#E07D0A"
+CHARCOAL = "#3C3C3C"; SLATE_700 = "#334155"; SLATE_800 = "#1E293B"
+GREEN_A = "#10B981"; BLUE_B = "#3B82F6"; AMBER_C = "#F59E0B"; RED_D = "#EF4444"
+TEXT_DARK = "#1E293B"; TEXT_MID = "#64748B"; TEXT_LIGHT = "#94A3B8"
+BG_WHITE = "#FFFFFF"; BG_GRAY = "#F8FAFC"; BG_WARM = "#FFFBF5"; BORDER = "#E2E8F0"
+GRADE_COLORS = {"A": GREEN_A, "B": BLUE_B, "C": AMBER_C, "D": RED_D}
+# 하위 호환 alias
+CYAN_400 = ORANGE_500; CYAN_500 = ORANGE_500; CYAN_600 = ORANGE_600
+NAVY_900 = CHARCOAL; NAVY_800 = SLATE_700; GOLD_400 = "#FFD700"; MAGENTA = "#FF0064"
 
 # ── 페이지 설정 ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="InterX 정부지원사업 인텔리전스",
-    page_icon="", layout="wide", initial_sidebar_state="collapsed",
+    page_title="InterX Gov Intelligence",
+    page_icon="https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence/master/.streamlit/interx_icon.png",
+    layout="wide", initial_sidebar_state="collapsed",
 )
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
+# ── 로고 인트로 애니메이션 ───────────────────────────────────────────────────
+if "intro_shown" not in st.session_state:
+    st.session_state.intro_shown = True
+    st.markdown("""
+    <style>
+    @keyframes logoFadeIn {
+        0% { opacity: 0; transform: scale(0.7) translateY(20px); }
+        40% { opacity: 1; transform: scale(1.05) translateY(0); }
+        60% { opacity: 1; transform: scale(1) translateY(0); }
+        100% { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    }
+    @keyframes bgFade { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; pointer-events: none; } }
+    .intro-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999;
+        background: #FFFFFF; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        animation: bgFade 2.8s ease-in-out forwards;
+    }
+    .intro-logo {
+        animation: logoFadeIn 2.8s ease-in-out forwards;
+        display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .intro-logo .brand {
+        font-size: 3rem; font-weight: 900; letter-spacing: -2px; font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
+    .intro-logo .brand .inter { color: #3C3C3C; }
+    .intro-logo .brand .x { color: #F5921B; }
+    .intro-logo .tagline { color: #94A3B8; font-size: 0.95rem; font-weight: 500; letter-spacing: 2px; }
+    </style>
+    <div class="intro-overlay">
+        <div class="intro-logo">
+            <div class="brand"><span class="inter">INTER</span><span class="x">X</span></div>
+            <div class="tagline">GOVERNMENT INTELLIGENCE ENGINE</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ── 프리미엄 CSS ─────────────────────────────────────────────────────────────
 st.markdown(f"""
 <style>
-    .stApp {{ background: {BG_WHITE}; }}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    .stApp {{ background: {BG_WHITE}; font-family: 'Inter', 'Segoe UI', sans-serif; }}
     section[data-testid="stSidebar"] {{ display: none; }}
+
+    /* ── 톱바 ── */
     .interx-topbar {{
-        background: {NAVY_900}; padding: 1rem 2rem; border-radius: 12px;
-        margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;
+        background: linear-gradient(135deg, {CHARCOAL} 0%, {SLATE_800} 100%);
+        padding: 1.1rem 2rem; border-radius: 16px; margin-bottom: 1.5rem;
+        display: flex; align-items: center; justify-content: space-between;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }}
-    .interx-topbar h1 {{ color: {CYAN_400}; font-size: 1.5rem; margin: 0; font-weight: 800; }}
-    .interx-topbar .subtitle {{ color: white; opacity: 0.5; font-size: 0.8rem; margin: 0; }}
+    .interx-topbar .brand {{ font-size: 1.4rem; font-weight: 900; letter-spacing: -1px; }}
+    .interx-topbar .brand .inter {{ color: #FFFFFF; }}
+    .interx-topbar .brand .x {{ color: {ORANGE_500}; }}
+    .interx-topbar .subtitle {{ color: rgba(255,255,255,0.45); font-size: 0.78rem; margin: 0; font-weight: 500; }}
+    .interx-topbar .version {{ color: rgba(255,255,255,0.25); font-size: 0.7rem; }}
+
+    /* ── KPI 카드 ── */
     .kpi-card {{
-        background: {BG_WHITE}; border: 1px solid {BORDER}; border-radius: 12px;
-        padding: 1.2rem; text-align: center; transition: all 0.3s ease;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        background: {BG_WHITE}; border: 1px solid {BORDER}; border-radius: 16px;
+        padding: 1.3rem 1rem; text-align: center; transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        position: relative; overflow: hidden;
     }}
-    .kpi-card:hover {{ border-color: {CYAN_400}; box-shadow: 0 4px 12px rgba(0,207,255,0.12); transform: translateY(-2px); }}
-    .kpi-value {{ font-size: 2rem; font-weight: 800; color: {NAVY_900}; line-height: 1.2; }}
-    .kpi-label {{ font-size: 0.8rem; color: {TEXT_MID}; margin-top: 0.3rem; }}
+    .kpi-card::before {{
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: linear-gradient(90deg, {ORANGE_500}, {ORANGE_400});
+        opacity: 0; transition: opacity 0.3s;
+    }}
+    .kpi-card:hover {{
+        border-color: {ORANGE_500}; transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(245,146,27,0.12);
+    }}
+    .kpi-card:hover::before {{ opacity: 1; }}
+    .kpi-value {{ font-size: 2rem; font-weight: 800; color: {CHARCOAL}; line-height: 1.2; }}
+    .kpi-label {{ font-size: 0.75rem; color: {TEXT_MID}; margin-top: 0.4rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }}
+
+    /* ── 등급 색상 ── */
     .grade-a {{ color: {GREEN_A}; font-weight: 800; }}
-    .grade-b {{ color: {CYAN_500}; font-weight: 700; }}
-    .grade-c {{ color: #F59E0B; font-weight: 600; }}
+    .grade-b {{ color: {BLUE_B}; font-weight: 700; }}
+    .grade-c {{ color: {AMBER_C}; font-weight: 600; }}
     .grade-d {{ color: {RED_D}; font-weight: 600; }}
+
+    /* ── 공고 카드 ── */
     .notice-card {{
-        background: {BG_WHITE}; border: 1px solid {BORDER}; border-radius: 10px;
-        padding: 0.9rem 1.2rem; margin-bottom: 0.6rem; transition: all 0.2s;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        background: {BG_WHITE}; border: 1px solid {BORDER}; border-radius: 12px;
+        padding: 1rem 1.3rem; margin-bottom: 0.6rem; transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        border-left: 3px solid transparent;
     }}
-    .notice-card:hover {{ border-color: {CYAN_400}; box-shadow: 0 2px 8px rgba(0,207,255,0.1); }}
+    .notice-card:hover {{
+        border-left-color: {ORANGE_500}; transform: translateX(4px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    }}
     .notice-title {{ color: {TEXT_DARK}; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }}
-    .notice-meta {{ color: {TEXT_LIGHT}; font-size: 0.78rem; }}
+    .notice-meta {{ color: {TEXT_LIGHT}; font-size: 0.78rem; font-weight: 400; }}
+
+    /* ── 섹션 타이틀 ── */
     .section-title {{
-        color: {TEXT_DARK}; font-weight: 700; font-size: 1.1rem;
+        color: {CHARCOAL}; font-weight: 800; font-size: 1.05rem;
         margin: 1.5rem 0 0.8rem; padding-bottom: 0.5rem;
-        border-bottom: 2px solid {CYAN_400}; display: inline-block;
+        border-bottom: 3px solid {ORANGE_500}; display: inline-block;
+        letter-spacing: -0.3px;
     }}
-    .stProgress > div > div > div > div {{ background: linear-gradient(90deg, {CYAN_400}, {GREEN_A}); }}
+
+    /* ── 프로그레스 바 ── */
+    .stProgress > div > div > div > div {{ background: linear-gradient(90deg, {ORANGE_500}, {ORANGE_400}); border-radius: 4px; }}
+
+    /* ── 버튼 ── */
     .stButton > button {{
-        background: linear-gradient(135deg, {CYAN_500}, {CYAN_400}); color: white;
-        font-weight: 700; border: none; border-radius: 8px; padding: 0.6rem 2rem; transition: all 0.3s;
+        background: linear-gradient(135deg, {ORANGE_600}, {ORANGE_500}); color: white;
+        font-weight: 700; border: none; border-radius: 10px; padding: 0.65rem 2rem;
+        transition: all 0.3s cubic-bezier(0.4,0,0.2,1); font-size: 0.9rem;
+        letter-spacing: 0.3px;
     }}
-    .stButton > button:hover {{ box-shadow: 0 4px 15px rgba(0,207,255,0.35); transform: translateY(-1px); }}
-    .stTabs [data-baseweb="tab-list"] {{ gap: 0; background: {BG_GRAY}; border-radius: 10px; padding: 4px; border: 1px solid {BORDER}; }}
-    .stTabs [data-baseweb="tab"] {{ color: {TEXT_MID}; border-radius: 8px; padding: 8px 16px; font-weight: 600; font-size: 0.85rem; }}
-    .stTabs [aria-selected="true"] {{ background: {BG_WHITE}; color: {CYAN_600}; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }}
+    .stButton > button:hover {{
+        box-shadow: 0 6px 20px rgba(245,146,27,0.35); transform: translateY(-2px);
+        background: linear-gradient(135deg, {ORANGE_500}, {ORANGE_400});
+    }}
+
+    /* ── 탭 네비게이션 ── */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 2px; background: {BG_GRAY}; border-radius: 12px; padding: 5px;
+        border: 1px solid {BORDER};
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        color: {TEXT_MID}; border-radius: 10px; padding: 10px 18px;
+        font-weight: 600; font-size: 0.82rem; transition: all 0.2s;
+    }}
+    .stTabs [data-baseweb="tab"]:hover {{ color: {ORANGE_500}; background: rgba(245,146,27,0.04); }}
+    .stTabs [aria-selected="true"] {{
+        background: {BG_WHITE}; color: {ORANGE_600}; font-weight: 700;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }}
+
+    /* ── 숨김 ── */
     #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}}
+
+    /* ── 데이터프레임 스타일 ── */
+    .stDataFrame {{ border-radius: 12px; overflow: hidden; }}
+
+    /* ── 토글/셀렉트박스 ── */
+    .stSelectbox label, .stMultiSelect label, .stSlider label {{ font-weight: 600; color: {TEXT_DARK}; font-size: 0.85rem; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,8 +223,12 @@ def _get_score_map(result):
 
 # ── plotly 공통 레이아웃 ──────────────────────────────────────────────────────
 def _layout(**kw):
-    base = dict(paper_bgcolor=BG_WHITE, plot_bgcolor=BG_GRAY, font_color=TEXT_DARK,
-                margin=dict(t=50, b=40, l=40, r=20))
+    base = dict(
+        paper_bgcolor=BG_WHITE, plot_bgcolor=BG_GRAY,
+        font=dict(color=TEXT_DARK, family="Inter, Segoe UI, sans-serif", size=12),
+        margin=dict(t=50, b=40, l=40, r=20),
+        hoverlabel=dict(bgcolor=CHARCOAL, font_color="white", font_size=12),
+    )
     base.update(kw)
     return base
 
@@ -133,8 +239,11 @@ def _layout(**kw):
 
 st.markdown(f"""
 <div class="interx-topbar">
-    <div><h1>InterX 정부지원사업 인텔리전스</h1><p class="subtitle">BD팀 공고 자동 수집 및 분석 플랫폼</p></div>
-    <div style="color:white; opacity:0.3; font-size:0.75rem;">v4.5 | 16개 사이트 | 23개 분석</div>
+    <div>
+        <div class="brand"><span class="inter">INTER</span><span class="x">X</span></div>
+        <p class="subtitle">Government Intelligence Engine</p>
+    </div>
+    <div class="version">v4.5 &nbsp;|&nbsp; 16 Sites &nbsp;|&nbsp; 23 Analytics</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -169,9 +278,13 @@ with tab_dash:
     if not result:
         st.markdown(f"""
         <div style="text-align:center; padding:5rem 0;">
-            <p style="font-size:3.5rem; margin:0;">&#x1F50D;</p>
-            <p style="color:{TEXT_MID}; font-size:1.1rem; margin-top:1rem;">아직 데이터가 없습니다</p>
-            <p style="color:{TEXT_LIGHT}; font-size:0.9rem;">위의 <b>수집 실행</b> 탭을 눌러 공고 수집을 시작하세요</p>
+            <div style="font-size:3.5rem; font-weight:900; letter-spacing:-2px; margin-bottom:1rem;">
+                <span style="color:{CHARCOAL};">INTER</span><span style="color:{ORANGE_500};">X</span>
+            </div>
+            <p style="color:{TEXT_MID}; font-size:1.05rem;">아직 수집된 데이터가 없습니다</p>
+            <p style="color:{TEXT_LIGHT}; font-size:0.85rem; margin-top:0.5rem;">
+                <b style="color:{ORANGE_500};">수집 실행</b> 탭에서 공고 수집을 시작하세요
+            </p>
         </div>""", unsafe_allow_html=True)
     else:
         import plotly.graph_objects as go
@@ -203,7 +316,7 @@ with tab_dash:
             fig = go.Figure(go.Pie(
                 labels=["A등급", "B등급", "C등급", "D등급"],
                 values=[grades["A"], grades["B"], grades["C"], grades["D"]],
-                marker_colors=[GREEN_A, CYAN_500, "#F59E0B", RED_D],
+                marker_colors=[GREEN_A, BLUE_B, AMBER_C, RED_D],
                 hole=0.55, textinfo="label+value", textfont=dict(color=TEXT_DARK, size=13)))
             fig.update_layout(title=dict(text="등급 분포", font=dict(color=TEXT_DARK, size=16)),
                               showlegend=False, height=350, **_layout())
@@ -223,7 +336,7 @@ with tab_dash:
         sc_cnt = Counter(n.site for n in notices).most_common()
         if sc_cnt:
             fig2 = go.Figure(go.Bar(x=[s[0] for s in sc_cnt], y=[s[1] for s in sc_cnt],
-                                    marker_color=CYAN_400, marker_line_color=CYAN_500, marker_line_width=1))
+                                    marker_color=ORANGE_500, marker_line_color=ORANGE_600, marker_line_width=1))
             fig2.update_layout(height=300, xaxis=dict(gridcolor=BORDER), yaxis=dict(gridcolor=BORDER, title="공고 수"), **_layout())
             st.plotly_chart(fig2, use_container_width=True)
 
@@ -584,7 +697,7 @@ with tab_predict:
                 elif wp < 80: bins["60-80%"] += 1
                 else: bins["80-100%"] += 1
             fig = go.Figure(go.Bar(x=list(bins.keys()), y=list(bins.values()),
-                                   marker_color=[RED_D, "#F59E0B", GOLD_400, CYAN_500, GREEN_A]))
+                                   marker_color=[RED_D, AMBER_C, "#FBBF24", BLUE_B, GREEN_A]))
             fig.update_layout(title=dict(text="수주 확률 분포", font=dict(color=TEXT_DARK)),
                               height=350, xaxis=dict(title="확률 구간"), yaxis=dict(title="공고 수", gridcolor=BORDER), **_layout())
             st.plotly_chart(fig, use_container_width=True)
@@ -593,7 +706,7 @@ with tab_predict:
             st.markdown('<div class="section-title">수주 유망 TOP 10</div>', unsafe_allow_html=True)
             for p in predictions[:10]:
                 n, sc, wp = p["notice"], p["sc"], p["win_prob"]
-                color = GREEN_A if wp >= 60 else CYAN_500 if wp >= 40 else "#F59E0B"
+                color = GREEN_A if wp >= 60 else BLUE_B if wp >= 40 else AMBER_C
                 st.markdown(f'''<div class="notice-card"><div class="notice-title">
                     <span style="color:{color};font-weight:800;">{wp:.0f}%</span> {n.title[:55]}
                     </div><div class="notice-meta">{sc.priority_grade}등급 | {n.site} | {n.agency or "-"} | {n.deadline_date or "-"}</div></div>''',
@@ -643,7 +756,7 @@ with tab_calendar:
             dates = sorted(set(u["date"] for u in upcoming))[:30]
             date_counts = Counter(u["date"] for u in upcoming)
             fig = go.Figure(go.Bar(x=dates, y=[date_counts[d] for d in dates], marker_color=[
-                RED_D if _calc_dday(d) <= 3 else "#F59E0B" if _calc_dday(d) <= 7 else CYAN_400 for d in dates]))
+                RED_D if _calc_dday(d) <= 3 else AMBER_C if _calc_dday(d) <= 7 else ORANGE_500 for d in dates]))
             fig.update_layout(title=dict(text="마감일별 공고 수 (30일)", font=dict(color=TEXT_DARK)),
                               height=300, xaxis=dict(title="마감일"), yaxis=dict(title="공고 수", gridcolor=BORDER), **_layout())
             st.plotly_chart(fig, use_container_width=True)
@@ -654,7 +767,7 @@ with tab_calendar:
             if u["dday"] > 7: break
             n, sc, dd = u["notice"], u["sc"], u["dday"]
             grade = sc.priority_grade if sc else "D"
-            color = RED_D if dd <= 3 else "#F59E0B"
+            color = RED_D if dd <= 3 else AMBER_C
             st.markdown(f'''<div class="notice-card"><div class="notice-title">
                 <span style="color:{color};font-weight:800;">D-{dd}</span>
                 <span class="grade-{grade.lower()}">[{grade}]</span> {n.title[:55]}
@@ -702,9 +815,9 @@ with tab_solution:
                 cats = [SOL_NAMES.get(k, k) for k in sol_avg.keys()]
                 vals = list(sol_avg.values())
                 fig = go.Figure(go.Scatterpolar(r=vals + [vals[0]], theta=cats + [cats[0]],
-                                                fill='toself', fillcolor=f'rgba(0,207,255,0.15)',
-                                                line=dict(color=CYAN_400, width=2),
-                                                marker=dict(size=6, color=CYAN_400)))
+                                                fill='toself', fillcolor='rgba(245,146,27,0.12)',
+                                                line=dict(color=ORANGE_500, width=2.5),
+                                                marker=dict(size=7, color=ORANGE_500)))
                 fig.update_layout(title=dict(text="솔루션별 평균 적합도", font=dict(color=TEXT_DARK)),
                                   polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=BORDER),
                                              bgcolor=BG_GRAY, angularaxis=dict(gridcolor=BORDER)),
@@ -716,8 +829,8 @@ with tab_solution:
                 avgs = [v for _, v in sorted_sols]
                 counts = [sol_count[k] for k, _ in sorted_sols]
                 fig = go.Figure()
-                fig.add_trace(go.Bar(x=names, y=avgs, name="평균 점수", marker_color=CYAN_400))
-                fig.add_trace(go.Bar(x=names, y=counts, name="매칭 공고 수", marker_color="#F59E0B"))
+                fig.add_trace(go.Bar(x=names, y=avgs, name="평균 점수", marker_color=ORANGE_500))
+                fig.add_trace(go.Bar(x=names, y=counts, name="매칭 공고 수", marker_color=BLUE_B))
                 fig.update_layout(title=dict(text="솔루션별 점수 & 공고 수", font=dict(color=TEXT_DARK)),
                                   barmode='group', height=400, xaxis=dict(gridcolor=BORDER),
                                   yaxis=dict(gridcolor=BORDER), legend=dict(orientation="h", y=1.12), **_layout())
@@ -766,7 +879,7 @@ with tab_keyword:
             if kw_counter:
                 top20 = kw_counter.most_common(20)
                 fig = go.Figure(go.Bar(y=[k[0] for k in reversed(top20)], x=[k[1] for k in reversed(top20)],
-                                       orientation='h', marker_color=CYAN_400))
+                                       orientation='h', marker_color=ORANGE_500))
                 fig.update_layout(title=dict(text="매칭 키워드 TOP 20 (스코어링)", font=dict(color=TEXT_DARK)),
                                   height=500, xaxis=dict(title="출현 횟수", gridcolor=BORDER), **_layout(margin=dict(l=120,r=20,t=50,b=40)))
                 st.plotly_chart(fig, use_container_width=True)
@@ -775,7 +888,7 @@ with tab_keyword:
             if title_words:
                 top20t = title_words.most_common(20)
                 fig = go.Figure(go.Bar(y=[k[0] for k in reversed(top20t)], x=[k[1] for k in reversed(top20t)],
-                                       orientation='h', marker_color="#F59E0B"))
+                                       orientation='h', marker_color=BLUE_B))
                 fig.update_layout(title=dict(text="공고 제목 빈출 단어 TOP 20", font=dict(color=TEXT_DARK)),
                                   height=500, xaxis=dict(title="출현 횟수", gridcolor=BORDER), **_layout(margin=dict(l=120,r=20,t=50,b=40)))
                 st.plotly_chart(fig, use_container_width=True)
@@ -815,7 +928,7 @@ with tab_manager:
         if mgr_data:
             mgrs = sorted(mgr_data.keys(), key=lambda m: -mgr_data[m]["total"])
             fig = go.Figure()
-            for grade, color in [("A", GREEN_A), ("B", CYAN_500), ("C", "#F59E0B"), ("D", RED_D)]:
+            for grade, color in [("A", GREEN_A), ("B", BLUE_B), ("C", AMBER_C), ("D", RED_D)]:
                 fig.add_trace(go.Bar(name=f"{grade}등급", x=mgrs, y=[mgr_data[m][grade] for m in mgrs], marker_color=color))
             fig.update_layout(title=dict(text="담당자별 공고 등급 분포", font=dict(color=TEXT_DARK)),
                               barmode='stack', height=400, legend=dict(orientation="h", y=1.12),
@@ -843,9 +956,11 @@ with tab_history:
     if not history:
         st.markdown(f"""
         <div style="text-align:center; padding:5rem 0;">
-            <p style="font-size:3.5rem; margin:0;">&#x1F4C5;</p>
-            <p style="color:{TEXT_MID}; font-size:1.1rem; margin-top:1rem;">수집 히스토리가 없습니다</p>
-            <p style="color:{TEXT_LIGHT}; font-size:0.9rem;">수집을 실행하면 결과가 여기에 기록됩니다</p>
+            <div style="font-size:2.5rem; font-weight:900; letter-spacing:-1px; margin-bottom:1rem;">
+                <span style="color:{CHARCOAL};">INTER</span><span style="color:{ORANGE_500};">X</span>
+            </div>
+            <p style="color:{TEXT_MID}; font-size:1.05rem;">수집 히스토리가 없습니다</p>
+            <p style="color:{TEXT_LIGHT}; font-size:0.85rem;">수집을 실행하면 결과가 여기에 기록됩니다</p>
         </div>""", unsafe_allow_html=True)
     else:
         import plotly.graph_objects as go
