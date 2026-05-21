@@ -26,9 +26,10 @@ _DETAIL_ID_RE = re.compile(r"/board/business/(\d+)", re.I)
 
 
 class JejtpCollector(BaseCollector):
-    site_key = "jejutp"
-    ministry = "제주특별자치도"
-    agency   = "제주테크노파크"
+    site_key      = "jejutp"
+    ministry      = "제주특별자치도"
+    agency        = "제주테크노파크"
+    fetch_detail  = False   # Vue.js SPA → 상세 페이지 HTML에 {{...}} 템플릿만 있음
     # pageNumber는 0-based → _page_url에서 page-1 적용
     LIST_URL = (
         "https://www.jejutp.or.kr/board/business"

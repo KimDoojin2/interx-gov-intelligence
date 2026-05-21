@@ -373,15 +373,15 @@ with tab_dash:
                     for _sk, _sl in [("사업목적","🎯 사업목적"), ("지원내용","💰 지원내용"), ("지원대상","👥 지원대상")]:
                         _sv = _struct.get(_sk, "")
                         if _sv: st.markdown(f"**{_sl}**: {_sv[:200]}")
-                    # 본문 미리보기
+                    # 본문 미리보기 (Vue/React 템플릿 변수 제거)
                     _body = getattr(n, "body_text", "") or ""
-                    if _body and not _struct:
+                    _body = re.sub(r'\{\{[^}]+\}\}', '', _body).strip()
+                    if _body and not _struct and len(_body) > 20:
                         st.markdown(f"**본문 미리보기**: {_body[:300]}...")
-                    # 원문 사이트 미리보기 (바로 표시)
+                    # 원문 바로가기 링크
                     _detail = getattr(n, "detail_url", "") or ""
                     if _detail and _detail.startswith("http"):
-                        st.markdown(f"[🔗 원문 바로가기]({_detail})")
-                        st.iframe(_detail, height=480)
+                        st.markdown(f"🔗 **[원문 바로가기 (새 탭)]({_detail})**")
 
         # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
         _rec = []
@@ -643,15 +643,18 @@ with tab_notices:
                                 st.markdown("**솔루션 매칭** &nbsp;" + " · ".join(f"**{name}** {score:.0f}" for name,score in sols[:5]))
 
                 body = getattr(sn, "body_text", "") or ""
-                if body:
+                body = re.sub(r'\{\{[^}]+\}\}', '', body).strip()  # Vue/React 템플릿 변수 제거
+                if body and len(body) > 20:
                     with st.expander("📄 공고 본문", expanded=False):
                         st.text(body[:5000])
                         if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
 
-                # ── 원문 사이트 미리보기 ──
+                # ── 원문 바로가기 ──
                 _sn_link = getattr(sn, "detail_url", "") or ""
                 if _sn_link and _sn_link.startswith("http"):
-                    with st.expander("🌐 원문 사이트 보기", expanded=False):
+                    st.markdown(f"🔗 **[원문 바로가기 (새 탭에서 열기)]({_sn_link})**")
+                    with st.expander("🌐 원문 사이트 미리보기", expanded=False):
+                        st.caption("⚠️ 일부 사이트는 보안 정책으로 미리보기가 차단됩니다. 차단 시 위 링크를 이용하세요.")
                         st.iframe(_sn_link, height=560)
         else:
             st.info("필터 조건에 맞는 공고가 없습니다.")
