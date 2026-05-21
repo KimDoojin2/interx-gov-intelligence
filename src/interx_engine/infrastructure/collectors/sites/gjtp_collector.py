@@ -24,7 +24,9 @@ class GjtpCollector(BaseCollector):
 
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
         notices = []
-        BASE = "https://www.gjtp.or.kr"
+        # BASE에 경로 포함 필수 — href가 "?act=view&bsnssId=..." 쿼리만 있으므로
+        # urljoin("https://www.gjtp.or.kr", "?...") → 경로 없이 메인으로 감
+        BASE = "https://www.gjtp.or.kr/home/business.cs"
         links = soup.find_all("a", href=lambda h: h and "bsnssId=" in (h or ""))
         if not links:
             return self._parse_table(soup, execution_id, BASE)
