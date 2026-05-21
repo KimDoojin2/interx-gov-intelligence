@@ -97,7 +97,7 @@ sites:
     collector_type: requests
   - code: gtp
     name: 경기테크노파크
-    enabled: true
+    enabled: false   # 404 에러 — URL 재조사 필요
     collector_type: requests
   - code: gdtp
     name: 경기대진테크노파크
@@ -105,19 +105,19 @@ sites:
     collector_type: requests
   - code: itp
     name: 인천테크노파크
-    enabled: true
+    enabled: false   # ConnectTimeout — 서버측 차단 또는 URL 변경
     collector_type: requests
   - code: gwtp
     name: 강원테크노파크
-    enabled: true
+    enabled: false   # 404 에러 — URL 재조사 필요
     collector_type: requests
   - code: sjtp
     name: 세종테크노파크
-    enabled: true
+    enabled: false   # 0건 수집 — 게시판 구조 변경 추정
     collector_type: requests
   - code: cbtp
     name: 충북테크노파크
-    enabled: true
+    enabled: false   # SSL DH_KEY_TOO_SMALL 에러
     collector_type: requests
   - code: ctp
     name: 충남테크노파크
@@ -129,15 +129,15 @@ sites:
     collector_type: requests
   - code: utp
     name: 울산테크노파크
-    enabled: true
+    enabled: false   # 비공고 페이지 수집 (건물안내/부서/CI 등) — URL 재조사 필요
     collector_type: requests
   - code: gntp
     name: 경남테크노파크
-    enabled: true
+    enabled: false   # 404 에러 — URL 재조사 필요
     collector_type: requests
   - code: ptp
     name: 포항테크노파크
-    enabled: true
+    enabled: false   # 404 에러 — URL 재조사 필요
     collector_type: requests
 
   - code: mock
