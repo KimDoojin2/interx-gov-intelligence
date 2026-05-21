@@ -375,31 +375,34 @@ with tab_dash:
                         if _sv: st.markdown(f"**{_sl}**: {_sv[:200]}")
                     # 핵심 내용 미리보기 (구조화 섹션 없을 때)
                     if not _struct:
-                        _summary = getattr(n, "summary", "") or ""
-                        _summary = re.sub(r'\{\{[^}]+\}\}', '', _summary).strip()
                         _body = getattr(n, "body_text", "") or ""
                         _body = re.sub(r'\{\{[^}]+\}\}', '', _body).strip()
-                        # summary가 있으면 우선 사용 (핵심 문장 추출된 것)
-                        if _summary and len(_summary) > 20:
-                            st.markdown(f"**📋 핵심 내용**: {_summary[:350]}")
-                        elif _body and len(_body) > 20:
-                            # body에서 핵심 키워드 포함 문장 직접 추출
-                            _imp_re = re.compile(r"(지원\s*대상|지원\s*내용|지원\s*규모|신청\s*자격|접수\s*기간|사업\s*목적|사업\s*내용|모집\s*기간|총\s*사업비|선정\s*규모)")
-                            _sents = [s.strip() for s in re.split(r'(?<=[.다요됨함])\s+', _body) if len(s.strip()) > 20]
+                        if _body and len(_body) > 20:
+                            # 메타데이터/잡음 패턴 제거 후 핵심 문장 추출
+                            _junk_re = re.compile(
+                                r"(작성일|작성자|조회수|다운로드|첨부파일|담당자\s*연락처|담당자\s*이메일|"
+                                r"\.pdf|\.hwp|\.xlsx|\.docx|KB\)|MB\)|로그인|회원가입|"
+                                r"주메뉴|바로가기|MAIN\s*TOPIC|홈\s*>|Ⅰ\.|Ⅱ\.|작성자\s|"
+                                r"접수기간\s*\d|조회수\s*\d|^\d{2}-\d{2}-\d{2}$)", re.I)
+                            _imp_re = re.compile(
+                                r"(지원\s*대상|지원\s*내용|지원\s*규모|신청\s*자격|접수\s*기간|"
+                                r"사업\s*목적|사업\s*내용|모집\s*기간|총\s*사업비|선정\s*규모|"
+                                r"사업\s*개요|참여\s*자격|공모\s*분야|수행\s*기간|과제당)")
+                            _sents = [s.strip() for s in re.split(r'(?<=[.다요됨함!\n])\s+', _body)
+                                      if len(s.strip()) > 25 and not _junk_re.search(s)]
                             _imp = [s for s in _sents if _imp_re.search(s)][:3]
                             if _imp:
                                 st.markdown("**📋 핵심 내용**:")
                                 for _is in _imp:
                                     st.markdown(f"- {_is[:200]}")
-                            else:
-                                # 앞부분 30자 이상인 첫 문장
-                                _first = next((s for s in _sents if len(s) >= 30), "")
-                                if _first:
-                                    st.markdown(f"**📋 핵심 내용**: {_first[:300]}")
-                    # 원문 바로가기 링크
+                            elif _sents:
+                                st.markdown(f"**📋 핵심 내용**: {_sents[0][:300]}")
+                    # 원문 바로가기 + 원문 미리보기 iframe
                     _detail = getattr(n, "detail_url", "") or ""
                     if _detail and _detail.startswith("http"):
                         st.markdown(f"🔗 **[원문 바로가기 (새 탭)]({_detail})**")
+                        st.caption("⚠️ 일부 사이트는 보안 정책으로 미리보기가 차단됩니다.")
+                        st.iframe(_detail, height=480)
 
         # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
         _rec = []
