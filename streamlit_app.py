@@ -355,6 +355,14 @@ with tab_run:
             st.write(f"**{run_mode}** · {len(sites_to_use)}개 사이트 · {max_pages}페이지/사이트")
             progress = st.progress(0, text="엔진 초기화...")
             try:
+                # ── Streamlit Cloud Python 3.14: stderr/stdout closed 문제 방지 ──
+                import logging as _logging
+                _root = _logging.getLogger()
+                for _h in list(_root.handlers):
+                    _root.removeHandler(_h)
+                _root.addHandler(_logging.StreamHandler(stream=open(os.devnull, "w")))
+                _root.setLevel(_logging.INFO)
+
                 progress.progress(5, text="설정 로딩...")
                 from interx_engine.infrastructure.config.settings_loader import settings
                 settings.ensure_dirs()
