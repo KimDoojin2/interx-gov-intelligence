@@ -11,7 +11,7 @@ from interx_engine.core.entities.notice import Notice
 class BipaCollector(BaseCollector):
     site_key = "bipa"
     agency   = "부산정보산업진흥원"
-    LIST_URL = "https://bipa.kr/board/business?page={page}"
+    LIST_URL = "http://bipa.kr/board/business/list?page={page}"
 
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
         notices = []
