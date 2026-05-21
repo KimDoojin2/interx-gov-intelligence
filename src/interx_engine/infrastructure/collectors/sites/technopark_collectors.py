@@ -1,0 +1,239 @@
+"""
+전국 테크노파크 12개 사이트 수집기 — 단일 파일 통합
+각 테크노파크는 게시판 구조가 대동소이하므로 _TechnoBaseCollector 공통 클래스를 상속.
+
+사이트별 특이사항은 _parse_page()를 오버라이드하여 처리.
+"""
+from __future__ import annotations
+
+import logging
+import re
+from typing import List
+from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
+
+from interx_engine.infrastructure.collectors.sites.base_collector import (
+    BaseCollector,
+    _extract_dates,
+    _notice_id,
+)
+from interx_engine.core.entities.notice import Notice
+
+log = logging.getLogger("interx.collectors")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  공통 파싱 로직 — 테크노파크 게시판 범용
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class _TechnoBaseCollector(BaseCollector):
+    """테크노파크 공통 베이스. 대부분 table/tbody 또는 li 기반 게시판."""
+    BASE_URL: str = ""          # 서브클래스에서 오버라이드
+    LINK_PATTERN: str = ""      # href에 포함되어야 하는 패턴 (선택)
+
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        notices: List[Notice] = []
+        seen: set = set()
+        base = self.BASE_URL
+
+        # ── 1) 특정 link 패턴이 있는 경우 우선 ──
+        if self.LINK_PATTERN:
+            for a in soup.find_all("a", href=True):
+                href = (a.get("href") or "").strip()
+                if self.LINK_PATTERN not in href:
+                    continue
+                full = href if href.startswith("http") else urljoin(base, href)
+                if full in seen:
+                    continue
+                seen.add(full)
+                title = a.get_text(strip=True)
+                if not title or len(title) < 3:
+                    continue
+                row = a.find_parent("tr") or a.find_parent("li") or a.parent
+                text = row.get_text(" ", strip=True) if row else title
+                dates = _extract_dates(text)
+                notices.append(self._make_notice(
+                    execution_id, title, full,
+                    dates[-1] if dates else "",
+                    dates[0] if len(dates) >= 2 else "",
+                ))
+            if notices:
+                return notices
+
+        # ── 2) 테이블 기반 파싱 ──
+        notices = self._parse_table(soup, execution_id, base)
+        if notices:
+            return notices
+
+        # ── 3) li 기반 파싱 ──
+        for li in soup.select(
+            "ul.board-list li, ul.notice-list li, .list-wrap li, "
+            ".board_list li, .business-list li, .biz-list li, "
+            ".bbsList li, .dataList li"
+        ):
+            a = li.find("a", href=True)
+            if not a:
+                continue
+            title = a.get_text(" ", strip=True)
+            if not title or len(title) < 3:
+                continue
+            href = a["href"]
+            if "javascript" in href.lower():
+                continue
+            detail = href if href.startswith("http") else urljoin(base, href)
+            if detail in seen:
+                continue
+            seen.add(detail)
+            text = li.get_text(" ", strip=True)
+            dates = _extract_dates(text)
+            notices.append(self._make_notice(
+                execution_id, title, detail,
+                dates[-1] if dates else "",
+                dates[0] if len(dates) >= 2 else "",
+            ))
+
+        # ── 4) div/article fallback ──
+        if not notices:
+            for a in soup.select("a[href]"):
+                title = a.get_text(" ", strip=True)
+                if not title or len(title) < 5:
+                    continue
+                href = a.get("href", "")
+                if not href or "javascript" in href.lower() or href == "#":
+                    continue
+                # 공고성 링크 필터 (board, view, detail, read 등)
+                if not re.search(r"(board|view|detail|read|notice|bbs|seq|idx|no=)", href, re.I):
+                    continue
+                detail = href if href.startswith("http") else urljoin(base, href)
+                if detail in seen:
+                    continue
+                seen.add(detail)
+                container = a.find_parent("li") or a.find_parent("div") or a.parent
+                text = container.get_text(" ", strip=True) if container else title
+                dates = _extract_dates(text)
+                notices.append(self._make_notice(
+                    execution_id, title, detail,
+                    dates[-1] if dates else "",
+                    dates[0] if len(dates) >= 2 else "",
+                ))
+
+        return notices
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  개별 테크노파크 수집기 (12개)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class SeoultpCollector(_TechnoBaseCollector):
+    """서울테크노파크 — seoultp.or.kr"""
+    site_key = "seoultp"
+    agency   = "서울테크노파크"
+    ministry = "서울특별시"
+    BASE_URL = "https://seoultp.or.kr"
+    LIST_URL = "https://seoultp.or.kr/user/nd19746.do?page={page}"
+
+
+class GtpCollector(_TechnoBaseCollector):
+    """경기테크노파크 — gtp.or.kr"""
+    site_key = "gtp"
+    agency   = "경기테크노파크"
+    ministry = "경기도"
+    BASE_URL = "https://www.gtp.or.kr"
+    LIST_URL = "https://www.gtp.or.kr/front/user/archBoardList.do?ARCH_ID=business&page={page}"
+    LINK_PATTERN = "archBoardView"
+
+
+class GdtpCollector(_TechnoBaseCollector):
+    """경기대진테크노파크 — gdtp.or.kr"""
+    site_key = "gdtp"
+    agency   = "경기대진테크노파크"
+    ministry = "경기도"
+    BASE_URL = "https://www.gdtp.or.kr"
+    LIST_URL = "https://www.gdtp.or.kr/board/announcement?page={page}"
+
+
+class ItpCollector(_TechnoBaseCollector):
+    """인천테크노파크 — itp.or.kr"""
+    site_key = "itp"
+    agency   = "인천테크노파크"
+    ministry = "인천광역시"
+    BASE_URL = "https://www.itp.or.kr"
+    LIST_URL = "https://www.itp.or.kr/intro.jsp?mid=IT010101&page={page}"
+    LINK_PATTERN = "mid=IT010101"
+
+
+class GwtpCollector(_TechnoBaseCollector):
+    """강원테크노파크 — gwtp.or.kr"""
+    site_key = "gwtp"
+    agency   = "강원테크노파크"
+    ministry = "강원특별자치도"
+    BASE_URL = "https://www.gwtp.or.kr"
+    LIST_URL = "https://www.gwtp.or.kr/bbsNew_list.php?code=sub01b&keyvalue=sub01&page={page}"
+
+
+class SjtpCollector(_TechnoBaseCollector):
+    """세종테크노파크 — sjtp.or.kr (그누보드 기반)"""
+    site_key = "sjtp"
+    agency   = "세종테크노파크"
+    ministry = "세종특별자치시"
+    BASE_URL = "https://sjtp.or.kr"
+    LIST_URL = "https://sjtp.or.kr/bbs/board.php?bo_table=business01&page={page}"
+    LINK_PATTERN = "bo_table=business01"
+
+
+class CbtpCollector(_TechnoBaseCollector):
+    """충북테크노파크 — cbtp.or.kr"""
+    site_key = "cbtp"
+    agency   = "충북테크노파크"
+    ministry = "충청북도"
+    BASE_URL = "https://www.cbtp.or.kr"
+    LIST_URL = "https://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
+    LINK_PATTERN = "board_id=saup_notice"
+
+
+class CtpCollector(_TechnoBaseCollector):
+    """충남테크노파크 — ctp.or.kr"""
+    site_key = "ctp"
+    agency   = "충남테크노파크"
+    ministry = "충청남도"
+    BASE_URL = "https://www.ctp.or.kr"
+    LIST_URL = "https://www.ctp.or.kr/business/data.do?page={page}"
+
+
+class BtpCollector(_TechnoBaseCollector):
+    """부산테크노파크 — btp.or.kr"""
+    site_key = "btp"
+    agency   = "부산테크노파크"
+    ministry = "부산광역시"
+    BASE_URL = "https://www.btp.or.kr"
+    LIST_URL = "https://www.btp.or.kr/kor/CMS/Board/Board.do?mCode=MN013&page={page}"
+    LINK_PATTERN = "mCode=MN013"
+
+
+class UtpCollector(_TechnoBaseCollector):
+    """울산테크노파크 — utp.or.kr"""
+    site_key = "utp"
+    agency   = "울산테크노파크"
+    ministry = "울산광역시"
+    BASE_URL = "https://www.utp.or.kr"
+    LIST_URL = "https://www.utp.or.kr/include/contents.php?mnuno=M0000018&menu_group=1&sno=0102&page={page}"
+
+
+class GntpCollector(_TechnoBaseCollector):
+    """경남테크노파크 — gntp.or.kr"""
+    site_key = "gntp"
+    agency   = "경남테크노파크"
+    ministry = "경상남도"
+    BASE_URL = "https://www.gntp.or.kr"
+    LIST_URL = "https://www.gntp.or.kr/kor/CMS/Board/Board.do?mCode=MN050&page={page}"
+    LINK_PATTERN = "mCode=MN050"
+
+
+class PtpCollector(_TechnoBaseCollector):
+    """포항테크노파크 — ptp.or.kr"""
+    site_key = "ptp"
+    agency   = "포항테크노파크"
+    ministry = "경상북도"
+    BASE_URL = "https://www.ptp.or.kr"
+    LIST_URL = "https://www.ptp.or.kr/board/business?page={page}"

@@ -90,6 +90,56 @@ sites:
     name: 정보통신기획평가원 (iitp.kr)
     enabled: true
     collector_type: playwright   # Vue.js SPA — AI·반도체·6G 과제 공고
+  # ── 테크노파크 12개 (v3.1 신규) ──
+  - code: seoultp
+    name: 서울테크노파크
+    enabled: true
+    collector_type: requests
+  - code: gtp
+    name: 경기테크노파크
+    enabled: true
+    collector_type: requests
+  - code: gdtp
+    name: 경기대진테크노파크
+    enabled: true
+    collector_type: requests
+  - code: itp
+    name: 인천테크노파크
+    enabled: true
+    collector_type: requests
+  - code: gwtp
+    name: 강원테크노파크
+    enabled: true
+    collector_type: requests
+  - code: sjtp
+    name: 세종테크노파크
+    enabled: true
+    collector_type: requests
+  - code: cbtp
+    name: 충북테크노파크
+    enabled: true
+    collector_type: requests
+  - code: ctp
+    name: 충남테크노파크
+    enabled: true
+    collector_type: requests
+  - code: btp
+    name: 부산테크노파크
+    enabled: true
+    collector_type: requests
+  - code: utp
+    name: 울산테크노파크
+    enabled: true
+    collector_type: requests
+  - code: gntp
+    name: 경남테크노파크
+    enabled: true
+    collector_type: requests
+  - code: ptp
+    name: 포항테크노파크
+    enabled: true
+    collector_type: requests
+
   - code: mock
     name: 테스트 목업
     enabled: false

@@ -45,6 +45,11 @@ def _build_registry() -> Dict[str, Type[NoticeCollectorPort]]:
     from interx_engine.infrastructure.collectors.sites.jntp_collector      import JntpCollector
     from interx_engine.infrastructure.collectors.sites.jbtp_collector      import JbtpCollector
     from interx_engine.infrastructure.collectors.sites.new_collectors      import NEW_COLLECTOR_CLASSES
+    from interx_engine.infrastructure.collectors.sites.technopark_collectors import (
+        SeoultpCollector, GtpCollector, GdtpCollector, ItpCollector,
+        GwtpCollector, SjtpCollector, CbtpCollector, CtpCollector,
+        BtpCollector, UtpCollector, GntpCollector, PtpCollector,
+    )
     from interx_engine.infrastructure.collectors.sites.mock_notice_collector import MockNoticeCollector
 
     return {
@@ -66,6 +71,19 @@ def _build_registry() -> Dict[str, Type[NoticeCollectorPort]]:
         "jbtp":      JbtpCollector,
         "mock":      MockNoticeCollector,
         **NEW_COLLECTOR_CLASSES,
+        # ── 테크노파크 12개 (v3.1) ──
+        "seoultp":   SeoultpCollector,
+        "gtp":       GtpCollector,
+        "gdtp":      GdtpCollector,
+        "itp":       ItpCollector,
+        "gwtp":      GwtpCollector,
+        "sjtp":      SjtpCollector,
+        "cbtp":      CbtpCollector,
+        "ctp":       CtpCollector,
+        "btp":       BtpCollector,
+        "utp":       UtpCollector,
+        "gntp":      GntpCollector,
+        "ptp":       PtpCollector,
     }
 
 
