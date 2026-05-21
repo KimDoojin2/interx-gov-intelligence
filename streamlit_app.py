@@ -300,12 +300,42 @@ with tab_dash:
                 st.markdown(_notice_row("A", n.title[:65], meta, extra_pills), unsafe_allow_html=True)
                 # ── 공고 요약 펼쳐보기 ──
                 with st.expander("📄 공고 요약 보기", expanded=False):
+                    # ── 예산 + 진행 판단 ──
+                    _budget_raw = getattr(n, "budget", "") or ""
+                    _budget_val = None
+                    if _budget_raw:
+                        try:
+                            _bm = re.search(r'(\d[\d,.]*)\s*억', _budget_raw)
+                            if _bm: _budget_val = float(_bm.group(1).replace(",",""))
+                            else:
+                                _bm2 = re.search(r'(\d[\d,.]*)\s*백만', _budget_raw)
+                                if _bm2: _budget_val = float(_bm2.group(1).replace(",","")) / 100
+                                else:
+                                    _bm3 = re.search(r'(\d[\d,.]*)\s*만', _budget_raw)
+                                    if _bm3: _budget_val = float(_bm3.group(1).replace(",","")) / 10000
+                        except: pass
+                    if _budget_val is not None:
+                        if _budget_val >= 2.1:
+                            _bdg_label = f"💰 **예산: {_budget_raw}**"
+                            _bdg_action = '<span style="background:#059669;color:#fff;padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:700">🏢 인터엑스 직접 진행</span>'
+                        else:
+                            _bdg_label = f"💰 **예산: {_budget_raw}**"
+                            _bdg_action = '<span style="background:#D97706;color:#fff;padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:700">🤝 파트너사 이관</span>'
+                    elif _budget_raw:
+                        _bdg_label = f"💰 **예산: {_budget_raw}**"
+                        _bdg_action = ""
+                    else:
+                        _bdg_label = "💰 **예산: 미확인**"
+                        _bdg_action = ""
+
                     _ec1, _ec2 = st.columns(2)
                     _ec1.markdown(f"**기관**: {n.agency or n.ministry or '-'}")
                     _ec2.markdown(f"**마감**: {n.deadline_date or '-'}" + (f" (D-{dd})" if dd >= 0 else ""))
                     _ec3, _ec4 = st.columns(2)
                     _ec3.markdown(f"**적합도**: {sc.fitness_score:.0f}점 · **우선순위**: {sc.priority_score:.0f}점")
                     _ec4.markdown(f"**수주확률**: {getattr(sc,'win_probability','-')}")
+                    # 예산 + 진행방식
+                    st.markdown(f"{_bdg_label} {_bdg_action}", unsafe_allow_html=True)
                     # 매칭 키워드
                     if sc.positive_keywords:
                         st.markdown("**매칭 키워드**: " + " ".join(f"`{k}`" for k in sc.positive_keywords[:15]))
@@ -453,10 +483,17 @@ with tab_notices:
         rows = []
         for n, sc in filtered:
             dd = _dday(n.deadline_date or "")
+            _bgt = n.budget or ""
+            _bv = None
+            try:
+                _m = re.search(r'(\d[\d,.]*)\s*억', _bgt)
+                if _m: _bv = float(_m.group(1).replace(",",""))
+            except: pass
+            _action = "인터엑스" if _bv and _bv >= 2.1 else "파트너이관" if _bv and _bv < 2.0 else "-"
             rows.append({"등급": sc.priority_grade if sc else "D", "점수": f"{sc.priority_score:.0f}" if sc else "-",
                          "공고명": n.title[:70] if n.title else "-", "주관기관": n.agency or n.ministry or "-",
                          "사이트": n.site, "마감일": n.deadline_date or "-", "D-day": dd if dd>=0 else "마감",
-                         "L3": "Y" if getattr(n,"l3_strong","N")=="Y" else "", "예산": n.budget or "-"})
+                         "L3": "Y" if getattr(n,"l3_strong","N")=="Y" else "", "예산": _bgt or "-", "진행": _action})
         if rows:
             st.dataframe(pd.DataFrame(rows), width="stretch", height=420)
 
