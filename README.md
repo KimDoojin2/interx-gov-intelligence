@@ -32,6 +32,17 @@
 
 ## 📋 최근 업데이트
 
+### v5.6 — 2026-05-21
+
+**🐛 수집기 버그 일괄 수정 + iframe 안정화**
+- **BTP 페이지네이션 파싱 버그 수정**: "443 페이지", "처음 페이지" 등 페이지 네비게이션 텍스트가 공고 제목으로 수집되던 버그 → `_PAGINATION_TITLE_RE` 정규식 필터 추가
+- **GWTP detail URL 404 수정**: Base64 `bbs_data` 파라미터의 `||` 접미사가 URL 인코딩 시 `%7C%7C`로 변환되어 404 → `_parse_page` 오버라이드에서 `||` 제거
+- **CBTP SSL 우회**: HTTP→HTTPS 강제 리다이렉트 + DH_KEY_TOO_SMALL → `ssl_verify=False` 설정
+- **SJTP/UTP LINK_PATTERN 수정**: `bo_table=` → `wr_id=` (개별 게시글만 매칭, 페이지네이션 링크 제외)
+- **SeoulTP/PTP detail enrichment 비활성화**: javascript: 링크 기반 (POST 폼 제출) → 정적 URL 추출 불가, `fetch_detail=False`
+- **`_parse_table` javascript: 필터**: base_collector의 테이블 파싱에서 javascript: href 스킵 추가
+- **`st.components.v1.iframe` → `st.iframe`**: deprecated API 제거 (2026-06-01 deadline 대응)
+
 ### v5.4 — 2026-05-21
 
 **🔧 안정화 + 수주분석 강화 + 원문 미리보기**

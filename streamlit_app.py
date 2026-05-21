@@ -220,7 +220,7 @@ HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence
 
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
-    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.5 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
+    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.6 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
 </div>
 <div class="hero-banner">
     <img src="{HERO_IMG}" alt="InterX Hero">
@@ -381,8 +381,7 @@ with tab_dash:
                     _detail = getattr(n, "detail_url", "") or ""
                     if _detail and _detail.startswith("http"):
                         st.markdown(f"[🔗 원문 바로가기]({_detail})")
-                        import streamlit.components.v1 as components
-                        components.iframe(_detail, height=480, scrolling=True)
+                        st.iframe(_detail, height=480, scrolling=True)
 
         # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
         _rec = []
@@ -653,8 +652,7 @@ with tab_notices:
                 _sn_link = getattr(sn, "detail_url", "") or ""
                 if _sn_link and _sn_link.startswith("http"):
                     with st.expander("🌐 원문 사이트 보기", expanded=False):
-                        import streamlit.components.v1 as components
-                        components.iframe(_sn_link, height=560, scrolling=True)
+                        st.iframe(_sn_link, height=560, scrolling=True)
         else:
             st.info("필터 조건에 맞는 공고가 없습니다.")
 

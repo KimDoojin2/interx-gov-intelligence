@@ -511,6 +511,8 @@ class BaseCollector(NoticeCollectorPort, ABC):
             if not title:
                 continue
             href   = a["href"]
+            if "javascript" in href.lower():
+                continue  # javascript: 링크는 유효한 detail URL 아님
             detail = href if href.startswith("http") else urljoin(base_url, href)
             text   = tr.get_text(" ", strip=True)
             dates  = _extract_dates(text)

@@ -22,6 +22,14 @@ from interx_engine.core.entities.notice import Notice
 
 log = logging.getLogger("interx.collectors")
 
+# ── 페이지네이션 / 비공고 제목 필터 패턴 ──
+_PAGINATION_TITLE_RE = re.compile(
+    r"^\d+\s*페이지$|^(처음|이전|다음|마지막|prev|next|first|last)\s*페이지?$|"
+    r"^(처음|이전|다음|마지막|prev|next|first|last)$|"
+    r"^[<>«»‹›]+$|^\[?\d+\]?$|^\.{2,}$",
+    re.I,
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  공통 파싱 로직 — 테크노파크 게시판 범용
@@ -49,6 +57,9 @@ class _TechnoBaseCollector(BaseCollector):
                 seen.add(full)
                 title = a.get_text(strip=True)
                 if not title or len(title) < 3:
+                    continue
+                # 페이지네이션 텍스트 제외 ("443 페이지", "11 페이지", "처음", "다음" 등)
+                if _PAGINATION_TITLE_RE.match(title.strip()):
                     continue
                 row = a.find_parent("tr") or a.find_parent("li") or a.parent
                 text = row.get_text(" ", strip=True) if row else title
@@ -126,12 +137,37 @@ class _TechnoBaseCollector(BaseCollector):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class SeoultpCollector(_TechnoBaseCollector):
-    """서울테크노파크 — seoultp.or.kr"""
-    site_key = "seoultp"
-    agency   = "서울테크노파크"
-    ministry = "서울특별시"
+    """서울테크노파크 — seoultp.or.kr (javascript:goBoardView → POST 기반, 정적 URL 불가)"""
+    site_key      = "seoultp"
+    agency        = "서울테크노파크"
+    ministry      = "서울특별시"
+    fetch_detail  = False  # 상세 URL이 javascript: → HTTP URL 변환 불가
     BASE_URL = "https://seoultp.or.kr"
     LIST_URL = "https://seoultp.or.kr/user/nd19746.do?page={page}"
+
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        """javascript:goBoardView 호출에서 공고 ID 추출 → 목록URL로 대체"""
+        notices: List[Notice] = []
+        for a in soup.find_all("a", href=True):
+            href = a.get("href", "")
+            if "goBoardView" not in href:
+                continue
+            title = a.get_text(strip=True)
+            if not title or len(title) < 5:
+                continue
+            # 목록 페이지 URL을 detail_url로 사용 (POST 기반이라 직접 링크 불가)
+            detail = self.LIST_URL.format(page=1)
+            row = a.find_parent("tr") or a.find_parent("li") or a.parent
+            text = row.get_text(" ", strip=True) if row else title
+            dates = _extract_dates(text)
+            notices.append(self._make_notice(
+                execution_id, title, detail,
+                dates[-1] if dates else "",
+                dates[0] if len(dates) >= 2 else "",
+            ))
+        if not notices:
+            return super()._parse_page(soup, execution_id)
+        return notices
 
 
 class GtpCollector(_TechnoBaseCollector):
@@ -176,6 +212,17 @@ class GwtpCollector(_TechnoBaseCollector):
         """강원TP는 startPage=0,30,60 방식 페이지네이션 (page 1→0, 2→30, 3→60)"""
         return self.LIST_URL.format(page=(page - 1) * 30)
 
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        """gwtp detail URL에 || 접미사가 붙어 URL 인코딩 시 404 → 제거"""
+        notices = super()._parse_page(soup, execution_id)
+        for n in notices:
+            if n.detail_url:
+                # Base64 bbs_data에 || 붙는 문제 제거
+                cleaned = re.sub(r'\|+$', '', n.detail_url)
+                n.detail_url = cleaned
+                n.notice_link = cleaned
+        return notices
+
 
 class SjtpCollector(_TechnoBaseCollector):
     """세종테크노파크 — sjtp.or.kr (그누보드 기반)"""
@@ -184,16 +231,17 @@ class SjtpCollector(_TechnoBaseCollector):
     ministry = "세종특별자치시"
     BASE_URL = "https://sjtp.or.kr"
     LIST_URL = "https://sjtp.or.kr/bbs/board.php?bo_table=business01&page={page}"
-    LINK_PATTERN = "bo_table=business01"
+    LINK_PATTERN = "wr_id="  # 그누보드: 개별 게시글만 매칭 (pagination 제외)
 
 
 class CbtpCollector(_TechnoBaseCollector):
-    """충북테크노파크 — cbtp.or.kr (HTTP only — HTTPS SSL DH_KEY_TOO_SMALL)"""
-    site_key = "cbtp"
-    agency   = "충북테크노파크"
-    ministry = "충청북도"
-    BASE_URL = "http://www.cbtp.or.kr"
-    LIST_URL = "http://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
+    """충북테크노파크 — cbtp.or.kr (HTTP→HTTPS 리다이렉트, SSL DH_KEY_TOO_SMALL)"""
+    site_key    = "cbtp"
+    agency      = "충북테크노파크"
+    ministry    = "충청북도"
+    ssl_verify  = False   # 서버가 HTTP→HTTPS 강제 리다이렉트, DH_KEY_TOO_SMALL 우회
+    BASE_URL    = "http://www.cbtp.or.kr"
+    LIST_URL    = "http://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
     LINK_PATTERN = "board_id=saup_notice"
 
 
@@ -223,7 +271,7 @@ class UtpCollector(_TechnoBaseCollector):
     ministry = "울산광역시"
     BASE_URL = "https://www.utp.or.kr"
     LIST_URL = "https://www.utp.or.kr/board/board.php?bo_table=sub0501&menu_group=4&sno=0401&page={page}"
-    LINK_PATTERN = "bo_table=sub0501"
+    LINK_PATTERN = "wr_id="  # 그누보드: 개별 게시글만 매칭 (pagination/메뉴 제외)
 
 
 class GntpCollector(_TechnoBaseCollector):
@@ -237,9 +285,10 @@ class GntpCollector(_TechnoBaseCollector):
 
 
 class PtpCollector(_TechnoBaseCollector):
-    """포항테크노파크 — ptp.or.kr (신규 사이트 전환, 1411건+)"""
-    site_key = "ptp"
-    agency   = "포항테크노파크"
-    ministry = "경상북도"
+    """포항테크노파크 — ptp.or.kr (javascript:void(0) → JS렌더링, 정적 URL 불가)"""
+    site_key      = "ptp"
+    agency        = "포항테크노파크"
+    ministry      = "경상북도"
+    fetch_detail  = False  # 상세 URL이 javascript:void(0) → HTTP URL 변환 불가
     BASE_URL = "https://www.ptp.or.kr"
     LIST_URL = "https://www.ptp.or.kr/main/board/index.do?menu_idx=116&manage_idx=15&page={page}"

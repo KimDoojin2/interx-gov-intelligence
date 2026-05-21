@@ -93,7 +93,7 @@ sites:
   # ── 테크노파크 12개 (v3.1 신규) ──
   - code: seoultp
     name: 서울테크노파크
-    enabled: true
+    enabled: true    # javascript:goBoardView → POST방식, detail enrichment 비활성
     collector_type: requests
   - code: gtp
     name: 경기테크노파크
@@ -113,11 +113,11 @@ sites:
     collector_type: requests
   - code: sjtp
     name: 세종테크노파크
-    enabled: true    # 재확인 — 615건 정상 (그누보드 bo_table=business01)
+    enabled: true    # LINK_PATTERN→wr_id= (pagination 오염 방지)
     collector_type: requests
   - code: cbtp
     name: 충북테크노파크
-    enabled: true    # HTTP로 전환 (HTTPS SSL 에러) — 1608건 정상
+    enabled: true    # ssl_verify=False로 우회 (HTTP→HTTPS 강제리다이렉트 DH_KEY 문제)
     collector_type: requests
   - code: ctp
     name: 충남테크노파크
@@ -137,7 +137,7 @@ sites:
     collector_type: requests
   - code: ptp
     name: 포항테크노파크
-    enabled: true    # URL 수정: /main/board/index.do (1411건+)
+    enabled: true    # javascript:void(0) → JS렌더링, detail enrichment 비활성
     collector_type: requests
 
   - code: mock
