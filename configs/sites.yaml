@@ -45,7 +45,7 @@ sites:
     collector_type: requests
   - code: dicia
     name: DICIA (의료기기산업협회)
-    enabled: true
+    enabled: false   # 제조AI 범위 외 — 비활성
     collector_type: playwright
   - code: gjtp
     name: 광주테크노파크

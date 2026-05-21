@@ -251,7 +251,7 @@ for key, default in [("pipeline_result", None), ("pipeline_running", False),
     if key not in st.session_state:
         st.session_state[key] = default
 
-ALL_SITES = ["bizinfo","kiat","nipa","innopolis","bipa","uipa","gicon","ttp","dicia","gjtp","kised","ketep","koiia","jejutp","smart_factory","iitp",
+ALL_SITES = ["bizinfo","kiat","nipa","innopolis","bipa","uipa","gicon","ttp","gjtp","kised","ketep","koiia","jejutp","smart_factory","iitp",
              "seoultp","gtp","gdtp","itp","gwtp","sjtp","cbtp","ctp","btp","utp","gntp","ptp"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
