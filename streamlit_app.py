@@ -1025,50 +1025,104 @@ with tab_history:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_news:
-    st.markdown(_section("🤖 AI 팩토리 · 제조AI 뉴스"), unsafe_allow_html=True)
-    st.markdown(f'<p style="font-size:.8rem;color:{S4}">제조AI·스마트공장·디지털트윈 관련 최신 뉴스와 정보를 한곳에서 확인하세요.</p>', unsafe_allow_html=True)
+    import xml.etree.ElementTree as ET
+    import requests as _req
+    from html import unescape as _unescape
 
-    _news_sources = [
-        {"cat": "🏭 스마트공장·제조AI", "items": [
-            ("스마트공장 뉴스", "https://www.smart-factory.kr/nw/lst", "스마트제조혁신추진단 공식 뉴스"),
-            ("IITP AI·반도체 동향", "https://www.iitp.kr/main.it", "정보통신기획평가원 기술동향"),
-            ("AI타임스", "https://www.aitimes.com/", "국내 AI 전문 미디어"),
-            ("로봇신문", "https://www.irobotnews.com/", "로봇·자동화·AI 뉴스"),
+    @st.cache_data(ttl=1800, show_spinner=False)  # 30분 캐시
+    def _fetch_rss(url, limit=8):
+        """RSS 피드에서 뉴스 항목 파싱"""
+        try:
+            r = _req.get(url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            items = []
+            # RSS 2.0 or Atom
+            for item in root.iter("item"):
+                title = (item.findtext("title") or "").strip()
+                link = (item.findtext("link") or "").strip()
+                desc = (item.findtext("description") or "").strip()
+                pub = (item.findtext("pubDate") or "").strip()
+                if not title: continue
+                # HTML 태그 제거 + unescape
+                desc = re.sub(r'<[^>]+>', '', _unescape(desc))[:200]
+                items.append({"title": _unescape(title), "link": link, "desc": desc, "date": pub[:16] if pub else ""})
+                if len(items) >= limit: break
+            # Atom 형식 fallback
+            if not items:
+                ns = {"atom": "http://www.w3.org/2005/Atom"}
+                for entry in root.findall(".//atom:entry", ns) or root.iter("entry"):
+                    title = ""
+                    for t in entry.iter():
+                        if t.tag.endswith("title"): title = (t.text or "").strip(); break
+                    link = ""
+                    for l in entry.iter():
+                        if l.tag.endswith("link"): link = l.get("href","") or (l.text or "").strip(); break
+                    summary = ""
+                    for s in entry.iter():
+                        if s.tag.endswith("summary") or s.tag.endswith("content"): summary = (s.text or "").strip(); break
+                    if not title: continue
+                    summary = re.sub(r'<[^>]+>', '', _unescape(summary))[:200]
+                    items.append({"title": _unescape(title), "link": link, "desc": summary, "date": ""})
+                    if len(items) >= limit: break
+            return items
+        except Exception:
+            return []
+
+    st.markdown(_section("🤖 AI 팩토리 · 제조AI 뉴스 (실시간)"), unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.8rem;color:{S4}">RSS 피드 기반 실시간 뉴스 · 30분 간격 자동 갱신</p>', unsafe_allow_html=True)
+
+    _rss_feeds = [
+        {"cat": "🏭 AI·제조·스마트공장", "feeds": [
+            ("AI타임스", "https://www.aitimes.com/rss/allArticle.xml"),
+            ("로봇신문", "https://www.irobotnews.com/rss/allArticle.xml"),
+            ("전자신문 AI", "https://rss.etnews.com/Section902.xml"),
         ]},
-        {"cat": "📊 정책·산업 동향", "items": [
-            ("NIPA 정책뉴스", "https://www.nipa.kr/main/selectMainContent.do", "정보통신산업진흥원"),
-            ("KIAT 산업기술동향", "https://www.kiat.or.kr/", "한국산업기술진흥원"),
-            ("K-스마트공장", "https://www.smart-factory.kr/", "스마트공장 포털"),
-            ("과기정통부 보도자료", "https://www.msit.go.kr/bbs/list.do?sCode=user&mId=113&mPid=112", "과학기술정보통신부"),
+        {"cat": "📊 IT·산업 동향", "feeds": [
+            ("ZDNet Korea", "https://zdnet.co.kr/rss/newsAll.htm"),
+            ("디지털타임스", "https://www.dt.co.kr/rss/allArticle.xml"),
+            ("IT조선", "http://it.chosun.com/rss/all_rss.xml"),
         ]},
-        {"cat": "🌐 글로벌 AI 트렌드", "items": [
-            ("MIT Tech Review", "https://www.technologyreview.com/topic/artificial-intelligence/", "MIT 기술 리뷰 AI 섹션"),
-            ("Manufacturing Dive", "https://www.manufacturingdive.com/", "글로벌 제조업 뉴스"),
-            ("IIoT World", "https://www.iiot-world.com/", "산업 IoT·스마트팩토리"),
-            ("The Robot Report", "https://www.therobotreport.com/", "로봇·자동화 글로벌"),
-        ]},
-        {"cat": "🔬 연구·기술", "items": [
-            ("arXiv AI", "https://arxiv.org/list/cs.AI/recent", "최신 AI 논문"),
-            ("Papers With Code", "https://paperswithcode.com/", "코드 포함 AI 논문"),
-            ("ETRI 연구성과", "https://www.etri.re.kr/", "한국전자통신연구원"),
-            ("Hugging Face Blog", "https://huggingface.co/blog", "오픈소스 AI 모델 트렌드"),
+        {"cat": "🌐 글로벌 AI", "feeds": [
+            ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
+            ("The Robot Report", "https://www.therobotreport.com/feed/"),
+            ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
         ]},
     ]
 
-    for src in _news_sources:
-        st.markdown(f'<div style="font-size:.92rem;font-weight:700;color:{P};margin:20px 0 10px;border-left:3px solid {P};padding-left:10px">{src["cat"]}</div>', unsafe_allow_html=True)
-        _nc1, _nc2 = st.columns(2)
-        for _ni, item in enumerate(src["items"]):
-            with (_nc1 if _ni % 2 == 0 else _nc2):
-                st.markdown(f'''<div style="background:{W};border:1px solid {S2};border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:all .2s">
-                    <a href="{item[1]}" target="_blank" style="text-decoration:none;color:{S8};font-weight:600;font-size:.85rem">{item[0]} ↗</a>
-                    <div style="font-size:.73rem;color:{S4};margin-top:4px">{item[2]}</div>
-                </div>''', unsafe_allow_html=True)
+    _news_cat = st.radio("카테고리", [f["cat"] for f in _rss_feeds], horizontal=True, key="news_cat")
+    _sel_feed = next((f for f in _rss_feeds if f["cat"] == _news_cat), _rss_feeds[0])
+
+    for feed_name, feed_url in _sel_feed["feeds"]:
+        st.markdown(f'<div style="font-size:.9rem;font-weight:700;color:{P};margin:18px 0 8px;border-left:3px solid {P};padding-left:10px">{feed_name}</div>', unsafe_allow_html=True)
+        items = _fetch_rss(feed_url, limit=5)
+        if items:
+            for it in items:
+                _date_str = f' · <span style="color:{S4}">{it["date"]}</span>' if it["date"] else ""
+                st.markdown(f'''<div style="background:{W};border:1px solid {S2};border-radius:10px;padding:14px 18px;margin-bottom:8px">
+<a href="{it["link"]}" target="_blank" style="text-decoration:none;color:{S8};font-weight:600;font-size:.85rem;line-height:1.4">{it["title"]}</a>{_date_str}
+<div style="font-size:.78rem;color:{S5};margin-top:6px;line-height:1.5">{it["desc"]}</div>
+</div>''', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="font-size:.8rem;color:{S4};padding:8px">피드를 불러올 수 없습니다. <a href="{feed_url}" target="_blank">직접 방문 ↗</a></div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+
+    # ── 바로가기 링크 섹션 ──
+    st.markdown(_section("🔗 주요 사이트 바로가기"), unsafe_allow_html=True)
+    _links = [
+        ("K-스마트공장", "https://www.smart-factory.kr/"), ("IITP", "https://www.iitp.kr/"),
+        ("NIPA", "https://www.nipa.kr/"), ("과기정통부", "https://www.msit.go.kr/"),
+        ("arXiv AI", "https://arxiv.org/list/cs.AI/recent"), ("Papers With Code", "https://paperswithcode.com/"),
+        ("Hugging Face", "https://huggingface.co/blog"), ("Manufacturing Dive", "https://www.manufacturingdive.com/"),
+    ]
+    _link_html = " ".join(f'<a href="{u}" target="_blank" style="background:{P_BG};color:{P_D};border:1px solid rgba(255,128,0,.2);padding:6px 16px;border-radius:20px;font-size:.8rem;font-weight:600;text-decoration:none;display:inline-block;margin:3px">{n} ↗</a>' for n, u in _links)
+    st.markdown(f'<div style="line-height:2.4">{_link_html}</div>', unsafe_allow_html=True)
+
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     st.markdown(_section("📌 오늘의 AI 키워드"), unsafe_allow_html=True)
     _ai_keywords = ["에이전틱AI", "피지컬AI", "디지털트윈", "자율공정", "AI팩토리",
                      "생성형AI", "LLM", "Multi-Agent", "스마트공장", "예지보전",
                      "컴퓨터비전", "AI반도체", "엣지AI", "DTaaS", "로보틱스"]
-    _kw_html = " ".join(f'<span style="background:{P_BG};color:{P_D};border:1px solid rgba(255,128,0,.2);padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;display:inline-block;margin:3px">{k}</span>' for k in _ai_keywords)
+    _kw_html = " ".join(f'<span style="background:{S0};color:{CH};padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;display:inline-block;margin:3px">{k}</span>' for k in _ai_keywords)
     st.markdown(f'<div style="line-height:2.2">{_kw_html}</div>', unsafe_allow_html=True)
