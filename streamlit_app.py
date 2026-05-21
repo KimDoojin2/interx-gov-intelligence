@@ -1071,7 +1071,7 @@ with tab_news:
 
     @st.cache_data(ttl=1800, show_spinner=False)  # 30분 캐시
     def _fetch_rss(url, limit=8):
-        """RSS 피드에서 뉴스 항목 파싱"""
+        """RSS 피드에서 뉴스 항목 파싱 (핵심 요약 포함)"""
         try:
             r = _req.get(url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
             r.raise_for_status()
@@ -1082,11 +1082,27 @@ with tab_news:
                 title = (item.findtext("title") or "").strip()
                 link = (item.findtext("link") or "").strip()
                 desc = (item.findtext("description") or "").strip()
+                # content:encoded 가 있으면 더 풍부한 본문 사용
+                content_encoded = ""
+                for el in item:
+                    if el.tag.endswith("encoded") or el.tag.endswith("content"):
+                        content_encoded = (el.text or "").strip()
+                        break
                 pub = (item.findtext("pubDate") or "").strip()
                 if not title: continue
                 # HTML 태그 제거 + unescape
-                desc = re.sub(r'<[^>]+>', '', _unescape(desc))[:200]
-                items.append({"title": _unescape(title), "link": link, "desc": desc, "date": pub[:16] if pub else ""})
+                raw = content_encoded if len(content_encoded) > len(desc) else desc
+                raw = re.sub(r'<[^>]+>', '', _unescape(raw)).strip()
+                # 핵심 문장 추출 (마침표 기준 3문장)
+                sents = [s.strip() for s in re.split(r'(?<=[.다요됨함])\s+', raw) if len(s.strip()) > 15]
+                summary_bullets = sents[:3] if sents else [raw[:300]]
+                items.append({
+                    "title": _unescape(title), "link": link,
+                    "desc": raw[:200],  # 짧은 미리보기
+                    "summary": summary_bullets,  # 핵심 요약 문장들
+                    "full_desc": raw[:800],  # 전체 요약
+                    "date": pub[:16] if pub else "",
+                })
                 if len(items) >= limit: break
             # Atom 형식 fallback
             if not items:
@@ -1098,19 +1114,54 @@ with tab_news:
                     link = ""
                     for l in entry.iter():
                         if l.tag.endswith("link"): link = l.get("href","") or (l.text or "").strip(); break
-                    summary = ""
+                    raw_text = ""
                     for s in entry.iter():
-                        if s.tag.endswith("summary") or s.tag.endswith("content"): summary = (s.text or "").strip(); break
+                        if s.tag.endswith("content") or s.tag.endswith("summary"):
+                            raw_text = (s.text or "").strip(); break
                     if not title: continue
-                    summary = re.sub(r'<[^>]+>', '', _unescape(summary))[:200]
-                    items.append({"title": _unescape(title), "link": link, "desc": summary, "date": ""})
+                    raw_text = re.sub(r'<[^>]+>', '', _unescape(raw_text)).strip()
+                    sents = [s.strip() for s in re.split(r'(?<=[.다요됨함])\s+', raw_text) if len(s.strip()) > 15]
+                    items.append({
+                        "title": _unescape(title), "link": link,
+                        "desc": raw_text[:200],
+                        "summary": sents[:3] if sents else [raw_text[:300]],
+                        "full_desc": raw_text[:800],
+                        "date": "",
+                    })
                     if len(items) >= limit: break
             return items
         except Exception:
             return []
 
-    st.markdown(_section("🤖 AI 팩토리 · 제조AI 뉴스 (실시간)"), unsafe_allow_html=True)
-    st.markdown(f'<p style="font-size:.8rem;color:{S4}">RSS 피드 기반 실시간 뉴스 · 30분 간격 자동 갱신</p>', unsafe_allow_html=True)
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def _fetch_article_summary(url):
+        """기사 원문에서 핵심 내용 추출"""
+        try:
+            r = _req.get(url, timeout=8, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            r.raise_for_status()
+            from bs4 import BeautifulSoup as _BS
+            soup = _BS(r.text, "html.parser")
+            # 불필요 태그 제거
+            for tag in soup(["script","style","nav","header","footer","aside","noscript","iframe"]):
+                tag.decompose()
+            # 본문 추출 (article > div.content > p 순서로 시도)
+            article = soup.find("article") or soup.find("div", class_=re.compile(r"article|content|body|entry"))
+            target = article if article else soup
+            paragraphs = target.find_all("p")
+            text_parts = [p.get_text(strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 30]
+            if not text_parts:
+                text_parts = [target.get_text(" ", strip=True)[:1500]]
+            full = " ".join(text_parts[:10])
+            # 핵심 문장 추출 (5문장)
+            sents = [s.strip() for s in re.split(r'(?<=[.다요됨함!?])\s+', full) if len(s.strip()) > 20]
+            return sents[:5] if sents else [full[:500]]
+        except Exception:
+            return []
+
+    st.markdown(_section("🤖 AI 팩토리 · 제조AI · IT 산업 뉴스"), unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.8rem;color:{S4}">RSS 피드 기반 실시간 뉴스 · 30분 캐시 · 기사 클릭 시 핵심 요약 표시</p>', unsafe_allow_html=True)
 
     _rss_feeds = [
         {"cat": "🏭 AI·제조·스마트공장", "feeds": [
@@ -1119,9 +1170,9 @@ with tab_news:
             ("전자신문 AI", "https://rss.etnews.com/Section902.xml"),
         ]},
         {"cat": "📊 IT·산업 동향", "feeds": [
-            ("ZDNet Korea", "https://zdnet.co.kr/rss/newsAll.htm"),
-            ("디지털타임스", "https://www.dt.co.kr/rss/allArticle.xml"),
-            ("IT조선", "http://it.chosun.com/rss/all_rss.xml"),
+            ("전자신문 IT", "https://rss.etnews.com/Section901.xml"),
+            ("디지털데일리", "https://www.ddaily.co.kr/rss/rss.aspx"),
+            ("테크M", "https://www.techm.kr/rss/allArticle.xml"),
         ]},
         {"cat": "🌐 글로벌 AI", "feeds": [
             ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
@@ -1137,12 +1188,35 @@ with tab_news:
         st.markdown(f'<div style="font-size:.9rem;font-weight:700;color:{P};margin:18px 0 8px;border-left:3px solid {P};padding-left:10px">{feed_name}</div>', unsafe_allow_html=True)
         items = _fetch_rss(feed_url, limit=5)
         if items:
-            for it in items:
-                _date_str = f' · <span style="color:{S4}">{it["date"]}</span>' if it["date"] else ""
-                st.markdown(f'''<div style="background:{W};border:1px solid {S2};border-radius:10px;padding:14px 18px;margin-bottom:8px">
-<a href="{it["link"]}" target="_blank" style="text-decoration:none;color:{S8};font-weight:600;font-size:.85rem;line-height:1.4">{it["title"]}</a>{_date_str}
-<div style="font-size:.78rem;color:{S5};margin-top:6px;line-height:1.5">{it["desc"]}</div>
+            for _ni, it in enumerate(items):
+                _date_str = f' · {it["date"]}' if it["date"] else ""
+                # ── 뉴스 카드 (제목 + RSS 요약) ──
+                st.markdown(f'''<div style="background:{W};border:1px solid {S2};border-radius:10px;padding:14px 18px;margin-bottom:4px">
+<a href="{it["link"]}" target="_blank" style="text-decoration:none;color:{S8};font-weight:700;font-size:.88rem;line-height:1.4">{it["title"]}</a>
+<span style="font-size:.72rem;color:{S4}">{_date_str}</span>
+<div style="font-size:.78rem;color:{S5};margin-top:6px;line-height:1.55">{it["desc"]}</div>
 </div>''', unsafe_allow_html=True)
+                # ── 핵심 요약 (RSS 본문 기반 + 원문 fetch) ──
+                _exp_key = f"news_{feed_name}_{_ni}"
+                with st.expander("📌 핵심 내용 보기", expanded=False):
+                    # 1) RSS 본문 요약
+                    if it["summary"] and it["summary"][0]:
+                        for _si, _sent in enumerate(it["summary"]):
+                            if _sent and len(_sent) > 10:
+                                st.markdown(f'<div style="font-size:.82rem;color:{CH};line-height:1.6;padding:2px 0 2px 12px;border-left:2px solid {P}"><b>{_si+1}.</b> {_sent[:200]}</div>', unsafe_allow_html=True)
+                    # 2) 원문에서 추가 요약 (버튼 클릭 시)
+                    if it.get("link"):
+                        if st.button("📖 원문 상세 요약 가져오기", key=f"fetch_{_exp_key}"):
+                            with st.spinner("기사 본문 분석중..."):
+                                _art_sents = _fetch_article_summary(it["link"])
+                            if _art_sents:
+                                st.markdown(f'<div style="background:{S0};border-radius:8px;padding:12px 16px;margin-top:8px">', unsafe_allow_html=True)
+                                st.markdown(f'<div style="font-size:.75rem;font-weight:700;color:{P};margin-bottom:8px">📰 기사 핵심 요약</div>', unsafe_allow_html=True)
+                                for _ai, _as in enumerate(_art_sents):
+                                    st.markdown(f'<div style="font-size:.82rem;color:{CH};line-height:1.6;padding:3px 0 3px 14px;border-left:2px solid {A2}"><b>▸</b> {_as[:250]}</div>', unsafe_allow_html=True)
+                                st.markdown('</div>', unsafe_allow_html=True)
+                            else:
+                                st.caption("원문 요약을 가져올 수 없습니다. 위 링크를 직접 방문해주세요.")
         else:
             st.markdown(f'<div style="font-size:.8rem;color:{S4};padding:8px">피드를 불러올 수 없습니다. <a href="{feed_url}" target="_blank">직접 방문 ↗</a></div>', unsafe_allow_html=True)
 
