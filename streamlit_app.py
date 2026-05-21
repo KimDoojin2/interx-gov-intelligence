@@ -381,7 +381,7 @@ with tab_dash:
                     _detail = getattr(n, "detail_url", "") or ""
                     if _detail and _detail.startswith("http"):
                         st.markdown(f"[🔗 원문 바로가기]({_detail})")
-                        st.iframe(_detail, height=480, scrolling=True)
+                        st.iframe(_detail, height=480)
 
         # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
         _rec = []
@@ -652,7 +652,7 @@ with tab_notices:
                 _sn_link = getattr(sn, "detail_url", "") or ""
                 if _sn_link and _sn_link.startswith("http"):
                     with st.expander("🌐 원문 사이트 보기", expanded=False):
-                        st.iframe(_sn_link, height=560, scrolling=True)
+                        st.iframe(_sn_link, height=560)
         else:
             st.info("필터 조건에 맞는 공고가 없습니다.")
 
