@@ -32,6 +32,21 @@
 
 ## 📋 최근 업데이트
 
+### v5.2 — 2026-05-21
+
+**🏗️ 테크노파크 12개 신규 + 2026 프로젝트 키워드 대량 추가**
+- **수집 사이트 27개로 확대** (기존 16개 → 27개)
+  - 신규 테크노파크 12개: 서울TP, 경기TP, 경기대진TP, 인천TP, 강원TP, 세종TP, 충북TP, 충남TP, 부산TP, 울산TP, 경남TP, 포항TP
+  - `_TechnoBaseCollector` 공통 베이스 클래스 (4단계 파싱: 링크패턴 → 테이블 → li → fallback)
+  - `technopark_collectors.py` 단일 파일 통합 (12개 클래스)
+- **dicia(의료기기산업협회) 비활성화** — 제조AI 범위 외
+- **2026 신규 과제 키워드 30개+** 대량 추가
+  - CORE: 에이전틱AI, 자율공정, DTaaS, 테스트베드, 소부장, 혁신바우처, 피지컬AI, 물류자동화, AI선박, AI반도체
+  - POSITIVE: 에이전틱AI(6), 피지컬AI(5), 제조DTaaS(6), AI+X(5), 자율공정(5), Multi AI Agent(6) 등 40항목
+  - COMBO: (에이전틱,ai,6), (피지컬,ai,6), (dtaas,제조,6), (multi,agent,6) 등 15쌍 신규
+  - L3 강공고 키워드: 에이전틱AI, 피지컬AI, 제조DTaaS, 자율공정, 제조DX멘토 추가
+- **솔루션맵 업데이트**: GenAI(에이전틱AI/피지컬AI), ManufacturingDT(자율공정/DTaaS), InfraDS(AI반도체) 확장
+
 ### v5.1 — 2026-05-21
 
 **🌍 히어로 배너 + 키워드 필터 개선**
@@ -98,7 +113,7 @@
 
 | 항목 | 수치 |
 |------|------|
-| 수집 사이트 | 20개+ (requests 18개, Playwright 2개) |
+| 수집 사이트 | 27개 활성 (requests 22개, Playwright 5개) |
 | 파이프라인 단계 | 17단계 |
 | 유즈케이스 | 25개 (스코어링, 중복제거, 경쟁사, 제안서, ML예측 등) |
 | 정기공고 패턴 | 18그룹, 120+ aliases (priority 1/2/3 등급) |
@@ -140,7 +155,7 @@ venv/Scripts/python -m pytest tests/ -v
 streamlit run src/interx_engine/interfaces/dashboard/app.py
 ```
 
-**Playwright 사이트 초기 설정 (kiat, dicia, smart_factory)**
+**Playwright 사이트 초기 설정 (bizinfo, kiat, ketep, smart_factory, iitp)**
 ```bash
 venv/Scripts/python -m playwright install chromium
 ```
@@ -264,8 +279,8 @@ interx_gov_intelligence/
     │   │       ├── ttp_collector.py       # 대전테크노파크
     │   │       ├── dicia_collector.py     # 의료기기산업협회 (Playwright)
     │   │       ├── gjtp_collector.py      # 광주테크노파크
-    │   │       ├── new_collectors.py      # NRF·KISED·KETEP·KOIIA (멀티)
-    │   │       ├── multi_site_collectors.py # 추가 테크노파크 묶음
+    │   │       ├── new_collectors.py      # KISED·KETEP·KOIIA·JEJUTP (멀티)
+    │   │       ├── technopark_collectors.py # 테크노파크 12개 통합 (v5.2)
     │   │       └── mock_notice_collector.py # 테스트용 Mock
     │   ├── sheets/
     │   │   ├── google_sheet_gateway.py    # 실제 Google Sheets API 연동
@@ -394,14 +409,31 @@ interx_gov_intelligence/
 | `uipa` | 울산정보산업진흥원 | requests | |
 | `gicon` | 광주전남연구원 | requests | |
 | `ttp` | 대전테크노파크 | requests | |
-| `dicia` | 의료기기산업협회 | Playwright | |
 | `gjtp` | 광주테크노파크 | requests | |
-| `NRF` | 한국연구재단 | requests | new_collectors.py |
-| `KISED` | 창업진흥원 | requests | new_collectors.py |
-| `KETEP` | 에너지기술평가원 | requests | new_collectors.py |
-| `iris` | IRIS | requests | 로그인 필수로 현재 비활성 |
-| `smba` | 중소벤처기업부 | requests | 서버 차단으로 현재 비활성 |
-| `gbtp` | 경북테크노파크 | — | Colab IP 차단으로 비활성 |
+| `kised` | 창업진흥원 | requests | new_collectors.py |
+| `ketep` | 에너지기술평가원 | Playwright | 2025~ /businessAcment URL |
+| `koiia` | 산업지능화협회 | requests | new_collectors.py |
+| `jejutp` | 제주테크노파크 | requests | |
+| `iitp` | 정보통신기획평가원 | Playwright | Vue.js SPA |
+| `seoultp` | 서울테크노파크 | requests | v5.2 신규 |
+| `gtp` | 경기테크노파크 | requests | v5.2 신규 |
+| `gdtp` | 경기대진테크노파크 | requests | v5.2 신규 |
+| `itp` | 인천테크노파크 | requests | v5.2 신규 |
+| `gwtp` | 강원테크노파크 | requests | v5.2 신규 |
+| `sjtp` | 세종테크노파크 | requests | v5.2 신규 |
+| `cbtp` | 충북테크노파크 | requests | v5.2 신규 |
+| `ctp` | 충남테크노파크 | requests | v5.2 신규 |
+| `btp` | 부산테크노파크 | requests | v5.2 신규 |
+| `utp` | 울산테크노파크 | requests | v5.2 신규 |
+| `gntp` | 경남테크노파크 | requests | v5.2 신규 |
+| `ptp` | 포항테크노파크 | requests | v5.2 신규 |
+| | | | |
+| *비활성* | | | |
+| `dicia` | 의료기기산업협회 | Playwright | 제조AI 범위 외 → 비활성 |
+| `iris` | IRIS | requests | 로그인 필수로 비활성 |
+| `smba` | 중소벤처기업부 | requests | 서버 차단으로 비활성 |
+| `gbtp` | 경북테크노파크 | — | IP 차단으로 비활성 |
+| `nrf` | 한국연구재단 | requests | 500 서버에러 → 비활성 |
 
 ### 6-2. 2단계 수집 흐름
 
@@ -1003,7 +1035,7 @@ venv/Scripts/python -m pytest tests/ --cov=src/interx_engine --cov-report=html
 - **설정값은 `configs/` YAML에** — 코드에 숫자/키워드 하드코딩 금지
 - **각 크롤러는 `BaseCollector` 상속** — `_parse_page()` 메서드만 구현
 - **`service_account.json`** — Git에 올리면 안 됨 (Google 인증키, .gitignore에 포함)
-- **Playwright 필요 사이트**: `bizinfo`, `kiat`, `dicia`, `smart_factory`
+- **Playwright 필요 사이트**: `bizinfo`, `kiat`, `ketep`, `smart_factory`, `iitp`
   → 초기 실행 전 `playwright install chromium` 필수
 - **의존 방향**: infrastructure → application → core (역방향 절대 금지)
 - **중복 방지**: notice_id = site_code + URL MD5 / 스마트공장은 nttId 기반 키 (`smart_factory-ntt{nttId}`)
