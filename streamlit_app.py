@@ -51,33 +51,19 @@ GRADE = {"A": GA, "B": GB, "C": GC, "D": GD}
 # ── Page Config ──
 st.set_page_config(page_title="InterX Intelligence", page_icon="🔶", layout="wide", initial_sidebar_state="collapsed")
 
-# ── Intro (즉시 표시 — Streamlit 렌더 지연 방지) ──
+# ── Intro (CSS only — Streamlit은 <script> 미실행) ──
 if "intro_shown" not in st.session_state:
     st.session_state.intro_shown = True
-    st.markdown("""<div id="ix-intro-root" style="position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column">
-    <div style="text-align:center;opacity:0" id="ix-logo">
-      <div style="font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif"><span style="color:#fff">INTER</span><span style="color:#FF8000">X</span></div>
-      <div style="color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500">INTELLIGENCE ENGINE</div>
-    </div>
-    </div>
-    <script>
-    (function(){
-      var logo=document.getElementById('ix-logo');
-      var root=document.getElementById('ix-intro-root');
-      if(!logo||!root)return;
-      logo.style.transition='opacity .5s ease, transform .5s ease';
-      logo.style.transform='scale(.8) translateY(16px)';
-      requestAnimationFrame(function(){
-        logo.style.opacity='1';logo.style.transform='scale(1)';
-        setTimeout(function(){
-          logo.style.opacity='0';logo.style.transform='scale(.97) translateY(-8px)';
-          setTimeout(function(){root.style.transition='opacity .3s';root.style.opacity='0';
-            setTimeout(function(){root.remove()},350);
-          },500);
-        },1600);
-      });
-    })();
-    </script>""", unsafe_allow_html=True)
+    st.markdown("""<style>
+    @keyframes ix-fade{0%{opacity:0;transform:scale(.85) translateY(14px)}15%{opacity:1;transform:scale(1.02)}40%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.97) translateY(-8px)}}
+    @keyframes ix-bg{0%,70%{opacity:1}100%{opacity:0;pointer-events:none;visibility:hidden}}
+    .ix-intro{position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;animation:ix-bg 2.2s ease forwards}
+    .ix-intro .logo{animation:ix-fade 2.2s ease forwards;text-align:center}
+    .ix-intro .mark{font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif}
+    .ix-intro .mark b{color:#FF8000} .ix-intro .mark span{color:#fff}
+    .ix-intro .sub{color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500}
+    </style>
+    <div class="ix-intro"><div class="logo"><div class="mark"><span>INTER</span><b>X</b></div><div class="sub">INTELLIGENCE ENGINE</div></div></div>""", unsafe_allow_html=True)
 
 # ── Enterprise CSS ──
 st.markdown(f"""<style>
