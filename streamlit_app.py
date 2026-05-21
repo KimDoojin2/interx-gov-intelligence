@@ -313,33 +313,20 @@ with tab_dash:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_run:
-    # ── 수집 설정 (st.fragment → 위젯 변경 시 탭 리셋 방지) ──
-    @st.fragment
-    def _pipeline_settings():
-        st.markdown(_section("수집 설정"), unsafe_allow_html=True)
-        cs1, cs2, cs3 = st.columns(3)
-        with cs1: st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"], key="run_mode_sel")
-        with cs2: st.slider("사이트당 최대 페이지", 1, 10, 5, key="max_pages_sel")
-        with cs3: st.toggle("Google Sheets 업로드", value=True, key="sheets_sel")
-        with st.expander("수집 사이트 선택", expanded=False):
-            st.multiselect("사이트", ALL_SITES, default=ALL_SITES, key="sel_sites", label_visibility="collapsed")
-
-        run_mode = st.session_state.get("run_mode_sel", "일반 수집 (빠름)")
-        max_pages = st.session_state.get("max_pages_sel", 5)
-        selected_sites = st.session_state.get("sel_sites", ALL_SITES)
-        ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-        c1,c2,c3 = st.columns(3)
-        c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
-        c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
-        c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
-    _pipeline_settings()
-
-    run_mode = st.session_state.get("run_mode_sel", "일반 수집 (빠름)")
-    max_pages = st.session_state.get("max_pages_sel", 5)
-    enable_sheets = st.session_state.get("sheets_sel", True)
-    selected_sites = st.session_state.get("sel_sites", ALL_SITES)
+    st.markdown(_section("수집 설정"), unsafe_allow_html=True)
+    cs1, cs2, cs3 = st.columns(3)
+    with cs1: run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"], key="run_mode_sel")
+    with cs2: max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5, key="max_pages_sel")
+    with cs3: enable_sheets = st.toggle("Google Sheets 업로드", value=True, key="sheets_sel")
+    with st.expander("수집 사이트 선택", expanded=False):
+        selected_sites = st.multiselect("사이트", ALL_SITES, default=ALL_SITES, key="sel_sites", label_visibility="collapsed")
     ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
+
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    c1,c2,c3 = st.columns(3)
+    c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
+    c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
+    c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
     cb, cs_ = st.columns([1, 3])
@@ -538,7 +525,7 @@ with tab_proposal:
             st.markdown(_empty("📝", "생성된 제안서가 없습니다", "A/B등급 공고가 있을 때 자동으로 제안서가 생성됩니다."), unsafe_allow_html=True)
         else:
             st.markdown(_section(f"자동 생성 제안서 ({len(proposals)}건)"), unsafe_allow_html=True)
-            for p in proposals:
+            for _pi, p in enumerate(proposals):
                 fp = Path(p)
                 if fp.exists():
                     cn, cd = st.columns([5, 1])
@@ -546,7 +533,7 @@ with tab_proposal:
                     with open(fp, "rb") as f:
                         cd.download_button("다운로드", f.read(), fp.name,
                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                           key=f"dl_{fp.name}")
+                                           key=f"dl_{_pi}_{fp.name}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
