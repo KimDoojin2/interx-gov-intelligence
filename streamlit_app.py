@@ -3,7 +3,7 @@ InterX Government Intelligence Engine — Enterprise Dashboard v5
 """
 from __future__ import annotations
 
-import io, json, os, sys, time
+import io, json, os, re, sys, time
 from collections import Counter, defaultdict
 from datetime import datetime, date
 from pathlib import Path
@@ -741,11 +741,18 @@ with tab_keyword:
             if sc.positive_keywords:
                 for k in sc.positive_keywords: kw_c[k]+=1
         title_w = Counter()
-        stops = {"사업","지원","공고","모집","안내","위한","대한","관련","통한","기반","활용","추진","참여","신청","접수","대상","분야","과제","수행","기관","선정","계획","결과","변경","연장"}
+        stops = {"사업","지원","공고","모집","안내","위한","대한","관련","통한","기반","활용","추진",
+                 "참여","신청","접수","대상","분야","과제","수행","기관","선정","계획","결과","변경",
+                 "연장","프로그램","센터","재공고","용역","발표","공지","정보","운영","기술","개발",
+                 "산업","기업","육성","연구","전문","협력","국내","혁신","전략","구축","도입","확대",
+                 "사항","가능","제공","진행","통해","등록","기타","문의","담당","홈페이지","바로가기",
+                 "상반기","하반기","년도","차년도","연도","해당"}
         for n in notices:
             for w in (n.title or "").split():
-                c="".join(ch for ch in w if ch.isalnum())
-                if len(c)>=2 and c not in stops: title_w[c]+=1
+                c = "".join(ch for ch in w if ch.isalnum())
+                # 숫자만(연도/금액), 2글자 미만, 불용어 제외
+                if len(c) < 2 or c in stops or re.fullmatch(r'\d+', c): continue
+                title_w[c] += 1
 
         k1,k2 = st.columns(2)
         k1.markdown(_metric(len(kw_c), "매칭 키워드"), unsafe_allow_html=True)
