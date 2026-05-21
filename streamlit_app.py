@@ -154,6 +154,32 @@ section[data-testid="stSidebar"]{{display:none}}
 .empty .heading{{font-size:1rem;font-weight:700;color:{CH};margin-bottom:6px}}
 .empty .desc{{font-size:.85rem;color:{S5};line-height:1.5}}
 .empty .action{{display:inline-block;margin-top:16px;padding:8px 20px;background:{P};color:{W};border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none}}
+
+/* ── Hero Banner ── */
+.hero-banner{{
+    position:relative;margin:-28px -1rem 28px;overflow:hidden;
+    height:220px;background:#000;
+}}
+.hero-banner img{{
+    width:100%;height:100%;object-fit:cover;object-position:center 60%;
+    opacity:.85;display:block;
+}}
+.hero-overlay{{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:linear-gradient(180deg,rgba(0,0,0,.25) 0%,rgba(0,0,0,.55) 100%);
+}}
+.hero-overlay .hero-brand{{
+    font-size:3.2rem;font-weight:900;letter-spacing:-2px;
+    font-family:'Inter',system-ui,sans-serif;
+    text-shadow:0 2px 24px rgba(0,0,0,.6);
+}}
+.hero-overlay .hero-brand span{{color:#fff}}
+.hero-overlay .hero-brand b{{color:{P}}}
+.hero-overlay .hero-sub{{
+    color:rgba(255,255,255,.55);font-size:.82rem;letter-spacing:5px;
+    margin-top:8px;font-weight:500;text-shadow:0 1px 8px rgba(0,0,0,.5);
+}}
 </style>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -200,9 +226,18 @@ def _layout(**kw):
 #  Navigation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence/master/assets/hero_earth.png"
+
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
     <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.0 &nbsp;·&nbsp; 16 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
+</div>
+<div class="hero-banner">
+    <img src="{HERO_IMG}" alt="InterX Hero">
+    <div class="hero-overlay">
+        <div class="hero-brand"><span>INTER</span><b>X</b></div>
+        <div class="hero-sub">GOVERNMENT INTELLIGENCE ENGINE</div>
+    </div>
 </div>""", unsafe_allow_html=True)
 
 tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
