@@ -14,11 +14,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-try:
-    if hasattr(sys.stdout, "buffer") and not sys.stdout.buffer.closed:
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-except (ValueError, AttributeError):
-    pass
+# NOTE: sys.stdout TextIOWrapper 교체 제거
+# Streamlit Cloud (Python 3.14) 에서 교체 시 로깅 핸들러가
+# closed stream 참조하여 "I/O operation on closed file" 에러 발생
 
 try:
     from dotenv import load_dotenv
