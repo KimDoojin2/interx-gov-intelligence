@@ -32,7 +32,18 @@
 
 ## 📋 최근 업데이트
 
-### v5.0 — 2025-05-20
+### v5.1 — 2026-05-21
+
+**🌍 히어로 배너 + 키워드 필터 개선**
+- **히어로 배너**: 지구 일출 이미지(회사 공식 이미지) + INTER**X** 로고 오버레이
+  - nav-bar 아래, 탭 위 220px 배너 / 그라디언트 오버레이 + 텍스트 쉐도우
+  - 이미지: `assets/hero_earth.png` (GitHub raw URL 서빙)
+- **키워드 차트 필터 강화**
+  - "2026" 등 순수 숫자(연도/금액) 제목 빈출 단어에서 제외
+  - 불용어 30개+ 추가 (프로그램, 센터, 재공고, 산업, 기업, 육성 등)
+  - 의미 있는 키워드만 표시 (AI, 제조, 스마트공장, 디지털트윈 등)
+
+### v5.0 — 2026-05-20
 
 **🏢 Enterprise UI v5 + 프로젝트 대규모 정리**
 - **interxlab.com 공식 디자인 시스템 적용**
@@ -172,6 +183,9 @@ venv/Scripts/python -m playwright install chromium
 ```
 interx_gov_intelligence/
 ├── run_engine.py                          # 단일 진입점 (CLI 파싱 → 오케스트레이터 호출)
+├── streamlit_app.py                       # Streamlit Cloud 대시보드 (Enterprise v5)
+├── assets/
+│   └── hero_earth.png                     # 히어로 배너 이미지 (지구 일출)
 ├── configs/                               # 모든 설정값 YAML (코드에 하드코딩 금지)
 │   ├── scoring.yaml                       # 점수 가중치, 등급 컷, 키워드 전체
 │   ├── sites.yaml                         # 수집 사이트 목록 (enabled 플래그)
