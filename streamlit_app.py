@@ -51,18 +51,33 @@ GRADE = {"A": GA, "B": GB, "C": GC, "D": GD}
 # ── Page Config ──
 st.set_page_config(page_title="InterX Intelligence", page_icon="🔶", layout="wide", initial_sidebar_state="collapsed")
 
-# ── Intro ──
+# ── Intro (즉시 표시 — Streamlit 렌더 지연 방지) ──
 if "intro_shown" not in st.session_state:
     st.session_state.intro_shown = True
-    st.markdown("""<style>
-    @keyframes ix{0%{opacity:0;transform:scale(.8) translateY(16px)}35%{opacity:1;transform:scale(1.02)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.97) translateY(-8px)}}
-    @keyframes ixbg{0%{opacity:1}75%{opacity:1}100%{opacity:0;pointer-events:none}}
-    .ix-intro{position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;animation:ixbg 2.6s ease forwards}
-    .ix-intro .logo{animation:ix 2.6s ease forwards;text-align:center}
-    .ix-intro .mark{font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif}
-    .ix-intro .mark b{color:#FF8000} .ix-intro .mark span{color:#fff}
-    .ix-intro .sub{color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500}
-    </style><div class="ix-intro"><div class="logo"><div class="mark"><span>INTER</span><b>X</b></div><div class="sub">INTELLIGENCE ENGINE</div></div></div>""", unsafe_allow_html=True)
+    st.markdown("""<div id="ix-intro-root" style="position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column">
+    <div style="text-align:center;opacity:0" id="ix-logo">
+      <div style="font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:'Inter',system-ui,sans-serif"><span style="color:#fff">INTER</span><span style="color:#FF8000">X</span></div>
+      <div style="color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500">INTELLIGENCE ENGINE</div>
+    </div>
+    </div>
+    <script>
+    (function(){
+      var logo=document.getElementById('ix-logo');
+      var root=document.getElementById('ix-intro-root');
+      if(!logo||!root)return;
+      logo.style.transition='opacity .5s ease, transform .5s ease';
+      logo.style.transform='scale(.8) translateY(16px)';
+      requestAnimationFrame(function(){
+        logo.style.opacity='1';logo.style.transform='scale(1)';
+        setTimeout(function(){
+          logo.style.opacity='0';logo.style.transform='scale(.97) translateY(-8px)';
+          setTimeout(function(){root.style.transition='opacity .3s';root.style.opacity='0';
+            setTimeout(function(){root.remove()},350);
+          },500);
+        },1600);
+      });
+    })();
+    </script>""", unsafe_allow_html=True)
 
 # ── Enterprise CSS ──
 st.markdown(f"""<style>
@@ -323,20 +338,33 @@ with tab_dash:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_run:
-    st.markdown(_section("수집 설정"), unsafe_allow_html=True)
-    cs1, cs2, cs3 = st.columns(3)
-    with cs1: run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"])
-    with cs2: max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5)
-    with cs3: enable_sheets = st.toggle("Google Sheets 업로드", value=True)
-    with st.expander("수집 사이트 선택", expanded=False):
-        selected_sites = st.multiselect("사이트", ALL_SITES, default=ALL_SITES, label_visibility="collapsed")
+    # ── 수집 설정 (st.fragment → 위젯 변경 시 탭 리셋 방지) ──
+    @st.fragment
+    def _pipeline_settings():
+        st.markdown(_section("수집 설정"), unsafe_allow_html=True)
+        cs1, cs2, cs3 = st.columns(3)
+        with cs1: st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"], key="run_mode_sel")
+        with cs2: st.slider("사이트당 최대 페이지", 1, 10, 5, key="max_pages_sel")
+        with cs3: st.toggle("Google Sheets 업로드", value=True, key="sheets_sel")
+        with st.expander("수집 사이트 선택", expanded=False):
+            st.multiselect("사이트", ALL_SITES, default=ALL_SITES, key="sel_sites", label_visibility="collapsed")
 
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-    c1,c2,c3 = st.columns(3)
+        run_mode = st.session_state.get("run_mode_sel", "일반 수집 (빠름)")
+        max_pages = st.session_state.get("max_pages_sel", 5)
+        selected_sites = st.session_state.get("sel_sites", ALL_SITES)
+        ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        c1,c2,c3 = st.columns(3)
+        c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
+        c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
+        c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
+    _pipeline_settings()
+
+    run_mode = st.session_state.get("run_mode_sel", "일반 수집 (빠름)")
+    max_pages = st.session_state.get("max_pages_sel", 5)
+    enable_sheets = st.session_state.get("sheets_sel", True)
+    selected_sites = st.session_state.get("sel_sites", ALL_SITES)
     ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
-    c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
-    c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
-    c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
     cb, cs_ = st.columns([1, 3])
