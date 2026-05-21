@@ -373,11 +373,29 @@ with tab_dash:
                     for _sk, _sl in [("사업목적","🎯 사업목적"), ("지원내용","💰 지원내용"), ("지원대상","👥 지원대상")]:
                         _sv = _struct.get(_sk, "")
                         if _sv: st.markdown(f"**{_sl}**: {_sv[:200]}")
-                    # 본문 미리보기 (Vue/React 템플릿 변수 제거)
-                    _body = getattr(n, "body_text", "") or ""
-                    _body = re.sub(r'\{\{[^}]+\}\}', '', _body).strip()
-                    if _body and not _struct and len(_body) > 20:
-                        st.markdown(f"**본문 미리보기**: {_body[:300]}...")
+                    # 핵심 내용 미리보기 (구조화 섹션 없을 때)
+                    if not _struct:
+                        _summary = getattr(n, "summary", "") or ""
+                        _summary = re.sub(r'\{\{[^}]+\}\}', '', _summary).strip()
+                        _body = getattr(n, "body_text", "") or ""
+                        _body = re.sub(r'\{\{[^}]+\}\}', '', _body).strip()
+                        # summary가 있으면 우선 사용 (핵심 문장 추출된 것)
+                        if _summary and len(_summary) > 20:
+                            st.markdown(f"**📋 핵심 내용**: {_summary[:350]}")
+                        elif _body and len(_body) > 20:
+                            # body에서 핵심 키워드 포함 문장 직접 추출
+                            _imp_re = re.compile(r"(지원\s*대상|지원\s*내용|지원\s*규모|신청\s*자격|접수\s*기간|사업\s*목적|사업\s*내용|모집\s*기간|총\s*사업비|선정\s*규모)")
+                            _sents = [s.strip() for s in re.split(r'(?<=[.다요됨함])\s+', _body) if len(s.strip()) > 20]
+                            _imp = [s for s in _sents if _imp_re.search(s)][:3]
+                            if _imp:
+                                st.markdown("**📋 핵심 내용**:")
+                                for _is in _imp:
+                                    st.markdown(f"- {_is[:200]}")
+                            else:
+                                # 앞부분 30자 이상인 첫 문장
+                                _first = next((s for s in _sents if len(s) >= 30), "")
+                                if _first:
+                                    st.markdown(f"**📋 핵심 내용**: {_first[:300]}")
                     # 원문 바로가기 링크
                     _detail = getattr(n, "detail_url", "") or ""
                     if _detail and _detail.startswith("http"):
@@ -643,11 +661,31 @@ with tab_notices:
                                 st.markdown("**솔루션 매칭** &nbsp;" + " · ".join(f"**{name}** {score:.0f}" for name,score in sols[:5]))
 
                 body = getattr(sn, "body_text", "") or ""
-                body = re.sub(r'\{\{[^}]+\}\}', '', body).strip()  # Vue/React 템플릿 변수 제거
-                if body and len(body) > 20:
-                    with st.expander("📄 공고 본문", expanded=False):
-                        st.text(body[:5000])
-                        if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
+                body = re.sub(r'\{\{[^}]+\}\}', '', body).strip()
+                _sn_struct = getattr(sn, "structured", None) or {}
+                _sn_summary = getattr(sn, "summary", "") or ""
+                _sn_summary = re.sub(r'\{\{[^}]+\}\}', '', _sn_summary).strip()
+                # 핵심 내용 요약 (구조화 > summary > 키워드 문장)
+                if _sn_struct or _sn_summary or (body and len(body) > 20):
+                    with st.expander("📋 공고 핵심 내용", expanded=False):
+                        # 구조화 섹션
+                        for _sk2, _sl2 in [("사업목적","🎯 사업목적"), ("지원내용","💰 지원내용"),
+                                           ("지원대상","👥 지원대상"), ("지원금액","💵 지원금액"),
+                                           ("신청방법","📝 신청방법"), ("추진일정","📅 추진일정")]:
+                            _sv2 = _sn_struct.get(_sk2, "")
+                            if _sv2:
+                                st.markdown(f"**{_sl2}**")
+                                st.markdown(f"> {_sv2[:300]}")
+                        # summary (핵심 문장)
+                        if not _sn_struct and _sn_summary and len(_sn_summary) > 20:
+                            st.markdown("**📌 핵심 요약**")
+                            st.markdown(f"> {_sn_summary[:400]}")
+                        # 전체 본문 (접기)
+                        if body and len(body) > 50:
+                            st.markdown("---")
+                            st.caption("📄 전체 본문")
+                            st.text(body[:5000])
+                            if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
 
                 # ── 원문 바로가기 ──
                 _sn_link = getattr(sn, "detail_url", "") or ""

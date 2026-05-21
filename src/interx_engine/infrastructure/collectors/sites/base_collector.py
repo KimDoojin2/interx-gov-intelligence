@@ -318,42 +318,91 @@ class BaseCollector(NoticeCollectorPort, ABC):
 
     # ── 상세 페이지 파싱 (Generic) ────────────────────────────────────────────
 
+    # 본문 영역 선택자 (우선순위순 — 한국 정부/기관 게시판 공통 패턴)
+    _CONTENT_SELECTORS = [
+        ".board_view", ".board-view", ".view_content", ".view-content",
+        ".board_content", ".boardView", ".board-detail", ".view_area",
+        ".bbs_view", ".bbsView", ".bbs-view", ".bbsContent",
+        ".detail_content", ".detail-content", ".detailView",
+        ".content_view", ".contentView", ".post-content",
+        "#board_content", "#boardContent", "#viewContent",
+        "article", ".article", "main .content", ".entry-content",
+        ".sub_content", ".subContent", "#contents",
+    ]
+    # 본문에서 제거할 잡음 패턴 (메뉴, 네비, 푸터 텍스트)
+    _JUNK_RE = re.compile(
+        r"(로그인|회원가입|사이트맵|개인정보.?처리방침|이용약관|저작권|copyright|"
+        r"찾아오시는\s*길|주소\s*:|전화번호|팩스|fax|대표전화|"
+        r"주메뉴바로가기|본문바로가기|하위메뉴|skip\s*navigation|"
+        r"MAIN\s*TOPIC|GNB|LNB|SNB|top|TOP|처음으로|홈\s*>|"
+        r"이전\s*글|다음\s*글|목록\s*보기|목록으로|글\s*목록|"
+        r"트위터|페이스북|카카오|공유하기|스크랩|인쇄|프린트)",
+        re.I,
+    )
+
     def _parse_detail_page(self, soup: BeautifulSoup, detail_url: str) -> Dict[str, Any]:
         """
-        범용 상세 페이지 파서.
-        서브클래스에서 오버라이드해 사이트별 정밀 파싱 가능.
+        범용 상세 페이지 파서 — 본문 영역 정밀 추출.
+        1) script/style/nav 등 불필요 태그 제거
+        2) 본문 컨테이너 탐색 (board_view, view_content 등)
+        3) 컨테이너 내 텍스트만 body_text로 사용 (메뉴/사이드바 오염 방지)
         """
-        # 불필요한 태그 제거 (시맨틱 태그)
+        # ── 1) 불필요한 태그 완전 제거 ──
         for tag in soup(["script", "style", "nav", "header", "footer",
-                         "noscript", "iframe", "aside"]):
+                         "noscript", "iframe", "aside", "form"]):
             tag.decompose()
-        # GNB/LNB/SNB div 네비게이션 제거 (GJTP 등 div 기반 메뉴 오염 방지)
         for div in soup.find_all("div", class_=re.compile(
-                r"\b(gnb|lnb|snb|tnb|nav|menu|sidebar|side-bar|header|footer)\b", re.I)):
+                r"\b(gnb|lnb|snb|tnb|nav|menu|sidebar|side-bar|header|footer|"
+                r"top-bar|topbar|breadcrumb|page-nav|skip|util|banner)\b", re.I)):
+            div.decompose()
+        for div in soup.find_all("div", id=re.compile(
+                r"\b(gnb|lnb|snb|nav|menu|sidebar|header|footer|topArea|skip)\b", re.I)):
             div.decompose()
 
-        # 본문 텍스트 정제
-        raw_text = soup.get_text(" ", strip=True)
-        text = re.sub(r"\s{2,}", " ", raw_text).strip()
+        # ── 2) 본문 컨테이너 탐색 (우선순위순) ──
+        content_el = None
+        for sel in self._CONTENT_SELECTORS:
+            content_el = soup.select_one(sel)
+            if content_el and len(content_el.get_text(strip=True)) > 50:
+                break
+            content_el = None
 
-        # 예산 추출
-        budget = _extract_budget_from_text(text)
+        # 컨테이너를 못 찾으면 가장 긴 텍스트 블록을 가진 div 사용
+        if not content_el:
+            best_div, best_len = None, 0
+            for div in soup.find_all(["div", "td", "section"]):
+                t = div.get_text(strip=True)
+                if len(t) > best_len and len(t) > 100:
+                    best_div, best_len = div, len(t)
+            content_el = best_div
 
-        # 첨부파일 추출
+        target = content_el if content_el else soup
+
+        # ── 3) 텍스트 추출 + 잡음 제거 ──
+        raw_text = target.get_text(" ", strip=True)
+        # 줄 단위로 잡음 필터링
+        lines = raw_text.split(" ")
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line or len(line) < 3:
+                continue
+            if self._JUNK_RE.search(line):
+                continue
+            clean_lines.append(line)
+        text = " ".join(clean_lines)
+        text = re.sub(r"\s{2,}", " ", text).strip()
+
+        # ── 4) 전체 페이지에서 예산/첨부 추출 (본문 영역 밖에 있을 수 있음) ──
+        full_text = soup.get_text(" ", strip=True)
+        budget = _extract_budget_from_text(text) or _extract_budget_from_text(full_text)
         attachment_items = _extract_attachment_items(soup, detail_url)
 
-        # 구조화 섹션 추출
+        # ── 5) 구조화 섹션 추출 ──
         structured = _extract_structured_sections(text)
 
-        # 요약: 앞부분 300자 (단, 짧은 단어 뭉치는 스킵)
-        summary = ""
-        for chunk in re.split(r"[.。\n]", text):
-            chunk = chunk.strip()
-            if len(chunk) >= 15:
-                summary = chunk[:300]
-                break
-        if not summary:
-            summary = text[:300]
+        # ── 6) 핵심 요약 생성 — 의미 있는 문장만 추출 ──
+        summary = self._extract_smart_summary(text, structured)
 
         return {
             "body_text":        text[:8000],
@@ -362,6 +411,37 @@ class BaseCollector(NoticeCollectorPort, ABC):
             "structured":       structured,
             "attachment_items": attachment_items,
         }
+
+    @staticmethod
+    def _extract_smart_summary(text: str, structured: Dict[str, str]) -> str:
+        """
+        본문에서 핵심 내용만 추출한 요약 생성.
+        우선순위: 구조화 섹션(사업목적/지원내용) > 핵심 키워드 문장 > 첫 유의미 문장
+        """
+        # 1) 구조화 섹션이 있으면 그걸 요약으로
+        for key in ["사업목적", "지원내용", "지원대상"]:
+            v = structured.get(key, "")
+            if v and len(v) > 20:
+                return v[:300]
+
+        # 2) 핵심 키워드 포함 문장 우선 추출
+        _IMPORTANT_RE = re.compile(
+            r"(지원\s*대상|지원\s*내용|지원\s*규모|지원\s*금액|신청\s*자격|"
+            r"접수\s*기간|신청\s*기간|모집\s*기간|사업\s*목적|사업\s*개요|"
+            r"사업\s*내용|추진\s*배경|총\s*사업비|과제당|수행\s*기간|"
+            r"선정\s*규모|지원\s*분야|참여\s*자격|공모\s*분야)",
+        )
+        sentences = [s.strip() for s in re.split(r'(?<=[.다요됨함!\n])\s+', text) if len(s.strip()) > 20]
+        important = [s for s in sentences if _IMPORTANT_RE.search(s)]
+        if important:
+            return " ".join(important[:3])[:400]
+
+        # 3) 첫 유의미 문장 (30자 이상)
+        for sent in sentences:
+            if len(sent) >= 30:
+                return sent[:300]
+
+        return text[:300] if text else ""
 
     def _enrich_notices(self, notices: List[Notice]) -> List[Notice]:
         """
