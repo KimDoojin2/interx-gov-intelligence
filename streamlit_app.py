@@ -291,13 +291,39 @@ with tab_dash:
             a_sorted = sorted([(n, smap[n.notice_id]) for n in notices
                                if smap.get(n.notice_id) and smap[n.notice_id].priority_grade == "A"],
                               key=lambda x: -x[1].priority_score)
-            for n, sc in a_sorted[:8]:
+            for _ai, (n, sc) in enumerate(a_sorted[:8]):
                 dd = _dday(n.deadline_date or "")
                 extra_pills = ""
                 if getattr(n, "l3_strong", "N") == "Y": extra_pills += _pill("L3", "l3") + " "
                 if 0 <= dd <= 3: extra_pills += _pill(f"D-{dd}", "urgent")
                 meta = f"{n.site} · {n.agency or n.ministry or '-'} · 점수 {sc.priority_score:.0f} · {n.deadline_date or '-'}"
                 st.markdown(_notice_row("A", n.title[:65], meta, extra_pills), unsafe_allow_html=True)
+                # ── 공고 요약 펼쳐보기 ──
+                with st.expander("📄 공고 요약 보기", expanded=False):
+                    _ec1, _ec2 = st.columns(2)
+                    _ec1.markdown(f"**기관**: {n.agency or n.ministry or '-'}")
+                    _ec2.markdown(f"**마감**: {n.deadline_date or '-'}" + (f" (D-{dd})" if dd >= 0 else ""))
+                    _ec3, _ec4 = st.columns(2)
+                    _ec3.markdown(f"**적합도**: {sc.fitness_score:.0f}점 · **우선순위**: {sc.priority_score:.0f}점")
+                    _ec4.markdown(f"**수주확률**: {getattr(sc,'win_probability','-')}")
+                    # 매칭 키워드
+                    if sc.positive_keywords:
+                        st.markdown("**매칭 키워드**: " + " ".join(f"`{k}`" for k in sc.positive_keywords[:15]))
+                    # 솔루션 점수
+                    sol_hits = [(s, v) for s, v in (sc.solution_scores or {}).items() if v > 0]
+                    if sol_hits:
+                        st.markdown("**추천 솔루션**: " + " · ".join(f"{s} ({v:.0f})" for s, v in sorted(sol_hits, key=lambda x:-x[1])[:4]))
+                    # 구조화 요약 (사업목적/지원내용)
+                    _struct = getattr(n, "structured", None) or {}
+                    for _sk, _sl in [("사업목적","🎯 사업목적"), ("지원내용","💰 지원내용"), ("지원대상","👥 지원대상")]:
+                        _sv = _struct.get(_sk, "")
+                        if _sv: st.markdown(f"**{_sl}**: {_sv[:200]}")
+                    # 본문 미리보기
+                    _body = getattr(n, "body_text", "") or ""
+                    if _body and not _struct:
+                        st.markdown(f"**본문 미리보기**: {_body[:300]}...")
+                    if getattr(n, "detail_url", ""):
+                        st.markdown(f"[🔗 원문 바로가기]({n.detail_url})")
 
         st.markdown(_section("사이트별 수집 현황"), unsafe_allow_html=True)
         sc_cnt = Counter(n.site for n in notices).most_common()
@@ -745,12 +771,17 @@ with tab_keyword:
                  "연장","프로그램","센터","재공고","용역","발표","공지","정보","운영","기술","개발",
                  "산업","기업","육성","연구","전문","협력","국내","혁신","전략","구축","도입","확대",
                  "사항","가능","제공","진행","통해","등록","기타","문의","담당","홈페이지","바로가기",
-                 "상반기","하반기","년도","차년도","연도","해당"}
+                 "상반기","하반기","년도","차년도","연도","해당",
+                 # v5.2 추가 불용어 — 연도·일반 공고용어
+                 "참여기업","모집공고","2025년","2025년도","2026년","2026년도","2027년","2027년도",
+                 "수요기업","공모","통합","시행","예정","일정","기간","방법","절차","요강",
+                 "수정","재안내","알림","공개","추가","확정","최종","우수","평가","심사",
+                 "테크노파크","진흥원","진흥재단","중소기업","지원사업","지방자치"}
         for n in notices:
             for w in (n.title or "").split():
                 c = "".join(ch for ch in w if ch.isalnum())
-                # 숫자만(연도/금액), 2글자 미만, 불용어 제외
-                if len(c) < 2 or c in stops or re.fullmatch(r'\d+', c): continue
+                # 숫자포함 연도패턴(2026년 등), 순수숫자, 2글자 미만, 불용어 제외
+                if len(c) < 2 or c in stops or re.fullmatch(r'\d+', c) or re.fullmatch(r'\d{4}년도?', c): continue
                 title_w[c] += 1
 
         k1,k2 = st.columns(2)
