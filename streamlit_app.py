@@ -377,8 +377,13 @@ with tab_dash:
                     _body = getattr(n, "body_text", "") or ""
                     if _body and not _struct:
                         st.markdown(f"**본문 미리보기**: {_body[:300]}...")
-                    if getattr(n, "detail_url", ""):
-                        st.markdown(f"[🔗 원문 바로가기]({n.detail_url})")
+                    # 원문 사이트 미리보기 + 바로가기
+                    _detail = getattr(n, "detail_url", "") or n.link or ""
+                    if _detail:
+                        st.markdown(f"[🔗 원문 바로가기]({_detail})")
+                        if st.button(f"🌐 원문 사이트 미리보기", key=f"iframe_{_ai}"):
+                            import streamlit.components.v1 as components
+                            components.iframe(_detail, height=520, scrolling=True)
 
         # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
         _rec = []
@@ -644,6 +649,13 @@ with tab_notices:
                     with st.expander("📄 공고 본문", expanded=False):
                         st.text(body[:5000])
                         if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
+
+                # ── 원문 사이트 미리보기 ──
+                _sn_link = getattr(sn, "detail_url", "") or sn.link or ""
+                if _sn_link:
+                    with st.expander("🌐 원문 사이트 보기", expanded=False):
+                        import streamlit.components.v1 as components
+                        components.iframe(_sn_link, height=560, scrolling=True)
         else:
             st.info("필터 조건에 맞는 공고가 없습니다.")
 
@@ -759,11 +771,41 @@ with tab_predict:
 
         with col_t:
             st.markdown(_section("수주 유망 TOP 10"), unsafe_allow_html=True)
-            for p in preds[:10]:
+            for _wi, p in enumerate(preds[:10]):
                 n,sc,wp = p["notice"],p["sc"],p["wp"]
                 c = GA if wp>=60 else GB if wp>=40 else GC
                 meta = f"{sc.priority_grade}등급 · {n.site} · {n.agency or '-'} · {n.deadline_date or '-'}"
                 st.markdown(_notice_row(sc.priority_grade, f'<span style="color:{c};font-weight:800">{wp:.0f}%</span> {n.title[:50]}', meta), unsafe_allow_html=True)
+                with st.expander(f"🔍 수주 가능성 분석", expanded=False):
+                    # 개별 가중치 계산
+                    _f = sc.fitness_score or 0; _p = sc.priority_score or 0; _i = sc.industry_score or 0
+                    _l3 = 1 if getattr(n,"l3_strong","N")=="Y" else 0
+                    _dd = _dday(n.deadline_date or ""); _u = max(0,min(100,(30-_dd)*3.33)) if _dd>=0 else 0
+                    _fc = _f*0.35; _pc = _p*0.25; _bc = 50*0.15; _uc = _u*0.10; _lc = _l3*10; _ic = _i*0.05
+                    # 시각적 바 차트
+                    _factors = [("키워드 적합도", _fc, f"{_f:.0f}×0.35={_fc:.1f}"),
+                                ("우선순위 점수", _pc, f"{_p:.0f}×0.25={_pc:.1f}"),
+                                ("예산 기여", _bc, f"50×0.15={_bc:.1f}"),
+                                ("마감 긴급도", _uc, f"D-{_dd}→{_u:.0f}×0.10={_uc:.1f}" if _dd>=0 else "마감→0"),
+                                ("L3 강공고", _lc, f"{'Y' if _l3 else 'N'}→{_lc:.1f}"),
+                                ("솔루션 매칭", _ic, f"{_i:.0f}×0.05={_ic:.1f}")]
+                    _bar_html = ""
+                    for _fn, _fv, _fd in _factors:
+                        _bw = max(2, min(100, _fv * 3))
+                        _bc2 = GA if _fv >= 10 else GB if _fv >= 5 else GC if _fv >= 2 else S4
+                        _bar_html += f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:.78rem"><span style="width:90px;color:{S5};font-weight:600;text-align:right">{_fn}</span><div style="flex:1;background:{S1};border-radius:4px;height:18px;overflow:hidden"><div style="width:{_bw}%;height:100%;background:{_bc2};border-radius:4px"></div></div><span style="width:120px;color:{S4};font-size:.72rem">{_fd}</span></div>'
+                    st.markdown(f'<div style="padding:4px 0">{_bar_html}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:right;font-size:.85rem;font-weight:800;color:{c};margin-top:6px">합계: {wp:.0f}%</div>', unsafe_allow_html=True)
+                    # 핵심 근거 요약
+                    _reasons = []
+                    if _f >= 40: _reasons.append(f"키워드 적합도 높음 ({_f:.0f}점)")
+                    if sc.positive_keywords: _reasons.append(f"매칭 키워드: {', '.join(sc.positive_keywords[:5])}")
+                    if _l3: _reasons.append("L3 강공고 해당")
+                    if 0 <= _dd <= 7: _reasons.append(f"마감 임박 D-{_dd}")
+                    sol_hits = [(s,v) for s,v in (sc.solution_scores or {}).items() if v > 0]
+                    if sol_hits: _reasons.append(f"솔루션: {', '.join(s for s,_ in sorted(sol_hits, key=lambda x:-x[1])[:3])}")
+                    if _reasons:
+                        st.markdown("**📌 핵심 근거**: " + " · ".join(_reasons))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
