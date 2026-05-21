@@ -164,12 +164,17 @@ class ItpCollector(_TechnoBaseCollector):
 
 
 class GwtpCollector(_TechnoBaseCollector):
-    """강원테크노파크 — gwtp.or.kr"""
+    """강원테크노파크 — gwtp.or.kr (HTTP only — HTTPS 404)"""
     site_key = "gwtp"
     agency   = "강원테크노파크"
     ministry = "강원특별자치도"
-    BASE_URL = "https://www.gwtp.or.kr"
-    LIST_URL = "https://www.gwtp.or.kr/bbsNew_list.php?code=sub01b&keyvalue=sub01&page={page}"
+    BASE_URL = "http://www.gwtp.or.kr"
+    LIST_URL = "http://www.gwtp.or.kr/gwtp/bbsNew_list.php?code=sub01b&keyvalue=sub01&startPage={page}"
+    LINK_PATTERN = "bbsNew_view"
+
+    def _page_url(self, page: int) -> str:
+        """강원TP는 startPage=0,30,60 방식 페이지네이션 (page 1→0, 2→30, 3→60)"""
+        return self.LIST_URL.format(page=(page - 1) * 30)
 
 
 class SjtpCollector(_TechnoBaseCollector):
@@ -183,12 +188,12 @@ class SjtpCollector(_TechnoBaseCollector):
 
 
 class CbtpCollector(_TechnoBaseCollector):
-    """충북테크노파크 — cbtp.or.kr"""
+    """충북테크노파크 — cbtp.or.kr (HTTP only — HTTPS SSL DH_KEY_TOO_SMALL)"""
     site_key = "cbtp"
     agency   = "충북테크노파크"
     ministry = "충청북도"
-    BASE_URL = "https://www.cbtp.or.kr"
-    LIST_URL = "https://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
+    BASE_URL = "http://www.cbtp.or.kr"
+    LIST_URL = "http://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
     LINK_PATTERN = "board_id=saup_notice"
 
 
@@ -212,28 +217,29 @@ class BtpCollector(_TechnoBaseCollector):
 
 
 class UtpCollector(_TechnoBaseCollector):
-    """울산테크노파크 — utp.or.kr"""
+    """울산테크노파크 — utp.or.kr (공지사항 게시판 = 사업공고 포함, 2843건+)"""
     site_key = "utp"
     agency   = "울산테크노파크"
     ministry = "울산광역시"
     BASE_URL = "https://www.utp.or.kr"
-    LIST_URL = "https://www.utp.or.kr/include/contents.php?mnuno=M0000018&menu_group=1&sno=0102&page={page}"
+    LIST_URL = "https://www.utp.or.kr/board/board.php?bo_table=sub0501&menu_group=4&sno=0401&page={page}"
+    LINK_PATTERN = "bo_table=sub0501"
 
 
 class GntpCollector(_TechnoBaseCollector):
-    """경남테크노파크 — gntp.or.kr"""
+    """경남테크노파크 — gntp.or.kr (신규 사이트로 전환)"""
     site_key = "gntp"
     agency   = "경남테크노파크"
     ministry = "경상남도"
     BASE_URL = "https://www.gntp.or.kr"
-    LIST_URL = "https://www.gntp.or.kr/kor/CMS/Board/Board.do?mCode=MN050&page={page}"
-    LINK_PATTERN = "mCode=MN050"
+    LIST_URL = "https://www.gntp.or.kr/biz/apply?page={page}"
+    LINK_PATTERN = "applyInfo"
 
 
 class PtpCollector(_TechnoBaseCollector):
-    """포항테크노파크 — ptp.or.kr"""
+    """포항테크노파크 — ptp.or.kr (신규 사이트 전환, 1411건+)"""
     site_key = "ptp"
     agency   = "포항테크노파크"
     ministry = "경상북도"
     BASE_URL = "https://www.ptp.or.kr"
-    LIST_URL = "https://www.ptp.or.kr/board/business?page={page}"
+    LIST_URL = "https://www.ptp.or.kr/main/board/index.do?menu_idx=116&manage_idx=15&page={page}"

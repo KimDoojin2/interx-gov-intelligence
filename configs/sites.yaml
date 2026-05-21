@@ -109,15 +109,15 @@ sites:
     collector_type: requests
   - code: gwtp
     name: 강원테크노파크
-    enabled: false   # 404 에러 — URL 재조사 필요
+    enabled: true    # HTTP로 전환 (HTTPS 404) — gwtp/bbsNew_list.php
     collector_type: requests
   - code: sjtp
     name: 세종테크노파크
-    enabled: false   # 0건 수집 — 게시판 구조 변경 추정
+    enabled: true    # 재확인 — 615건 정상 (그누보드 bo_table=business01)
     collector_type: requests
   - code: cbtp
     name: 충북테크노파크
-    enabled: false   # SSL DH_KEY_TOO_SMALL 에러
+    enabled: true    # HTTP로 전환 (HTTPS SSL 에러) — 1608건 정상
     collector_type: requests
   - code: ctp
     name: 충남테크노파크
@@ -129,15 +129,15 @@ sites:
     collector_type: requests
   - code: utp
     name: 울산테크노파크
-    enabled: false   # 비공고 페이지 수집 (건물안내/부서/CI 등) — URL 재조사 필요
+    enabled: true    # URL 수정: 공지사항 게시판 (bo_table=sub0501, 2843건)
     collector_type: requests
   - code: gntp
     name: 경남테크노파크
-    enabled: false   # 404 에러 — URL 재조사 필요
+    enabled: true    # URL 수정: /biz/apply (신규 사이트 전환)
     collector_type: requests
   - code: ptp
     name: 포항테크노파크
-    enabled: false   # 404 에러 — URL 재조사 필요
+    enabled: true    # URL 수정: /main/board/index.do (1411건+)
     collector_type: requests
 
   - code: mock

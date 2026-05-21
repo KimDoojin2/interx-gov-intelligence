@@ -220,7 +220,7 @@ HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence
 
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
-    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.4 &nbsp;·&nbsp; 19 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
+    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.5 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
 </div>
 <div class="hero-banner">
     <img src="{HERO_IMG}" alt="InterX Hero">
@@ -242,7 +242,7 @@ for key, default in [("pipeline_result", None), ("pipeline_running", False),
         st.session_state[key] = default
 
 ALL_SITES = ["bizinfo","kiat","nipa","innopolis","bipa","uipa","gicon","ttp","gjtp","kised","ketep","koiia","jejutp","smart_factory","iitp",
-             "seoultp","gdtp","ctp","btp"]
+             "seoultp","gdtp","gwtp","sjtp","cbtp","ctp","btp","utp","gntp","ptp"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TAB 1 · Dashboard
@@ -378,7 +378,7 @@ with tab_dash:
                     if _body and not _struct:
                         st.markdown(f"**본문 미리보기**: {_body[:300]}...")
                     # 원문 사이트 미리보기 + 바로가기
-                    _detail = getattr(n, "detail_url", "") or n.link or ""
+                    _detail = getattr(n, "detail_url", "") or getattr(n, "link", "") or ""
                     if _detail:
                         st.markdown(f"[🔗 원문 바로가기]({_detail})")
                         if st.button(f"🌐 원문 사이트 미리보기", key=f"iframe_{_ai}"):
@@ -615,7 +615,7 @@ with tab_notices:
                                        ("예산", sn.budget or "-"), ("공고일", getattr(sn,"notice_date","-") or "-"),
                                        ("신청기간", getattr(sn,"apply_period","-") or "-")]:
                         st.markdown(f"- **{label}** : {val}")
-                    link = sn.link or ""
+                    link = getattr(sn, "detail_url", "") or getattr(sn, "link", "") or ""
                     if link: st.markdown(f"- **링크** : [{link[:50]}...]({link})")
 
                 with dc2:
@@ -651,7 +651,7 @@ with tab_notices:
                         if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
 
                 # ── 원문 사이트 미리보기 ──
-                _sn_link = getattr(sn, "detail_url", "") or sn.link or ""
+                _sn_link = getattr(sn, "detail_url", "") or getattr(sn, "link", "") or ""
                 if _sn_link:
                     with st.expander("🌐 원문 사이트 보기", expanded=False):
                         import streamlit.components.v1 as components
