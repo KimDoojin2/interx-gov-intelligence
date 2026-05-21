@@ -231,9 +231,9 @@ st.markdown(f"""<div class="nav-bar">
 </div>""", unsafe_allow_html=True)
 
 tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
-tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history = st.tabs([
+tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history, tab_news = st.tabs([
     "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
-    "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자", "🕐 히스토리",
+    "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자", "🕐 히스토리", "🤖 AI 뉴스",
 ])
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
@@ -267,12 +267,37 @@ with tab_dash:
             dd = _dday(n.deadline_date or "")
             if 0 <= dd <= 7: urg += 1
 
+        # ── 🔴 D-day 긴급 배너 (D-3 이내) ──
+        _urgent3 = [(n, smap.get(n.notice_id)) for n in notices
+                     if 0 <= _dday(n.deadline_date or "") <= 3 and smap.get(n.notice_id)]
+        if _urgent3:
+            _urgent3.sort(key=lambda x: _dday(x[0].deadline_date or ""))
+            _urg_html = ''.join(f'<span style="margin-right:18px">🔴 <b>{n.title[:40]}</b> <span style="color:#DC2626;font-weight:800">D-{_dday(n.deadline_date or "")}</span> ({n.site})</span>' for n, sc in _urgent3[:5])
+            st.markdown(f'<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:14px 20px;margin-bottom:16px;font-size:.84rem;color:#991B1B;overflow-x:auto;white-space:nowrap"><b>⚠️ 긴급 마감 공고</b>&nbsp;&nbsp;{_urg_html}</div>', unsafe_allow_html=True)
+
         c1,c2,c3,c4,c5,c6 = st.columns(6)
         for col, (v, l, ac) in zip([c1,c2,c3,c4,c5,c6], [
             (total, "전체 공고", ""), (gr["A"], "A등급 · 핵심", GA), (gr["B"], "B등급 · 검토", GB),
             (l3c, "L3 강공고", "#DB2777"), (urg, "7일내 마감", GD),
             (len(result.get("proposal_files", [])), "제안서 생성", ""),
         ]): col.markdown(_metric(v, l, ac), unsafe_allow_html=True)
+
+        # ── 🔍 키워드 빠른 검색 ──
+        _qk = st.text_input("🔍 공고 키워드 검색", placeholder="AI, 스마트공장, 디지털트윈 ...", key="dash_search")
+        if _qk:
+            _qr = [(n, smap[n.notice_id]) for n in notices
+                    if _qk.lower() in (n.title or "").lower() and smap.get(n.notice_id)]
+            _qr.sort(key=lambda x: -x[1].priority_score)
+            if _qr:
+                st.markdown(f'<p style="font-size:.82rem;color:{S5}">검색 결과 <b style="color:{CH}">{len(_qr)}</b>건</p>', unsafe_allow_html=True)
+                for n, sc in _qr[:10]:
+                    dd = _dday(n.deadline_date or "")
+                    pills = _pill(sc.priority_grade, sc.priority_grade.lower())
+                    if 0 <= dd <= 3: pills += " " + _pill(f"D-{dd}", "urgent")
+                    meta = f"{n.site} · {sc.priority_score:.0f}점 · {n.deadline_date or '-'} · {n.budget or '-'}"
+                    st.markdown(_notice_row(sc.priority_grade, n.title[:60], meta, pills), unsafe_allow_html=True)
+            else:
+                st.info(f"'{_qk}' 관련 공고가 없습니다.")
 
         st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
         col_chart, col_list = st.columns([1, 2])
@@ -355,6 +380,31 @@ with tab_dash:
                     if getattr(n, "detail_url", ""):
                         st.markdown(f"[🔗 원문 바로가기]({n.detail_url})")
 
+        # ── 💡 오늘의 추천 공고 (A/B + 예산 2.1억+ + D-7~30) ──
+        _rec = []
+        for n in notices:
+            sc = smap.get(n.notice_id)
+            if not sc or sc.priority_grade not in ("A","B"): continue
+            dd = _dday(n.deadline_date or "")
+            if not (3 <= dd <= 30): continue
+            _bgt_r = getattr(n, "budget", "") or ""
+            _bv = None
+            try:
+                _m = re.search(r'(\d[\d,.]*)\s*억', _bgt_r)
+                if _m: _bv = float(_m.group(1).replace(",",""))
+            except: pass
+            _rec.append((n, sc, dd, _bv))
+        _rec.sort(key=lambda x: -x[1].priority_score)
+        if _rec:
+            st.markdown(_section(f"💡 오늘의 추천 공고 ({len(_rec[:5])}건)"), unsafe_allow_html=True)
+            st.markdown(f'<p style="font-size:.75rem;color:{S4}">A/B등급 · D-3~30일 마감 · 점수 순</p>', unsafe_allow_html=True)
+            for n, sc, dd, bv in _rec[:5]:
+                pills = _pill(sc.priority_grade, sc.priority_grade.lower())
+                if bv and bv >= 2.1: pills += f' <span style="background:#059669;color:#fff;padding:1px 8px;border-radius:10px;font-size:.68rem;font-weight:700">{bv:.0f}억</span>'
+                elif bv: pills += f' <span style="background:#D97706;color:#fff;padding:1px 8px;border-radius:10px;font-size:.68rem;font-weight:700">{bv:.1f}억→파트너</span>'
+                meta = f"{n.site} · {sc.priority_score:.0f}점 · D-{dd} · {n.agency or n.ministry or '-'}"
+                st.markdown(_notice_row(sc.priority_grade, n.title[:60], meta, pills), unsafe_allow_html=True)
+
         st.markdown(_section("사이트별 수집 현황"), unsafe_allow_html=True)
         sc_cnt = Counter(n.site for n in notices).most_common()
         if sc_cnt:
@@ -362,6 +412,29 @@ with tab_dash:
                                     marker_color=P, marker_line_width=0))
             fig2.update_layout(height=260, xaxis=dict(gridcolor=S2), yaxis=dict(gridcolor=S2, title="건수"), **_layout())
             st.plotly_chart(fig2, width="stretch")
+
+        # ── 🏆 솔루션별 TOP3 공고 ──
+        _sol_names = ["ManufacturingDT","RecipeAI","QualityAI","InspectionAI","SafetyAI","GenAI","InfraDS","PdM"]
+        _sol_display = {"ManufacturingDT":"제조DT","RecipeAI":"레시피AI","QualityAI":"품질AI",
+                        "InspectionAI":"검사AI","SafetyAI":"안전AI","GenAI":"GenAI","InfraDS":"인프라DS","PdM":"예지보전"}
+        _sol_data = {s: [] for s in _sol_names}
+        for n in notices:
+            sc = smap.get(n.notice_id)
+            if not sc or not sc.solution_scores: continue
+            for s in _sol_names:
+                v = sc.solution_scores.get(s, 0)
+                if v > 0: _sol_data[s].append((n, sc, v))
+        for s in _sol_names:
+            _sol_data[s].sort(key=lambda x: -x[2])
+        _active_sols = [(s, _sol_data[s]) for s in _sol_names if _sol_data[s]]
+        if _active_sols:
+            st.markdown(_section("🏆 솔루션별 TOP3 공고"), unsafe_allow_html=True)
+            _sc1, _sc2 = st.columns(2)
+            for _si, (s, items) in enumerate(_active_sols):
+                with (_sc1 if _si % 2 == 0 else _sc2):
+                    st.markdown(f'<div style="font-size:.85rem;font-weight:700;color:{P};margin:12px 0 6px">🔧 {_sol_display.get(s,s)}</div>', unsafe_allow_html=True)
+                    for n, sc, v in items[:3]:
+                        st.markdown(f'<div style="font-size:.8rem;color:{S8};padding:3px 0">{_pill(sc.priority_grade, sc.priority_grade.lower())} {n.title[:45]} <span style="color:{S4}">({v:.0f}점)</span></div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -945,3 +1018,57 @@ with tab_history:
                     sr=[{"사이트":s,"최근":ls.get(s,0),"이전":ps.get(s,0),
                          "변화":f"+{ls.get(s,0)-ps.get(s,0)}" if ls.get(s,0)-ps.get(s,0)>0 else str(ls.get(s,0)-ps.get(s,0))} for s in asn]
                     st.dataframe(pd.DataFrame(sr), width="stretch", height=280)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  TAB 12 · AI News & Trends
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab_news:
+    st.markdown(_section("🤖 AI 팩토리 · 제조AI 뉴스"), unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.8rem;color:{S4}">제조AI·스마트공장·디지털트윈 관련 최신 뉴스와 정보를 한곳에서 확인하세요.</p>', unsafe_allow_html=True)
+
+    _news_sources = [
+        {"cat": "🏭 스마트공장·제조AI", "items": [
+            ("스마트공장 뉴스", "https://www.smart-factory.kr/nw/lst", "스마트제조혁신추진단 공식 뉴스"),
+            ("IITP AI·반도체 동향", "https://www.iitp.kr/main.it", "정보통신기획평가원 기술동향"),
+            ("AI타임스", "https://www.aitimes.com/", "국내 AI 전문 미디어"),
+            ("로봇신문", "https://www.irobotnews.com/", "로봇·자동화·AI 뉴스"),
+        ]},
+        {"cat": "📊 정책·산업 동향", "items": [
+            ("NIPA 정책뉴스", "https://www.nipa.kr/main/selectMainContent.do", "정보통신산업진흥원"),
+            ("KIAT 산업기술동향", "https://www.kiat.or.kr/", "한국산업기술진흥원"),
+            ("K-스마트공장", "https://www.smart-factory.kr/", "스마트공장 포털"),
+            ("과기정통부 보도자료", "https://www.msit.go.kr/bbs/list.do?sCode=user&mId=113&mPid=112", "과학기술정보통신부"),
+        ]},
+        {"cat": "🌐 글로벌 AI 트렌드", "items": [
+            ("MIT Tech Review", "https://www.technologyreview.com/topic/artificial-intelligence/", "MIT 기술 리뷰 AI 섹션"),
+            ("Manufacturing Dive", "https://www.manufacturingdive.com/", "글로벌 제조업 뉴스"),
+            ("IIoT World", "https://www.iiot-world.com/", "산업 IoT·스마트팩토리"),
+            ("The Robot Report", "https://www.therobotreport.com/", "로봇·자동화 글로벌"),
+        ]},
+        {"cat": "🔬 연구·기술", "items": [
+            ("arXiv AI", "https://arxiv.org/list/cs.AI/recent", "최신 AI 논문"),
+            ("Papers With Code", "https://paperswithcode.com/", "코드 포함 AI 논문"),
+            ("ETRI 연구성과", "https://www.etri.re.kr/", "한국전자통신연구원"),
+            ("Hugging Face Blog", "https://huggingface.co/blog", "오픈소스 AI 모델 트렌드"),
+        ]},
+    ]
+
+    for src in _news_sources:
+        st.markdown(f'<div style="font-size:.92rem;font-weight:700;color:{P};margin:20px 0 10px;border-left:3px solid {P};padding-left:10px">{src["cat"]}</div>', unsafe_allow_html=True)
+        _nc1, _nc2 = st.columns(2)
+        for _ni, item in enumerate(src["items"]):
+            with (_nc1 if _ni % 2 == 0 else _nc2):
+                st.markdown(f'''<div style="background:{W};border:1px solid {S2};border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:all .2s">
+                    <a href="{item[1]}" target="_blank" style="text-decoration:none;color:{S8};font-weight:600;font-size:.85rem">{item[0]} ↗</a>
+                    <div style="font-size:.73rem;color:{S4};margin-top:4px">{item[2]}</div>
+                </div>''', unsafe_allow_html=True)
+
+    st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+    st.markdown(_section("📌 오늘의 AI 키워드"), unsafe_allow_html=True)
+    _ai_keywords = ["에이전틱AI", "피지컬AI", "디지털트윈", "자율공정", "AI팩토리",
+                     "생성형AI", "LLM", "Multi-Agent", "스마트공장", "예지보전",
+                     "컴퓨터비전", "AI반도체", "엣지AI", "DTaaS", "로보틱스"]
+    _kw_html = " ".join(f'<span style="background:{P_BG};color:{P_D};border:1px solid rgba(255,128,0,.2);padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;display:inline-block;margin:3px">{k}</span>' for k in _ai_keywords)
+    st.markdown(f'<div style="line-height:2.2">{_kw_html}</div>', unsafe_allow_html=True)
