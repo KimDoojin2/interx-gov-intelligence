@@ -492,6 +492,18 @@ class BaseCollector(NoticeCollectorPort, ABC):
                 if apply_status and hasattr(notice, '__dict__'):
                     notice.__dict__['apply_status'] = apply_status
 
+                # OCR: body_text가 짧고 첨부파일이 있으면 PDF/HWP 텍스트 보강
+                if len(notice.body_text or "") < 200 and notice.attachment_items:
+                    try:
+                        from interx_engine.infrastructure.ocr.document_parser import extract_from_attachments
+                        ocr_text, _ = extract_from_attachments(
+                            notice.attachment_items, max_files=2, max_pages=5
+                        )
+                        if ocr_text and len(ocr_text) > len(notice.body_text or ""):
+                            notice.body_text = ocr_text
+                    except Exception as ocr_err:
+                        log.debug("[%s] OCR 보강 실패: %s", self.site_key, ocr_err)
+
                 time.sleep(random.uniform(0.3, 0.8))
             except Exception as e:
                 log.debug("[%s] detail 파싱 실패 %s: %s",
