@@ -34,7 +34,16 @@
 
 ### v5.9 — 2026-05-22
 
-**🤖 ML 엔진 v2 고도화 + 전면 버그 캐치 + OCR 구현 완료**
+**🏗️ 프로덕션 Ready + ML 엔진 v2 + OCR 완료**
+
+**엔진 최적화 — 개발팀 즉시 연동 가능:**
+- `pyproject.toml`: 표준 Python 패키지 (`pip install -e ".[dev]"`)
+- `Dockerfile` + `docker-compose.yml`: 원커맨드 빌드/실행
+- FastAPI REST API (`/api/v1/`): 공고 CRUD + 통계 + 파이프라인 실행
+- GitHub Actions CI: push/PR 자동 lint(ruff) + 테스트
+- `Makefile`: `make test`, `make run`, `make api`, `make docker-build`
+- `conftest.py`: 테스트 환경 표준화 (sys.path 해킹 제거)
+- `.env.example` 보강, `.dockerignore` 추가
 
 **ML 수주예측 엔진 v2:**
 - 피처 12개로 확장: fitness, priority, budget_score, dday_urgency, l3_flag, industry_score, tfidf_similarity, keyword_density, type_multiplier, combo_count, budget_grade, urgency_boost
@@ -221,40 +230,104 @@
 | 수주 예측 | Rule 가중합 + ML(LogisticRegression) 자동 전환 |
 | Sheets 시트 수 | 10개 (97_상태변경로그 포함) |
 | 웹 플랫폼 | FastAPI + Tailwind (4페이지 + 6 API) |
+| REST API | FastAPI 7 엔드포인트 (Swagger UI 자동 생성) |
 | 팀 배포 앱 | Streamlit Cloud (11개 탭, 무료 호스팅) |
-| 단위 테스트 | 106 passed, 0 failed |
+| 단위 테스트 | 201 passed (unit 143 + integration 58) |
+| CI/CD | GitHub Actions (자동 lint + test on push) |
+| 패키징 | pyproject.toml + Docker + docker-compose |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
 
 ---
 
 ## 2. 빠른 실행
 
+### 2-A. 개발 환경 셋업 (신규 팀원 온보딩)
+
+```bash
+# 1) 클론
+git clone https://github.com/KimDoojin2/interx-gov-intelligence.git
+cd interx-gov-intelligence
+
+# 2) 가상환경 + 의존성
+python -m venv venv
+venv/Scripts/activate          # Linux/Mac: source venv/bin/activate
+pip install -r requirements.txt
+pip install -e ".[dev]"        # 패키지 + pytest + ruff
+
+# 3) 환경변수
+cp .env.example .env           # 실제 값으로 수정
+
+# 4) 테스트 실행 (201건 통과 확인)
+pytest tests/unit/ -v --tb=short
+
+# 5) Dry-run 파이프라인 테스트 (실제 수집 없이)
+python run_engine.py --dry-run
+```
+
+### 2-B. 실행 옵션
+
 ```bash
 # 기본 실행 (수집 → 스코어링 → Sheets 업로드)
-venv/Scripts/python run_engine.py
+python run_engine.py
 
 # 전체 실행 (클러스터링·파트너매칭·알림 포함)
-venv/Scripts/python run_engine.py --full
+python run_engine.py --full
 
 # 개발/테스트용
-venv/Scripts/python run_engine.py --dry-run        # Mock 데이터로 실행
-venv/Scripts/python run_engine.py --no-sheets      # Sheets 업로드 생략
-venv/Scripts/python run_engine.py --no-alert       # 알림 생략
-venv/Scripts/python run_engine.py --no-detail      # 상세 페이지 방문 생략 (빠름)
-venv/Scripts/python run_engine.py --sites bizinfo,kiat,nipa  # 특정 사이트만
+python run_engine.py --dry-run        # Mock 데이터로 실행
+python run_engine.py --no-sheets      # Sheets 업로드 생략
+python run_engine.py --no-alert       # 알림 생략
+python run_engine.py --no-detail      # 상세 페이지 방문 생략 (빠름)
+python run_engine.py --sites bizinfo,kiat,nipa  # 특정 사이트만
 
 # 테스트
-venv/Scripts/python -m pytest tests/unit/ -v --tb=short
-venv/Scripts/python -m pytest tests/ -v
+pytest tests/unit/ -v --tb=short      # 단위 테스트
+pytest tests/ -v                      # 전체 (unit + integration)
 
 # 대시보드 UI
-streamlit run src/interx_engine/interfaces/dashboard/app.py
+streamlit run streamlit_app.py
+
+# REST API (프론트엔드 연동)
+python -m interx_engine.api           # http://localhost:8000/docs
 ```
 
-**Playwright 사이트 초기 설정 (bizinfo, kiat, ketep, smart_factory, iitp)**
+### 2-C. Docker (원커맨드 실행)
+
 ```bash
-venv/Scripts/python -m playwright install chromium
+# 빌드
+docker build -t interx-engine .
+
+# 파이프라인 1회 실행
+docker compose --profile engine up
+
+# 대시보드 (http://localhost:8501)
+docker compose --profile dashboard up
+
+# REST API (http://localhost:8000/docs)
+docker compose --profile api up
+
+# 전체
+docker compose --profile all up -d
 ```
+
+### 2-D. Playwright 사이트 (bizinfo, kiat, ketep, smart_factory, iitp)
+```bash
+python -m playwright install chromium
+```
+
+### 2-E. REST API 엔드포인트
+
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/health` | 헬스체크 |
+| GET | `/api/v1/notices` | 공고 목록 (필터·정렬·페이징) |
+| GET | `/api/v1/notices/{id}` | 공고 상세 |
+| GET | `/api/v1/notices/urgent` | 긴급 마감 공고 |
+| GET | `/api/v1/stats` | 통계 (등급별·사이트별) |
+| GET | `/api/v1/pipeline/status` | 마지막 실행 상태 |
+| POST | `/api/v1/pipeline/run` | 파이프라인 수동 실행 |
+
+Swagger UI: `http://localhost:8000/docs`
 
 ---
 

@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interx-gov-intelligence"
+version = "5.9.0"
+description = "Government subsidy notice collection, scoring, and CRM pipeline engine"
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python = ">=3.10"
+authors = [
+    {name = "InterX Team"},
+]
+
+dependencies = [
+    # HTTP / Crawling
+    "requests>=2.31.0",
+    "urllib3>=2.0.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    # Document parsing
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.11.0",
+    "python-docx>=1.1.0",
+    "olefile>=0.47",
+    # Google Sheets
+    "gspread>=6.0.0",
+    "google-auth>=2.28.0",
+    "google-auth-oauthlib>=1.2.0",
+    # Config
+    "PyYAML>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "python-dateutil>=2.9.0",
+    # ML / Analysis
+    "scikit-learn>=1.4.0",
+    "pandas>=2.1.0",
+    "openpyxl>=3.1.0",
+    # Async
+    "nest-asyncio>=1.6.0",
+]
+
+[project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.35.0",
+    "plotly>=5.20.0",
+    "wordcloud>=1.9.0",
+    "matplotlib>=3.8.0",
+]
+playwright = [
+    "playwright>=1.43.0",
+]
+api = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+]
+ocr = [
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.17.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+]
+all = [
+    "interx-gov-intelligence[dashboard,api,dev]",
+]
+
+[project.scripts]
+interx-engine = "interx_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+interx_engine = ["../../configs/*.yaml"]
+
+# ── Ruff (lint + format) ─────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]  # line-length handled by formatter
+
+[tool.ruff.lint.isort]
+known-first-party = ["interx_engine"]
+
+# ── Pytest ───────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short -q"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration tests requiring external services",
+]

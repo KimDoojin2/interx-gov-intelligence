@@ -1,0 +1,44 @@
+# =============================================================================
+# InterX Government Intelligence Engine — Docker Compose
+# 사용법:
+#   docker compose up engine        # 파이프라인 1회 실행
+#   docker compose up dashboard     # Streamlit 대시보드
+#   docker compose up api           # FastAPI REST 서버
+#   docker compose up --profile all # 전체 기동
+# =============================================================================
+version: "3.9"
+
+x-common: &common
+  build: .
+  env_file: .env
+  volumes:
+    - ./data:/app/data
+    - ./logs:/app/logs
+    - ./output:/app/output
+    - ./configs:/app/configs
+    # service_account.json은 로컬에서 마운트 (Git에 올리지 말 것)
+    - ./service_account.json:/app/service_account.json:ro
+
+services:
+  # ── 파이프라인 실행 (1회) ─────────────────────────────────────────────────
+  engine:
+    <<: *common
+    command: ["python", "run_engine.py"]
+    profiles: ["engine", "all"]
+
+  # ── Streamlit 대시보드 ───────────────────────────────────────────────────
+  dashboard:
+    <<: *common
+    command: ["streamlit", "run", "streamlit_app.py",
+              "--server.port=8501", "--server.headless=true"]
+    ports:
+      - "8501:8501"
+    profiles: ["dashboard", "all"]
+
+  # ── FastAPI REST API ─────────────────────────────────────────────────────
+  api:
+    <<: *common
+    command: ["python", "-m", "interx_engine.api", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    profiles: ["api", "all"]

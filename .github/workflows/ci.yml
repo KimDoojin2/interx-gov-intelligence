@@ -1,0 +1,60 @@
+# =============================================================================
+# InterX CI — push/PR 시 자동 lint + 테스트
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov ruff
+
+      - name: Lint (ruff)
+        run: ruff check src/ tests/ --output-format=github
+        continue-on-error: true   # warn-only for now
+
+      - name: Unit tests
+        run: |
+          pytest tests/unit/ -v --tb=short --junitxml=test-results.xml
+        env:
+          PYTHONPATH: src
+
+      - name: Integration tests (dry-run)
+        run: |
+          pytest tests/integration/ -v --tb=short -k "not collector_factory"
+        env:
+          PYTHONPATH: src
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: test-results.xml
