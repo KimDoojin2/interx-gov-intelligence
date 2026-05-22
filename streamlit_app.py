@@ -468,27 +468,35 @@ with tab_dash:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab_run:
-    st.markdown(_section("수집 설정"), unsafe_allow_html=True)
-    # ── st.form 으로 감싸서 selectbox 변경 시 탭 리셋 방지 ──
-    with st.form("pipeline_form", border=False):
-        cs1, cs2, cs3 = st.columns(3)
-        with cs1: run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"], key="run_mode_sel")
-        with cs2: max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5, key="max_pages_sel")
-        with cs3: enable_sheets = st.toggle("Google Sheets 업로드", value=True, key="sheets_sel")
-        with st.expander("수집 사이트 선택", expanded=False):
-            selected_sites = st.multiselect("사이트", ALL_SITES, default=ALL_SITES, key="sel_sites", label_visibility="collapsed")
-        ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
+    # ── 실행 중이면 설정 폼 숨기고 상태만 표시 ──
+    if not st.session_state.pipeline_running:
+        st.markdown(_section("수집 설정"), unsafe_allow_html=True)
+        with st.form("pipeline_form", border=False):
+            cs1, cs2, cs3 = st.columns(3)
+            with cs1: run_mode = st.selectbox("실행 모드", ["일반 수집 (빠름)", "전체 분석 (클러스터+알림)", "테스트 (Mock 데이터)"], key="run_mode_sel")
+            with cs2: max_pages = st.slider("사이트당 최대 페이지", 1, 10, 5, key="max_pages_sel")
+            with cs3: enable_sheets = st.toggle("Google Sheets 업로드", value=True, key="sheets_sel")
+            with st.expander("수집 사이트 선택", expanded=False):
+                selected_sites = st.multiselect("사이트", ALL_SITES, default=ALL_SITES, key="sel_sites", label_visibility="collapsed")
+            ml = "일반" if "일반" in run_mode else "전체" if "전체" in run_mode else "테스트"
 
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-        c1,c2,c3 = st.columns(3)
-        c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
-        c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
-        c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            c1,c2,c3 = st.columns(3)
+            c1.markdown(_metric(len(selected_sites), "선택 사이트"), unsafe_allow_html=True)
+            c2.markdown(_metric(max_pages, "최대 페이지"), unsafe_allow_html=True)
+            c3.markdown(_metric(ml, "실행 모드"), unsafe_allow_html=True)
 
-        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-        run_clicked = st.form_submit_button("⚡ 수집 시작", type="primary", disabled=st.session_state.pipeline_running, use_container_width=True)
+            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+            run_clicked = st.form_submit_button("⚡ 수집 시작", type="primary", use_container_width=True)
+    else:
+        run_clicked = False
+        selected_sites = ALL_SITES
+        run_mode = "일반 수집 (빠름)"
+        max_pages = 5
+        enable_sheets = True
+        ml = "일반"
 
-    if st.session_state.pipeline_result:
+    if st.session_state.pipeline_result and not st.session_state.pipeline_running:
         st.success(f"✓ 마지막 실행: {len(st.session_state.pipeline_result.get('notices',[]))}건 수집 완료")
 
     if run_clicked:
