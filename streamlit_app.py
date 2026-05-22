@@ -112,11 +112,6 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     border-bottom:1px solid rgba(255,128,0,.15);box-sizing:border-box;
 }}
 
-/* ── Footer — 음수 마진으로 좌우 돌파 + 하단 밀착 ── */
-.ix-footer{{
-    background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    margin:40px -1rem 0 -1rem;padding:48px 40px 36px;box-sizing:border-box;
-}}
 .nav-bar .brand{{font-size:1.4rem;font-weight:900;letter-spacing:-1.5px}}
 .nav-bar .brand span{{color:#fff}} .nav-bar .brand b{{color:{P}}}
 .nav-bar .meta{{display:flex;align-items:center;gap:16px}}
@@ -241,18 +236,6 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     box-shadow:0 2px 12px rgba(255,128,0,.2);
 }}
 
-/* ── Footer Banner children ── */
-.ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
-.ix-footer .ft-brand span{{color:#fff}} .ix-footer .ft-brand b{{color:{P}}}
-.ix-footer .ft-email{{color:rgba(255,255,255,.4);font-size:.82rem;margin-bottom:24px;font-weight:400}}
-.ix-footer .ft-divider{{border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0}}
-.ix-footer .ft-copy{{color:rgba(255,255,255,.2);font-size:.72rem;letter-spacing:.5px}}
-.ix-footer .ft-links{{display:flex;gap:20px;margin-top:12px}}
-.ix-footer .ft-links a{{
-    color:rgba(255,255,255,.3);font-size:.72rem;text-decoration:none;font-weight:500;
-    transition:color .2s;
-}}
-.ix-footer .ft-links a:hover{{color:{P}}}
 
 /* ── Chat ── */
 .stChatMessage{{border-radius:12px}}
@@ -1567,18 +1550,3 @@ if page == "💬 AI 챗봇":
             st.rerun()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  FOOTER — interxlab.com 스타일
-# ═══════════════════════════════════════════════════════════════════════════════
-
-st.markdown(f"""<div class="ix-footer">
-    <div class="ft-brand"><span>INTER</span><b>X</b></div>
-    <div class="ft-email">Email : ixg.innovation.dx_security@interxlab.com</div>
-    <hr class="ft-divider">
-    <div class="ft-copy">Copyright &copy; INTERX All rights reserved</div>
-    <div class="ft-links">
-        <a href="https://interxlab.com" target="_blank">interxlab.com</a>
-        <a href="https://interx-gov-intel.streamlit.app" target="_blank">Intelligence Engine</a>
-        <a href="https://github.com/KimDoojin2/interx-gov-intelligence" target="_blank">GitHub</a>
-    </div>
-</div>""", unsafe_allow_html=True)
