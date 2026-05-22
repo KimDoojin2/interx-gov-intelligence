@@ -44,8 +44,9 @@
 - 수주 예측 탭 전면 개선: v2 피처별 기여도 시각화, InterX 유사도/콤보 키워드 표시
 
 **버그 수정:**
+- 부산테크노파크(BTP) 수집기: 페이지네이션("443 페이지") 공고 혼입, 제목 중복, 상세 URL 메인페이지 연결 문제 수정
 - 통합 테스트 4건 실패 수정 (설정값 변경 반영: l3=30, partner=18, 등급=A/B/C/D)
-- 전체 180건 테스트 통과 (unit 122 + integration 58)
+- 전체 201건 테스트 통과 (unit 143 + integration 58)
 - 스마트공장 nttId 중복 방지 정상 작동 확인
 - 모든 25개 수집기 등록 및 설정 정상 확인
 
@@ -55,7 +56,7 @@
 - Phase 3: HWP 바이너리 파싱 (olefile + zlib Section 스트림) + DOCX (python-docx)
 - `base_collector` 자동 연동: body_text < 200자 + 첨부파일 있으면 OCR 보강
 - 통합 dispatcher: 확장자별 자동 분기 (`.pdf` → `.docx` → `.hwp`)
-- 단위 테스트 16건 추가 (ExtractionResult, dispatcher, PDF/DOCX/HWP, attachments)
+- 실전 추출 테스트 37건 (한글 PDF/DOCX/HWP 실제 파일 생성 → 추출 검증)
 
 ### v5.8 — 2026-05-21
 
