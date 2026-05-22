@@ -34,10 +34,10 @@
 
 ### v5.9 — 2026-05-22
 
-**🤖 ML 엔진 v2 고도화 + 전면 버그 캐치 + OCR 설계**
+**🤖 ML 엔진 v2 고도화 + 전면 버그 캐치 + OCR 구현 완료**
 
 **ML 수주예측 엔진 v2:**
-- 피처 10개로 확장: 기본 5개(fitness, priority, budget, dday, l3) + 고도화 5개(tfidf_similarity, keyword_density, type_multiplier, combo_count, industry)
+- 피처 12개로 확장: fitness, priority, budget_score, dday_urgency, l3_flag, industry_score, tfidf_similarity, keyword_density, type_multiplier, combo_count, budget_grade, urgency_boost
 - GradientBoosting / RandomForest / VotingClassifier 앙상블 지원 (50건+ 자동 GBM 전환)
 - 파이프라인 실행마다 JSONL 학습 데이터 자동 내보내기 (`data/exports/training/`)
 - Streamlit 대시보드에 ML 모델 정보 배너 + 학습 버튼 + 피처 중요도 차트
@@ -45,14 +45,17 @@
 
 **버그 수정:**
 - 통합 테스트 4건 실패 수정 (설정값 변경 반영: l3=30, partner=18, 등급=A/B/C/D)
-- 전체 164건 테스트 통과 (unit 106 + integration 58)
+- 전체 180건 테스트 통과 (unit 122 + integration 58)
 - 스마트공장 nttId 중복 방지 정상 작동 확인
 - 모든 25개 수집기 등록 및 설정 정상 확인
 
-**OCR 기능 설계 (Phase 1~3):**
-- Phase 1: pdfplumber 텍스트 기반 PDF 파싱 (Streamlit Cloud 호환)
-- Phase 2: pytesseract + pdf2image OCR (로컬 전용)
-- Phase 3: HWP → docx 변환 후 텍스트 추출
+**OCR 문서 파싱 구현 (Phase 1~3):**
+- Phase 1: pdfplumber 텍스트 기반 PDF + 테이블 추출 (Streamlit Cloud 호환) + pypdf fallback
+- Phase 2: pytesseract + pdf2image 스캔 PDF OCR (로컬/Tesseract 설치 필요)
+- Phase 3: HWP 바이너리 파싱 (olefile + zlib Section 스트림) + DOCX (python-docx)
+- `base_collector` 자동 연동: body_text < 200자 + 첨부파일 있으면 OCR 보강
+- 통합 dispatcher: 확장자별 자동 분기 (`.pdf` → `.docx` → `.hwp`)
+- 단위 테스트 16건 추가 (ExtractionResult, dispatcher, PDF/DOCX/HWP, attachments)
 
 ### v5.8 — 2026-05-21
 
