@@ -94,15 +94,20 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     color:{S8} !important;
 }}
 
-/* ── Main content flush ── */
-.stMainBlockContainer{{padding-top:0 !important}}
-[data-testid="stAppViewBlockContainer"]{{padding-top:0 !important}}
-.block-container{{padding-top:0 !important}}
+/* ── Main content flush — 상하좌우 빈공간 완전 제거 ── */
+.stMainBlockContainer,
+[data-testid="stAppViewBlockContainer"],
+.block-container,
+[data-testid="stMainBlockContainer"]{{
+    padding:0 !important;max-width:100% !important;
+}}
+.stApp > header{{display:none !important}}
+[data-testid="stAppViewContainer"] > section > div{{padding:0 !important}}
 
 /* ── Top Navigation Bar ── */
 .nav-bar{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    border-radius:0;padding:14px 36px;margin:-1rem -1rem 0;
+    border-radius:0;padding:14px 36px;margin:0;width:100%;
     display:flex;align-items:center;justify-content:space-between;
     border-bottom:1px solid rgba(255,128,0,.15);
 }}
@@ -233,7 +238,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
 /* ── Footer Banner — interxlab.com ── */
 .ix-footer{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    margin:40px -1rem -1rem -1rem;padding:48px 40px 36px;
+    margin:40px 0 0 0;padding:48px 40px 36px;width:100%;
     border-top:none;
 }}
 .ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
@@ -311,7 +316,7 @@ with st.sidebar:
     st.markdown(f'<div style="border-top:1px solid rgba(0,0,0,.06);margin:16px 0 12px"></div>', unsafe_allow_html=True)
     st.markdown(f'<div style="padding:0 12px"><div style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:{S4}"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block"></span> LIVE · v5.9 · 25 Sites · ML v2</div></div>', unsafe_allow_html=True)
 
-# ── Compact Top Bar ──
+# ── Compact Top Bar (full-width) ──
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
     <div class="meta">
@@ -321,7 +326,8 @@ st.markdown(f"""<div class="nav-bar">
         <div class="meta-item">ML v2</div>
     </div>
 </div>
-<div style="height:16px"></div>""", unsafe_allow_html=True)
+<div style="height:16px"></div>
+<style>.stMainBlockContainer > div > div > div {{padding-left:24px !important;padding-right:24px !important}}</style>""", unsafe_allow_html=True)
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
                       ("collection_history", []), ("selected_notice_id", None)]:
