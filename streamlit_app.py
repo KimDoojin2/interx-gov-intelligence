@@ -292,8 +292,8 @@ with st.sidebar:
 
     NAV_ITEMS = [
         "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
-        "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자",
-        "🕐 히스토리", "🤖 AI 뉴스", "💬 AI 챗봇",
+        "🎯 수주 예측", "📅 마감 캘린더", "📈 분석", "👤 담당자",
+        "🤖 AI 뉴스", "💬 AI 챗봇",
     ]
     page = st.radio("메뉴", NAV_ITEMS, label_visibility="collapsed", key="nav_page")
 
@@ -1057,108 +1057,169 @@ if page == "📅 마감 캘린더":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE · Solution Matching
+#  PAGE · 분석 (솔루션 + 키워드 + 히스토리 통합)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if page == "🔧 솔루션":
+if page == "📈 분석":
     result = _result()
-    if not result:
-        st.markdown(_empty("🔧", "솔루션 분석 데이터 없음", "수집 실행 후 8개 솔루션별 매칭 분석을 제공합니다."), unsafe_allow_html=True)
-    else:
-        import plotly.graph_objects as go
-        score_cards = result.get("score_cards",[])
-        SOL = {"ManufacturingDT":"제조 DT","RecipeAI":"레시피 AI","QualityAI":"품질 AI",
-               "InspectionAI":"비전검사","SafetyAI":"안전 AI","GenAI":"GenAI","InfraDS":"데이터 인프라","PdM":"예지보전"}
-        sol_t = defaultdict(list)
-        for sc in score_cards:
-            if sc.solution_scores:
-                for k,v in sc.solution_scores.items():
-                    if v>0: sol_t[k].append(v)
-        if sol_t:
-            sol_avg = {k:sum(v)/len(v) for k,v in sol_t.items()}
-            sol_cnt = {k:len(v) for k,v in sol_t.items()}
-            ss = sorted(sol_avg.items(), key=lambda x:-x[1])
-            top = ss[0] if ss else ("N/A",0)
+    _an_tab = st.radio("분석 항목", ["🔧 솔루션", "📈 키워드", "🕐 히스토리"], horizontal=True, label_visibility="collapsed")
 
-            k1,k2,k3 = st.columns(3)
-            k1.markdown(_metric(len(sol_t), "매칭 솔루션"), unsafe_allow_html=True)
-            k2.markdown(_metric(SOL.get(top[0],top[0]), "TOP 솔루션"), unsafe_allow_html=True)
-            k3.markdown(_metric(f"{top[1]:.0f}", "TOP 평균점수"), unsafe_allow_html=True)
-
-            cr, cb = st.columns(2)
-            with cr:
-                cats=[SOL.get(k,k) for k in sol_avg]; vals=list(sol_avg.values())
-                fig=go.Figure(go.Scatterpolar(r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself',
-                    fillcolor='rgba(245,146,27,.08)', line=dict(color=P,width=2.5), marker=dict(size=6,color=P)))
-                fig.update_layout(title=dict(text="솔루션 레이더",font=dict(size=14,color=S8)),
-                    polar=dict(radialaxis=dict(visible=True,range=[0,100],gridcolor=S2),bgcolor=S0,angularaxis=dict(gridcolor=S2)),
-                    height=380,**_layout())
-                st.plotly_chart(fig, width="stretch")
-            with cb:
-                names=[SOL.get(k,k) for k,_ in ss]; avgs=[v for _,v in ss]; cnts=[sol_cnt[k] for k,_ in ss]
-                fig=go.Figure()
-                fig.add_trace(go.Bar(x=names,y=avgs,name="평균 점수",marker_color=P))
-                fig.add_trace(go.Bar(x=names,y=cnts,name="매칭 공고",marker_color=GB))
-                fig.update_layout(title=dict(text="솔루션별 비교",font=dict(size=14,color=S8)),barmode='group',height=380,
-                    xaxis=dict(gridcolor=S2),yaxis=dict(gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
-                st.plotly_chart(fig, width="stretch")
+    # ── 솔루션 매칭 ──
+    if _an_tab == "🔧 솔루션":
+        if not result:
+            st.markdown(_empty("🔧", "솔루션 분석 데이터 없음", "수집 실행 후 8개 솔루션별 매칭 분석을 제공합니다."), unsafe_allow_html=True)
         else:
-            st.markdown(_empty("🔧","솔루션 데이터 없음","매칭되는 솔루션이 없습니다."), unsafe_allow_html=True)
+            import plotly.graph_objects as go
+            score_cards = result.get("score_cards",[])
+            SOL = {"ManufacturingDT":"제조 DT","RecipeAI":"레시피 AI","QualityAI":"품질 AI",
+                   "InspectionAI":"비전검사","SafetyAI":"안전 AI","GenAI":"GenAI","InfraDS":"데이터 인프라","PdM":"예지보전"}
+            sol_t = defaultdict(list)
+            for sc in score_cards:
+                if sc.solution_scores:
+                    for k,v in sc.solution_scores.items():
+                        if v>0: sol_t[k].append(v)
+            if sol_t:
+                sol_avg = {k:sum(v)/len(v) for k,v in sol_t.items()}
+                sol_cnt = {k:len(v) for k,v in sol_t.items()}
+                ss = sorted(sol_avg.items(), key=lambda x:-x[1])
+                top = ss[0] if ss else ("N/A",0)
 
+                k1,k2,k3 = st.columns(3)
+                k1.markdown(_metric(len(sol_t), "매칭 솔루션"), unsafe_allow_html=True)
+                k2.markdown(_metric(SOL.get(top[0],top[0]), "TOP 솔루션"), unsafe_allow_html=True)
+                k3.markdown(_metric(f"{top[1]:.0f}", "TOP 평균점수"), unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE · Keyword Trends
-# ═══════════════════════════════════════════════════════════════════════════════
+                cr, cb = st.columns(2)
+                with cr:
+                    cats=[SOL.get(k,k) for k in sol_avg]; vals=list(sol_avg.values())
+                    fig=go.Figure(go.Scatterpolar(r=vals+[vals[0]], theta=cats+[cats[0]], fill='toself',
+                        fillcolor='rgba(245,146,27,.08)', line=dict(color=P,width=2.5), marker=dict(size=6,color=P)))
+                    fig.update_layout(title=dict(text="솔루션 레이더",font=dict(size=14,color=S8)),
+                        polar=dict(radialaxis=dict(visible=True,range=[0,100],gridcolor=S2),bgcolor=S0,angularaxis=dict(gridcolor=S2)),
+                        height=380,**_layout())
+                    st.plotly_chart(fig, width="stretch")
+                with cb:
+                    names=[SOL.get(k,k) for k,_ in ss]; avgs=[v for _,v in ss]; cnts=[sol_cnt[k] for k,_ in ss]
+                    fig=go.Figure()
+                    fig.add_trace(go.Bar(x=names,y=avgs,name="평균 점수",marker_color=P))
+                    fig.add_trace(go.Bar(x=names,y=cnts,name="매칭 공고",marker_color=GB))
+                    fig.update_layout(title=dict(text="솔루션별 비교",font=dict(size=14,color=S8)),barmode='group',height=380,
+                        xaxis=dict(gridcolor=S2),yaxis=dict(gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
+                    st.plotly_chart(fig, width="stretch")
+            else:
+                st.markdown(_empty("🔧","솔루션 데이터 없음","매칭되는 솔루션이 없습니다."), unsafe_allow_html=True)
 
-if page == "📈 키워드":
-    result = _result()
-    if not result:
-        st.markdown(_empty("📈", "키워드 데이터 없음", "수집 실행 후 시장 키워드 트렌드를 분석합니다."), unsafe_allow_html=True)
-    else:
-        import plotly.graph_objects as go
-        notices = result.get("notices",[]); score_cards = result.get("score_cards",[])
-        kw_c = Counter()
-        for sc in score_cards:
-            if sc.positive_keywords:
-                for k in sc.positive_keywords: kw_c[k]+=1
-        title_w = Counter()
-        stops = {"사업","지원","공고","모집","안내","위한","대한","관련","통한","기반","활용","추진",
-                 "참여","신청","접수","대상","분야","과제","수행","기관","선정","계획","결과","변경",
-                 "연장","프로그램","센터","재공고","용역","발표","공지","정보","운영","기술","개발",
-                 "산업","기업","육성","연구","전문","협력","국내","혁신","전략","구축","도입","확대",
-                 "사항","가능","제공","진행","통해","등록","기타","문의","담당","홈페이지","바로가기",
-                 "상반기","하반기","년도","차년도","연도","해당",
-                 # v5.2 추가 불용어 — 연도·일반 공고용어
-                 "참여기업","모집공고","2025년","2025년도","2026년","2026년도","2027년","2027년도",
-                 "수요기업","공모","통합","시행","예정","일정","기간","방법","절차","요강",
-                 "수정","재안내","알림","공개","추가","확정","최종","우수","평가","심사",
-                 "테크노파크","진흥원","진흥재단","중소기업","지원사업","지방자치"}
-        for n in notices:
-            for w in (n.title or "").split():
-                c = "".join(ch for ch in w if ch.isalnum())
-                # 숫자포함 연도패턴(2026년 등), 순수숫자, 2글자 미만, 불용어 제외
-                if len(c) < 2 or c in stops or re.fullmatch(r'\d+', c) or re.fullmatch(r'\d{4}년도?', c): continue
-                title_w[c] += 1
+    # ── 키워드 트렌드 ──
+    elif _an_tab == "📈 키워드":
+        if not result:
+            st.markdown(_empty("📈", "키워드 데이터 없음", "수집 실행 후 시장 키워드 트렌드를 분석합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            notices = result.get("notices",[]); score_cards = result.get("score_cards",[])
+            kw_c = Counter()
+            for sc in score_cards:
+                if sc.positive_keywords:
+                    for k in sc.positive_keywords: kw_c[k]+=1
+            title_w = Counter()
+            stops = {"사업","지원","공고","모집","안내","위한","대한","관련","통한","기반","활용","추진",
+                     "참여","신청","접수","대상","분야","과제","수행","기관","선정","계획","결과","변경",
+                     "연장","프로그램","센터","재공고","용역","발표","공지","정보","운영","기술","개발",
+                     "산업","기업","육성","연구","전문","협력","국내","혁신","전략","구축","도입","확대",
+                     "사항","가능","제공","진행","통해","등록","기타","문의","담당","홈페이지","바로가기",
+                     "상반기","하반기","년도","차년도","연도","해당",
+                     "참여기업","모집공고","2025년","2025년도","2026년","2026년도","2027년","2027년도",
+                     "수요기업","공모","통합","시행","예정","일정","기간","방법","절차","요강",
+                     "수정","재안내","알림","공개","추가","확정","최종","우수","평가","심사",
+                     "테크노파크","진흥원","진흥재단","중소기업","지원사업","지방자치"}
+            for n in notices:
+                for w in (n.title or "").split():
+                    c = "".join(ch for ch in w if ch.isalnum())
+                    if len(c) < 2 or c in stops or re.fullmatch(r'\d+', c) or re.fullmatch(r'\d{4}년도?', c): continue
+                    title_w[c] += 1
 
-        k1,k2 = st.columns(2)
-        k1.markdown(_metric(len(kw_c), "매칭 키워드"), unsafe_allow_html=True)
-        k2.markdown(_metric(kw_c.most_common(1)[0][0] if kw_c else "-", "최다 키워드"), unsafe_allow_html=True)
+            k1,k2 = st.columns(2)
+            k1.markdown(_metric(len(kw_c), "매칭 키워드"), unsafe_allow_html=True)
+            k2.markdown(_metric(kw_c.most_common(1)[0][0] if kw_c else "-", "최다 키워드"), unsafe_allow_html=True)
 
-        ck,ct = st.columns(2)
-        with ck:
-            if kw_c:
-                t20=kw_c.most_common(20)
-                fig=go.Figure(go.Bar(y=[k[0] for k in reversed(t20)],x=[k[1] for k in reversed(t20)],orientation='h',marker_color=P))
-                fig.update_layout(title=dict(text="스코어링 키워드 TOP 20",font=dict(size=14,color=S8)),
-                    height=480,xaxis=dict(title="횟수",gridcolor=S2),**_layout(margin=dict(l=110,r=16,t=40,b=36)))
-                st.plotly_chart(fig, width="stretch")
-        with ct:
-            if title_w:
-                t20t=title_w.most_common(20)
-                fig=go.Figure(go.Bar(y=[k[0] for k in reversed(t20t)],x=[k[1] for k in reversed(t20t)],orientation='h',marker_color=GB))
-                fig.update_layout(title=dict(text="제목 빈출 단어 TOP 20",font=dict(size=14,color=S8)),
-                    height=480,xaxis=dict(title="횟수",gridcolor=S2),**_layout(margin=dict(l=110,r=16,t=40,b=36)))
-                st.plotly_chart(fig, width="stretch")
+            ck,ct = st.columns(2)
+            with ck:
+                if kw_c:
+                    t20=kw_c.most_common(20)
+                    fig=go.Figure(go.Bar(y=[k[0] for k in reversed(t20)],x=[k[1] for k in reversed(t20)],orientation='h',marker_color=P))
+                    fig.update_layout(title=dict(text="스코어링 키워드 TOP 20",font=dict(size=14,color=S8)),
+                        height=480,xaxis=dict(title="횟수",gridcolor=S2),**_layout(margin=dict(l=110,r=16,t=40,b=36)))
+                    st.plotly_chart(fig, width="stretch")
+            with ct:
+                if title_w:
+                    t20t=title_w.most_common(20)
+                    fig=go.Figure(go.Bar(y=[k[0] for k in reversed(t20t)],x=[k[1] for k in reversed(t20t)],orientation='h',marker_color=GB))
+                    fig.update_layout(title=dict(text="제목 빈출 단어 TOP 20",font=dict(size=14,color=S8)),
+                        height=480,xaxis=dict(title="횟수",gridcolor=S2),**_layout(margin=dict(l=110,r=16,t=40,b=36)))
+                    st.plotly_chart(fig, width="stretch")
+
+    # ── 수집 히스토리 ──
+    elif _an_tab == "🕐 히스토리":
+        history = st.session_state.get("collection_history",[])
+        if not history:
+            st.markdown(_empty("🕐","수집 히스토리 없음","수집을 실행하면 결과가 여기에 기록됩니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            latest = history[-1]
+            k1,k2,k3,k4 = st.columns(4)
+            k1.markdown(_metric(len(history), "총 수집 횟수"), unsafe_allow_html=True)
+            k2.markdown(_metric(latest["total"], "최근 수집건수"), unsafe_allow_html=True)
+            k3.markdown(_metric(latest["grades"].get("A",0), "최근 A등급", GA), unsafe_allow_html=True)
+            if len(history)>=2:
+                diff = latest["total"]-history[-2]["total"]
+                ds = f"+{diff}" if diff>0 else str(diff)
+                k4.markdown(_metric(ds, "이전 대비", GA if diff>0 else GD if diff<0 else S5), unsafe_allow_html=True)
+            else:
+                k4.markdown(_metric("-", "이전 대비"), unsafe_allow_html=True)
+
+            st.markdown(_section("수집 기록"), unsafe_allow_html=True)
+            hrows = [{"#":i,"수집일시":h["timestamp"],"모드":h.get("mode","-"),"전체":h["total"],
+                      "A":h["grades"].get("A",0),"B":h["grades"].get("B",0),"C":h["grades"].get("C",0),
+                      "D":h["grades"].get("D",0),"L3":h.get("l3_count",0),"제안서":h.get("proposals",0),
+                      "사이트":len(h.get("sites",{}))} for i,h in enumerate(reversed(history),1)]
+            st.dataframe(pd.DataFrame(hrows), width="stretch", height=280)
+
+            try:
+                buf=io.BytesIO()
+                with pd.ExcelWriter(buf,engine="openpyxl") as w:
+                    pd.DataFrame(hrows).to_excel(w,index=False,sheet_name="히스토리")
+                st.download_button("📊 히스토리 Excel", buf.getvalue(),
+                                   f"interx_history_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            except: pass
+
+            if len(history)>=2:
+                ct,cg = st.columns(2)
+                with ct:
+                    ts=[h["timestamp"][:16] for h in history]; tots=[h["total"] for h in history]
+                    fig=go.Figure()
+                    fig.add_trace(go.Scatter(x=ts,y=tots,mode='lines+markers',name='전체',line=dict(color=P,width=3),marker=dict(size=8,color=P)))
+                    fig.add_trace(go.Scatter(x=ts,y=[h["grades"].get("A",0) for h in history],mode='lines+markers',name='A등급',line=dict(color=GA,width=2),marker=dict(size=6,color=GA)))
+                    fig.update_layout(title=dict(text="수집 추이",font=dict(size=14,color=S8)),height=330,
+                        xaxis=dict(gridcolor=S2),yaxis=dict(title="건수",gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
+                    st.plotly_chart(fig, width="stretch")
+                with cg:
+                    lg=history[-1]["grades"]; pg=history[-2]["grades"]
+                    gl=["A","B","C","D"]
+                    fig=go.Figure()
+                    fig.add_trace(go.Bar(name="이전",x=gl,y=[pg.get(g,0) for g in gl],marker_color=S3))
+                    fig.add_trace(go.Bar(name="최근",x=gl,y=[lg.get(g,0) for g in gl],marker_color=[GA,GB,GC,GD]))
+                    fig.update_layout(title=dict(text="등급 비교",font=dict(size=14,color=S8)),height=330,barmode='group',
+                        xaxis=dict(gridcolor=S2),yaxis=dict(title="건수",gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
+                    st.plotly_chart(fig, width="stretch")
+
+                if len(history)>=2:
+                    st.markdown(_section("사이트별 변화"), unsafe_allow_html=True)
+                    ls=history[-1].get("sites",{}); ps=history[-2].get("sites",{})
+                    asn=sorted(set(list(ls)+list(ps)))
+                    if asn:
+                        sr=[{"사이트":s,"최근":ls.get(s,0),"이전":ps.get(s,0),
+                             "변화":f"+{ls.get(s,0)-ps.get(s,0)}" if ls.get(s,0)-ps.get(s,0)>0 else str(ls.get(s,0)-ps.get(s,0))} for s in asn]
+                        st.dataframe(pd.DataFrame(sr), width="stretch", height=280)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1196,74 +1257,6 @@ if page == "👤 담당자":
         mrows = [{"담당자":m,"전체":d["total"],"A":d["A"],"B":d["B"],"C":d["C"],"D":d["D"],
                   "A비율":f'{d["A"]/max(1,d["total"])*100:.0f}%'} for m,d in sorted(md.items(),key=lambda x:-x[1]["total"])]
         st.dataframe(pd.DataFrame(mrows), width="stretch", height=350)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE · Collection History
-# ═══════════════════════════════════════════════════════════════════════════════
-
-if page == "🕐 히스토리":
-    history = st.session_state.get("collection_history",[])
-    if not history:
-        st.markdown(_empty("🕐","수집 히스토리 없음","수집을 실행하면 결과가 여기에 기록됩니다."), unsafe_allow_html=True)
-    else:
-        import plotly.graph_objects as go
-        latest = history[-1]
-        k1,k2,k3,k4 = st.columns(4)
-        k1.markdown(_metric(len(history), "총 수집 횟수"), unsafe_allow_html=True)
-        k2.markdown(_metric(latest["total"], "최근 수집건수"), unsafe_allow_html=True)
-        k3.markdown(_metric(latest["grades"].get("A",0), "최근 A등급", GA), unsafe_allow_html=True)
-        if len(history)>=2:
-            diff = latest["total"]-history[-2]["total"]
-            ds = f"+{diff}" if diff>0 else str(diff)
-            k4.markdown(_metric(ds, "이전 대비", GA if diff>0 else GD if diff<0 else S5), unsafe_allow_html=True)
-        else:
-            k4.markdown(_metric("-", "이전 대비"), unsafe_allow_html=True)
-
-        st.markdown(_section("수집 기록"), unsafe_allow_html=True)
-        hrows = [{"#":i,"수집일시":h["timestamp"],"모드":h.get("mode","-"),"전체":h["total"],
-                  "A":h["grades"].get("A",0),"B":h["grades"].get("B",0),"C":h["grades"].get("C",0),
-                  "D":h["grades"].get("D",0),"L3":h.get("l3_count",0),"제안서":h.get("proposals",0),
-                  "사이트":len(h.get("sites",{}))} for i,h in enumerate(reversed(history),1)]
-        st.dataframe(pd.DataFrame(hrows), width="stretch", height=280)
-
-        try:
-            buf=io.BytesIO()
-            with pd.ExcelWriter(buf,engine="openpyxl") as w:
-                pd.DataFrame(hrows).to_excel(w,index=False,sheet_name="히스토리")
-            st.download_button("📊 히스토리 Excel", buf.getvalue(),
-                               f"interx_history_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        except: pass
-
-        if len(history)>=2:
-            ct,cg = st.columns(2)
-            with ct:
-                ts=[h["timestamp"][:16] for h in history]; tots=[h["total"] for h in history]
-                fig=go.Figure()
-                fig.add_trace(go.Scatter(x=ts,y=tots,mode='lines+markers',name='전체',line=dict(color=P,width=3),marker=dict(size=8,color=P)))
-                fig.add_trace(go.Scatter(x=ts,y=[h["grades"].get("A",0) for h in history],mode='lines+markers',name='A등급',line=dict(color=GA,width=2),marker=dict(size=6,color=GA)))
-                fig.update_layout(title=dict(text="수집 추이",font=dict(size=14,color=S8)),height=330,
-                    xaxis=dict(gridcolor=S2),yaxis=dict(title="건수",gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
-                st.plotly_chart(fig, width="stretch")
-            with cg:
-                lg=history[-1]["grades"]; pg=history[-2]["grades"]
-                gl=["A","B","C","D"]
-                fig=go.Figure()
-                fig.add_trace(go.Bar(name="이전",x=gl,y=[pg.get(g,0) for g in gl],marker_color=S3))
-                fig.add_trace(go.Bar(name="최근",x=gl,y=[lg.get(g,0) for g in gl],marker_color=[GA,GB,GC,GD]))
-                fig.update_layout(title=dict(text="등급 비교",font=dict(size=14,color=S8)),height=330,barmode='group',
-                    xaxis=dict(gridcolor=S2),yaxis=dict(title="건수",gridcolor=S2),legend=dict(orientation="h",y=1.12),**_layout())
-                st.plotly_chart(fig, width="stretch")
-
-            if len(history)>=2:
-                st.markdown(_section("사이트별 변화"), unsafe_allow_html=True)
-                ls=history[-1].get("sites",{}); ps=history[-2].get("sites",{})
-                asn=sorted(set(list(ls)+list(ps)))
-                if asn:
-                    sr=[{"사이트":s,"최근":ls.get(s,0),"이전":ps.get(s,0),
-                         "변화":f"+{ls.get(s,0)-ps.get(s,0)}" if ls.get(s,0)-ps.get(s,0)>0 else str(ls.get(s,0)-ps.get(s,0))} for s in asn]
-                    st.dataframe(pd.DataFrame(sr), width="stretch", height=280)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
