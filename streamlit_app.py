@@ -62,37 +62,42 @@ st.markdown(f"""<style>
 .stApp{{background:#FAFAFA;font-family:'Inter',system-ui,-apple-system,sans-serif}}
 #MainMenu,footer,header{{visibility:hidden}}
 
-/* ── Sidebar Dark Theme ── */
+/* ── Sidebar Light Theme ── */
 section[data-testid="stSidebar"]{{
-    background:linear-gradient(180deg,#0D0D0D 0%,#1A1A2E 100%);
-    min-width:240px;max-width:240px;
+    background:{W};min-width:240px;max-width:240px;
+    border-right:1px solid rgba(0,0,0,.06);
 }}
 section[data-testid="stSidebar"] .stRadio label{{
-    color:rgba(255,255,255,.75) !important;font-weight:600;font-size:.82rem;
+    color:{S8} !important;font-weight:600;font-size:.82rem;
 }}
 section[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"]{{
-    color:rgba(255,255,255,.75) !important;
+    color:{S8} !important;
 }}
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label{{
     padding:10px 16px !important;border-radius:8px !important;margin:1px 0;
     transition:all .2s;
 }}
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover{{
-    background:rgba(255,128,0,.08) !important;
+    background:rgba(255,128,0,.05) !important;
 }}
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[data-checked="true"],
 section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:has(input:checked){{
-    background:rgba(255,128,0,.12) !important;
-    border-left:3px solid {P} !important;
+    background:rgba(255,128,0,.08) !important;
+    border-left:3px solid {P} !important;color:{P} !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{{
-    color:rgba(255,255,255,.5) !important;
+    color:{S5} !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2,
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
-    color:#fff !important;
+    color:{S8} !important;
 }}
+
+/* ── Main content flush ── */
+.stMainBlockContainer{{padding-top:0 !important}}
+[data-testid="stAppViewBlockContainer"]{{padding-top:0 !important}}
+.block-container{{padding-top:0 !important}}
 
 /* ── Top Navigation Bar ── */
 .nav-bar{{
@@ -228,8 +233,8 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
 /* ── Footer Banner — interxlab.com ── */
 .ix-footer{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    margin:60px -1rem -1rem;padding:48px 40px 36px;
-    border-top:1px solid rgba(255,128,0,.1);
+    margin:40px -1rem -1rem -1rem;padding:48px 40px 36px;
+    border-top:none;
 }}
 .ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
 .ix-footer .ft-brand span{{color:#fff}} .ix-footer .ft-brand b{{color:{P}}}
@@ -293,8 +298,8 @@ def _layout(**kw):
 
 # ── Sidebar Navigation ──
 with st.sidebar:
-    st.markdown(f'<div style="padding:18px 12px 10px;text-align:center"><div style="font-size:1.5rem;font-weight:900;letter-spacing:-1.5px"><span style="color:#fff">INTER</span><span style="color:{P}">X</span></div><div style="color:rgba(255,255,255,.3);font-size:.62rem;letter-spacing:4px;margin-top:4px">INTELLIGENCE ENGINE</div></div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="border-top:1px solid rgba(255,255,255,.06);margin:8px 0 12px"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="padding:18px 12px 10px;text-align:center"><div style="font-size:1.5rem;font-weight:900;letter-spacing:-1.5px"><span style="color:{S8}">INTER</span><span style="color:{P}">X</span></div><div style="color:{S4};font-size:.62rem;letter-spacing:4px;margin-top:4px">INTELLIGENCE ENGINE</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="border-top:1px solid rgba(0,0,0,.06);margin:8px 0 12px"></div>', unsafe_allow_html=True)
 
     NAV_ITEMS = [
         "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
@@ -303,8 +308,8 @@ with st.sidebar:
     ]
     page = st.radio("메뉴", NAV_ITEMS, label_visibility="collapsed", key="nav_page")
 
-    st.markdown(f'<div style="border-top:1px solid rgba(255,255,255,.06);margin:16px 0 12px"></div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="padding:0 12px"><div style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:rgba(255,255,255,.25)"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block"></span> LIVE · v5.9 · 25 Sites · ML v2</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="border-top:1px solid rgba(0,0,0,.06);margin:16px 0 12px"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="padding:0 12px"><div style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:{S4}"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block"></span> LIVE · v5.9 · 25 Sites · ML v2</div></div>', unsafe_allow_html=True)
 
 # ── Compact Top Bar ──
 st.markdown(f"""<div class="nav-bar">
