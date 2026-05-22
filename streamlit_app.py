@@ -377,6 +377,8 @@ with tab_dash:
                     if not _struct:
                         _body = getattr(n, "body_text", "") or ""
                         _body = re.sub(r'\{\{[^}]+\}\}', '', _body).strip()
+                        if _body and _body.startswith("[첨부:"):
+                            st.caption("📎 OCR: 첨부파일에서 텍스트 자동 추출됨")
                         if _body and len(_body) > 20:
                             # 메타데이터/잡음 패턴 제거 후 핵심 문장 추출
                             _junk_re = re.compile(
@@ -665,6 +667,11 @@ with tab_notices:
 
                 body = getattr(sn, "body_text", "") or ""
                 body = re.sub(r'\{\{[^}]+\}\}', '', body).strip()
+
+                # OCR 보강 표시 (body_text가 첨부파일에서 추출된 경우)
+                if body and body.startswith("[첨부:"):
+                    st.caption("📎 OCR: 첨부파일에서 텍스트 자동 추출됨")
+
                 _sn_struct = getattr(sn, "structured", None) or {}
                 _sn_summary = getattr(sn, "summary", "") or ""
                 _sn_summary = re.sub(r'\{\{[^}]+\}\}', '', _sn_summary).strip()

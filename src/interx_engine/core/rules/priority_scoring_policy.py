@@ -46,6 +46,13 @@ def _load_thresholds(config_path: str | None = None) -> dict:
             t = raw.get("thresholds", {})
             pf = raw.get("priority_formula", {})
             sol = raw.get("solutions", {})
+            # combo_keywords: [[kw_a, kw_b, bonus], ...] → List[tuple]
+            combo_raw = raw.get("combo_keywords", [])
+            combo_list = []
+            for item in combo_raw:
+                if isinstance(item, (list, tuple)) and len(item) >= 3:
+                    combo_list.append((str(item[0]), str(item[1]), float(item[2])))
+
             return {
                 "L3_THRESHOLD":      t.get("l3_strong",        _L3_DEFAULT),
                 "PARTNER_THRESHOLD": t.get("partner_candidate", _PARTNER_DEFAULT),
@@ -62,6 +69,7 @@ def _load_thresholds(config_path: str | None = None) -> dict:
                 "SCALE":             sol.get("scale_factor",   _SCALE),
                 "W_FIT":             pf.get("w_fitness",       _W_FIT),
                 "W_IND":             pf.get("w_industry",      _W_IND),
+                "COMBO_KEYWORDS":    combo_list,
             }
         except Exception as e:
             log.warning("scoring.yaml 로드 실패 (%s): %s — fallback 기본값 사용", p, e)
@@ -74,12 +82,17 @@ def _load_thresholds(config_path: str | None = None) -> dict:
         "POS_MULT": _POS_MULT,
         "STRUCT_BONUS": _STRUCT_BONUS, "BUDGET_BONUS": _BUDGET_BONUS,
         "SCALE": _SCALE, "W_FIT": _W_FIT, "W_IND": _W_IND,
+        "COMBO_KEYWORDS": [],  # YAML 로드 실패 시 빈 리스트
     }
 
 
 _CFG = _load_thresholds()
 L3_THRESHOLD      = _CFG["L3_THRESHOLD"]
 PARTNER_THRESHOLD = _CFG["PARTNER_THRESHOLD"]
+# YAML에서 콤보 키워드 로드 (없으면 코드 내 fallback 사용)
+COMBO_KEYWORD_GROUPS: List[tuple] = (
+    _CFG.get("COMBO_KEYWORDS") or _COMBO_KEYWORD_GROUPS_FALLBACK
+)
 
 # ── 제조/AI 필수 코어 키워드 (하나도 없으면 0점) ──────────────────────────────
 CORE_KEYWORDS = {
@@ -437,9 +450,9 @@ NEGATIVE_KEYWORDS: Dict[str, float] = {
 }
 
 # ── COMBO 키워드 그룹 (두 키워드가 동시에 존재할 때 추가 가점) ───────────────────
-# 형식: (keyword_a, keyword_b, bonus_score)
-# 두 키워드가 모두 scored_text에 있으면 bonus_score를 pos_score에 더함
-COMBO_KEYWORD_GROUPS: List[tuple] = [
+# scoring.yaml의 combo_keywords에서 로드됨 → _CFG["COMBO_KEYWORDS"]
+# 아래는 YAML 로드 실패 시 fallback 기본값
+_COMBO_KEYWORD_GROUPS_FALLBACK: List[tuple] = [
     # AI + 제조 결합 — 고가치 핵심 조합
     ("ai", "제조", 5),
     ("인공지능", "제조", 5),

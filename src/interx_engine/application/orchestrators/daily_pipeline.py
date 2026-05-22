@@ -22,6 +22,9 @@ from interx_engine.application.use_cases.assign_milestone import assign_mileston
 from interx_engine.application.use_cases.track_competitors import track_competitors
 from interx_engine.application.use_cases.detect_recurring import detect_recurring
 from interx_engine.application.use_cases.site_quality_grader import grade_site_quality
+from interx_engine.application.use_cases.log_status_change import (
+    detect_status_changes, load_snapshot, save_snapshot,
+)
 from interx_engine.application.use_cases.generate_proposal import generate_proposals
 from interx_engine.application.mappers.notice_mapper import (
     notice_to_master_row, notice_to_urgent_row, _calc_dday,
@@ -159,6 +162,19 @@ class DailyPipelineOrchestrator:
 
         # ── 7-B. BD 마일스톤 자동 배정 ───────────────────────────────────────
         notices = assign_milestones(notices, score_cards)
+
+        # ── 7-C. 상태변경 로그 기록 ──────────────────────────────────────────
+        try:
+            prev_snapshot = load_snapshot()
+            status_rows, new_snapshot = detect_status_changes(
+                notices, prev_snapshot, execution_id
+            )
+            save_snapshot(new_snapshot)
+            if status_rows:
+                log.info("[Pipeline] 상태변경: %d건 기록", len(status_rows))
+        except Exception as e:
+            log.warning("[Pipeline] 상태변경 로그 실패 (무시): %s", e)
+            status_rows = []
 
         # ── 8. 경쟁사 트래킹 ─────────────────────────────────────────────────
         notices = track_competitors(notices)
@@ -344,6 +360,7 @@ class DailyPipelineOrchestrator:
             if site_stats: gw.append_rows("93_사이트별수집통계", site_stats)
             gw.append_rows("94_실행로그",                        [exec_log_row])
             if error_rows: gw.append_rows("96_수집에러로그",     error_rows)
+            if status_rows: gw.append_rows("97_상태변경로그",   status_rows)
 
             log.info("[Pipeline] 업로드 완료 (%.1fs, %d건)", elapsed, total)
         except Exception as exc:
