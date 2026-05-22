@@ -54,7 +54,7 @@ class TestScoreNotices:
         notices = _collect()
         _, cards = _score(notices)
         for card in cards:
-            assert card.priority_grade in ("P1", "P2", "P3", "P4")
+            assert card.priority_grade in ("A", "B", "C", "D")
 
     def test_fitness_in_range(self):
         notices = _collect()
@@ -97,12 +97,12 @@ class TestDeduplication:
 
 
 class TestMappers:
-    def test_master_row_24_keys(self):
+    def test_master_row_has_minimum_keys(self):
         notices = _collect()
         _, cards = _score(notices)
         sc_map  = {c.notice_id: c for c in cards}
         row = notice_to_master_row(notices[0], sc_map.get(notices[0].notice_id))
-        assert len(row) == 24
+        assert len(row) >= 24   # v3 이후 추가 필드 포함
 
     def test_master_row_required_keys(self):
         notices = _collect()

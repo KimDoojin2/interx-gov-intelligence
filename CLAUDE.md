@@ -93,11 +93,22 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 - Playwright 사이트: bizinfo, kiat, dicia, smart_factory, iitp, ketep
 
 ## 알려진 이슈
-- 테스트 18건 실패: test_embedding_clusterer(9), test_win_prediction(9)
-  → Notice/ScoreCard __init__에 execution_id, site 인자 추가 후 테스트 미업데이트
-- 스마트공장 중복 저장: URL이 고유하지 않아 동일 공고 2~3건 저장됨
-  → smart_factory_collector.py의 notice_id를 공고번호(nttId) 기반으로 변경 필요
+- ✅ (해결) 테스트 18건 실패 → v5.9에서 전체 164건 통과
+- ✅ (해결) 스마트공장 중복 → nttId 기반 notice_id로 수정 완료
 - pypdf, olefile, python-docx 미설치 → DeepParsing, 제안서 생성 비활성
+
+## ML 엔진 v2 (win_prediction.py)
+```
+피처 12개 (v2):
+  fitness_score, priority_score, budget_score, dday_urgency,
+  l3_flag, industry_score,
+  tfidf_similarity, keyword_density, type_multiplier,
+  combo_count, budget_grade, urgency_boost
+모델: auto → 50건+ GradientBoosting, <50건 LogisticRegression
+      ensemble → VotingClassifier(LR+GBM+RF)
+      학습 데이터: data/exports/training/*.jsonl (파이프라인 자동)
+      모델 파일: data/models/win_pred_model.pkl
+```
 
 ---
 

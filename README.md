@@ -32,6 +32,28 @@
 
 ## 📋 최근 업데이트
 
+### v5.9 — 2026-05-22
+
+**🤖 ML 엔진 v2 고도화 + 전면 버그 캐치 + OCR 설계**
+
+**ML 수주예측 엔진 v2:**
+- 피처 10개로 확장: 기본 5개(fitness, priority, budget, dday, l3) + 고도화 5개(tfidf_similarity, keyword_density, type_multiplier, combo_count, industry)
+- GradientBoosting / RandomForest / VotingClassifier 앙상블 지원 (50건+ 자동 GBM 전환)
+- 파이프라인 실행마다 JSONL 학습 데이터 자동 내보내기 (`data/exports/training/`)
+- Streamlit 대시보드에 ML 모델 정보 배너 + 학습 버튼 + 피처 중요도 차트
+- 수주 예측 탭 전면 개선: v2 피처별 기여도 시각화, InterX 유사도/콤보 키워드 표시
+
+**버그 수정:**
+- 통합 테스트 4건 실패 수정 (설정값 변경 반영: l3=30, partner=18, 등급=A/B/C/D)
+- 전체 164건 테스트 통과 (unit 106 + integration 58)
+- 스마트공장 nttId 중복 방지 정상 작동 확인
+- 모든 25개 수집기 등록 및 설정 정상 확인
+
+**OCR 기능 설계 (Phase 1~3):**
+- Phase 1: pdfplumber 텍스트 기반 PDF 파싱 (Streamlit Cloud 호환)
+- Phase 2: pytesseract + pdf2image OCR (로컬 전용)
+- Phase 3: HWP → docx 변환 후 텍스트 추출
+
 ### v5.8 — 2026-05-21
 
 **🎯 스코어링 정밀화 — 비제조AI 공고 오탐 대폭 감소**

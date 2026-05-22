@@ -225,6 +225,13 @@ class DailyPipelineOrchestrator:
         except Exception as e:
             log.warning("[Pipeline] WinPrediction 실패 (무시): %s", e)
 
+        # ── 11-D2. 학습 데이터 자동 내보내기 (JSONL) ─────────────────────────
+        try:
+            from interx_engine.application.use_cases.win_prediction import export_training_data
+            export_training_data(notices, score_cards, execution_id)
+        except Exception as e:
+            log.debug("[Pipeline] 학습 데이터 내보내기 스킵: %s", e)
+
         # ── 11-E. 제안서 초안 자동 생성 (A/B 등급) ───────────────────────────
         try:
             proposal_files = generate_proposals(notices, score_cards)

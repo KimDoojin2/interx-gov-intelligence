@@ -16,11 +16,11 @@ class TestSettingsLoad:
     def test_project_root_has_configs(self):
         assert (self.s.project_root / "configs").is_dir()
 
-    def test_l3_threshold_is_74(self):
-        assert self.s.l3_threshold() == 74
+    def test_l3_threshold_is_30(self):
+        assert self.s.l3_threshold() == 30
 
-    def test_partner_threshold_is_54(self):
-        assert self.s.partner_threshold() == 54
+    def test_partner_threshold_is_18(self):
+        assert self.s.partner_threshold() == 18
 
     def test_sim_threshold_in_range(self):
         t = self.s.sim_threshold()

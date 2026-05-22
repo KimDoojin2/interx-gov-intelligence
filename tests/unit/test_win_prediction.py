@@ -171,8 +171,11 @@ class TestWinPredictionUseCase:
         notices = [_notice("N-1")]
         cards   = [_card("N-1")]
         report  = self.uc.execute(notices, cards, "EXEC-008")
-        expected_keys = {"fitness_score", "priority_score", "budget_억",
-                         "dday_urgency", "l3_flag", "industry_score"}
+        # v2: 10개 피처 (기본 5 + 고도화 5)
+        expected_keys = {"fitness_score", "priority_score", "budget_score",
+                         "dday_urgency", "l3_flag", "industry_score",
+                         "tfidf_similarity", "keyword_density", "type_multiplier",
+                         "combo_count"}
         assert set(report.predictions[0].feature_contributions.keys()) == expected_keys
 
     def test_grade_field_valid(self):

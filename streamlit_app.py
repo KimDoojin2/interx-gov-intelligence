@@ -220,7 +220,7 @@ HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence
 
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
-    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.6 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; 23 ANALYTICS</div>
+    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.9 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; ML v2 ENGINE</div>
 </div>
 <div class="hero-banner">
     <img src="{HERO_IMG}" alt="InterX Hero">
@@ -775,24 +775,35 @@ with tab_predict:
         st.markdown(_empty("🎯", "수주 예측 데이터 없음", "수집 실행 후 공고별 수주 확률을 예측합니다."), unsafe_allow_html=True)
     else:
         import plotly.graph_objects as go
+        from interx_engine.application.use_cases.win_prediction import WinPredictionUseCase, _extract_v2_features, _WEIGHTS_V2
         notices = result.get("notices", []); smap = _smap(result)
+
+        # ── ML 엔진 v2로 수주 예측 ──
+        _wp_uc = WinPredictionUseCase()
+        _wp_info = _wp_uc.model_info
         preds = []
         for n in notices:
             sc = smap.get(n.notice_id)
             if not sc: continue
-            f_ = sc.fitness_score or 0; p_ = sc.priority_score or 0; i_ = sc.industry_score or 0
-            l3 = 1 if getattr(n,"l3_strong","N")=="Y" else 0
-            dd = _dday(n.deadline_date or ""); u_ = max(0,min(100,(30-dd)*3.33)) if dd>=0 else 0
-            wp = min(100, max(0, f_*0.35 + p_*0.25 + 50*0.15 + u_*0.10 + l3*10 + i_*0.05))
-            preds.append({"notice":n, "sc":sc, "wp":wp})
+            feats = _extract_v2_features(n, sc)
+            wp = sum(_WEIGHTS_V2.get(k, 0) * v for k, v in feats.items() if k in _WEIGHTS_V2)
+            wp = min(1.0, max(0.0, wp)) * 100
+            preds.append({"notice":n, "sc":sc, "wp":wp, "feats":feats})
         preds.sort(key=lambda x:-x["wp"])
 
         hp = sum(1 for p in preds if p["wp"]>=60)
         avg = sum(p["wp"] for p in preds)/max(1,len(preds))
-        k1,k2,k3 = st.columns(3)
+        k1,k2,k3,k4 = st.columns(4)
         k1.markdown(_metric(len(preds), "예측 대상"), unsafe_allow_html=True)
         k2.markdown(_metric(hp, "유망 60%+", GA), unsafe_allow_html=True)
         k3.markdown(_metric(f"{avg:.0f}%", "평균 확률"), unsafe_allow_html=True)
+        _ml_label = f'{_wp_info["model"]}' if _wp_info["mode"] == "ml" else "RuleV2"
+        k4.markdown(_metric(_ml_label, "ML 모델", A2), unsafe_allow_html=True)
+
+        # ── ML 모델 정보 배너 ──
+        _ml_badge_color = GA if _wp_info["mode"] == "ml" else P
+        _ml_status = "ML 활성" if _wp_info["mode"] == "ml" else "룰 기반 (학습 데이터 수집 중)"
+        st.markdown(f'<div style="background:{S0};border:1px solid {S2};border-radius:10px;padding:10px 16px;margin:8px 0;display:flex;align-items:center;gap:12px"><span style="background:{_ml_badge_color};color:{W};padding:3px 10px;border-radius:6px;font-size:.72rem;font-weight:700">{_ml_status}</span><span style="font-size:.78rem;color:{S5}">v2 피처 10개 · {_wp_info.get("accuracy","—")} 정확도 · 수집 실행마다 학습 데이터 자동 저장</span></div>', unsafe_allow_html=True)
 
         col_h, col_t = st.columns([1,2])
         with col_h:
@@ -813,40 +824,73 @@ with tab_predict:
         with col_t:
             st.markdown(_section("수주 유망 TOP 10"), unsafe_allow_html=True)
             for _wi, p in enumerate(preds[:10]):
-                n,sc,wp = p["notice"],p["sc"],p["wp"]
+                n,sc,wp,feats = p["notice"],p["sc"],p["wp"],p["feats"]
                 c = GA if wp>=60 else GB if wp>=40 else GC
                 meta = f"{sc.priority_grade}등급 · {n.site} · {n.agency or '-'} · {n.deadline_date or '-'}"
                 st.markdown(_notice_row(sc.priority_grade, f'<span style="color:{c};font-weight:800">{wp:.0f}%</span> {n.title[:50]}', meta), unsafe_allow_html=True)
-                with st.expander(f"🔍 수주 가능성 분석", expanded=False):
-                    # 개별 가중치 계산
-                    _f = sc.fitness_score or 0; _p = sc.priority_score or 0; _i = sc.industry_score or 0
-                    _l3 = 1 if getattr(n,"l3_strong","N")=="Y" else 0
-                    _dd = _dday(n.deadline_date or ""); _u = max(0,min(100,(30-_dd)*3.33)) if _dd>=0 else 0
-                    _fc = _f*0.35; _pc = _p*0.25; _bc = 50*0.15; _uc = _u*0.10; _lc = _l3*10; _ic = _i*0.05
-                    # 시각적 바 차트
-                    _factors = [("키워드 적합도", _fc, f"{_f:.0f}×0.35={_fc:.1f}"),
-                                ("우선순위 점수", _pc, f"{_p:.0f}×0.25={_pc:.1f}"),
-                                ("예산 기여", _bc, f"50×0.15={_bc:.1f}"),
-                                ("마감 긴급도", _uc, f"D-{_dd}→{_u:.0f}×0.10={_uc:.1f}" if _dd>=0 else "마감→0"),
-                                ("L3 강공고", _lc, f"{'Y' if _l3 else 'N'}→{_lc:.1f}"),
-                                ("솔루션 매칭", _ic, f"{_i:.0f}×0.05={_ic:.1f}")]
+                with st.expander("🔍 수주 가능성 분석", expanded=False):
+                    # v2 피처별 기여도 시각화
+                    _feat_labels = {
+                        "fitness_score": "키워드 적합도", "priority_score": "우선순위",
+                        "budget_score": "예산 기여", "dday_urgency": "마감 긴급도",
+                        "l3_flag": "L3 강공고", "industry_score": "솔루션 매칭",
+                        "tfidf_similarity": "InterX 유사도", "keyword_density": "키워드 밀도",
+                        "type_multiplier": "공고 유형", "combo_count": "콤보 키워드",
+                    }
                     _bar_html = ""
-                    for _fn, _fv, _fd in _factors:
-                        _bw = max(2, min(100, _fv * 3))
-                        _bc2 = GA if _fv >= 10 else GB if _fv >= 5 else GC if _fv >= 2 else S4
-                        _bar_html += f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:.78rem"><span style="width:90px;color:{S5};font-weight:600;text-align:right">{_fn}</span><div style="flex:1;background:{S1};border-radius:4px;height:18px;overflow:hidden"><div style="width:{_bw}%;height:100%;background:{_bc2};border-radius:4px"></div></div><span style="width:120px;color:{S4};font-size:.72rem">{_fd}</span></div>'
+                    for _fk, _fl in _feat_labels.items():
+                        _fv = feats.get(_fk, 0) * _WEIGHTS_V2.get(_fk, 0) * 100
+                        _raw = feats.get(_fk, 0)
+                        _w = _WEIGHTS_V2.get(_fk, 0)
+                        _bw = max(2, min(100, _fv * 4))
+                        _bc2 = GA if _fv >= 8 else GB if _fv >= 4 else GC if _fv >= 1 else S4
+                        _bar_html += f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:.78rem"><span style="width:100px;color:{S5};font-weight:600;text-align:right">{_fl}</span><div style="flex:1;background:{S1};border-radius:4px;height:18px;overflow:hidden"><div style="width:{_bw}%;height:100%;background:{_bc2};border-radius:4px"></div></div><span style="width:100px;color:{S4};font-size:.72rem">{_raw:.2f}x{_w:.2f}={_fv:.1f}</span></div>'
                     st.markdown(f'<div style="padding:4px 0">{_bar_html}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div style="text-align:right;font-size:.85rem;font-weight:800;color:{c};margin-top:6px">합계: {wp:.0f}%</div>', unsafe_allow_html=True)
                     # 핵심 근거 요약
+                    _f = sc.fitness_score or 0; _dd = _dday(n.deadline_date or "")
                     _reasons = []
                     if _f >= 40: _reasons.append(f"키워드 적합도 높음 ({_f:.0f}점)")
                     if sc.positive_keywords: _reasons.append(f"매칭 키워드: {', '.join(sc.positive_keywords[:5])}")
-                    if _l3: _reasons.append("L3 강공고 해당")
+                    if n.l3_strong == "Y": _reasons.append("L3 강공고 해당")
+                    if sc.tfidf_similarity >= 0.3: _reasons.append(f"InterX 유사도 {sc.tfidf_similarity:.0%}")
+                    if sc.combo_keywords: _reasons.append(f"콤보: {', '.join(sc.combo_keywords[:3])}")
                     if 0 <= _dd <= 7: _reasons.append(f"마감 임박 D-{_dd}")
                     sol_hits = [(s,v) for s,v in (sc.solution_scores or {}).items() if v > 0]
                     if sol_hits: _reasons.append(f"솔루션: {', '.join(s for s,_ in sorted(sol_hits, key=lambda x:-x[1])[:3])}")
                     if _reasons:
                         st.markdown("**📌 핵심 근거**: " + " · ".join(_reasons))
+
+        # ── ML 학습 데이터 현황 ──
+        st.markdown(_section("🤖 ML 학습 데이터 현황"), unsafe_allow_html=True)
+        _train_dir = ROOT / "data" / "exports" / "training"
+        if _train_dir.exists():
+            _jsonl_files = sorted(_train_dir.glob("*.jsonl"), reverse=True)
+            _total_lines = 0
+            for _jf in _jsonl_files[:10]:
+                _total_lines += sum(1 for line in _jf.read_text(encoding="utf-8").splitlines() if line.strip())
+            st.markdown(f'<div style="background:{S0};border-radius:10px;padding:12px 16px;font-size:.82rem;color:{CH}">JSONL 파일 <b>{len(_jsonl_files)}</b>개 · 총 <b>{_total_lines}</b>건 · 20건 이상 시 ML 학습 가능</div>', unsafe_allow_html=True)
+            if _total_lines >= 20:
+                if st.button("🧠 ML 모델 학습 실행", key="train_ml"):
+                    with st.spinner("ML 모델 학습 중..."):
+                        try:
+                            from interx_engine.application.use_cases.win_prediction import WinPredictionTrainer
+                            trainer = WinPredictionTrainer()
+                            result_ml = trainer.train()
+                            st.success(f"학습 완료! 모델: {result_ml['model_type']} · 정확도: {result_ml['accuracy']:.1%} · 샘플: {result_ml['n_samples']}건")
+                            if result_ml.get("feature_importance"):
+                                fi = result_ml["feature_importance"]
+                                fig_fi = go.Figure(go.Bar(
+                                    x=list(fi.values()), y=list(fi.keys()),
+                                    orientation='h', marker_color=P,
+                                ))
+                                fig_fi.update_layout(title=dict(text="피처 중요도",font=dict(size=14,color=S8)),
+                                    height=300, xaxis=dict(title="중요도"), **_layout())
+                                st.plotly_chart(fig_fi, width="stretch")
+                        except Exception as e:
+                            st.error(f"학습 실패: {e}")
+        else:
+            st.markdown(f'<div style="font-size:.82rem;color:{S4};padding:8px">수집을 실행하면 학습 데이터가 자동으로 축적됩니다.</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
