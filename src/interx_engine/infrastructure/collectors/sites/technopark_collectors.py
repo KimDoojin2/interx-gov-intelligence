@@ -24,11 +24,15 @@ log = logging.getLogger("interx.collectors")
 
 # ── 페이지네이션 / 비공고 제목 필터 패턴 ──
 _PAGINATION_TITLE_RE = re.compile(
-    r"^\d+\s*페이지$|^(처음|이전|다음|마지막|prev|next|first|last)\s*페이지?$|"
+    r'^"?\d+\s*페이지"?$|'                                       # "443 페이지", 11 페이지
+    r"^(처음|이전|다음|마지막|prev|next|first|last)\s*페이지?$|"
     r"^(처음|이전|다음|마지막|prev|next|first|last)$|"
     r"^[<>«»‹›]+$|^\[?\d+\]?$|^\.{2,}$",
     re.I,
 )
+
+# ── 페이지네이션 URL 패턴 (robot=Y 등) ──
+_PAGINATION_URL_RE = re.compile(r"robot=Y|page=\d+$", re.I)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -54,13 +58,27 @@ class _TechnoBaseCollector(BaseCollector):
                 full = href if href.startswith("http") else urljoin(base, href)
                 if full in seen:
                     continue
-                seen.add(full)
+
                 title = a.get_text(strip=True)
                 if not title or len(title) < 3:
                     continue
-                # 페이지네이션 텍스트 제외 ("443 페이지", "11 페이지", "처음", "다음" 등)
+
+                # ── 페이지네이션 / 네비게이션 필터 ──
+                # 1) 제목이 페이지네이션 텍스트 ("443 페이지", "11", "다음" 등)
                 if _PAGINATION_TITLE_RE.match(title.strip()):
                     continue
+                # 2) URL에 robot=Y 또는 mode=view 없이 page= 만 있는 건 페이지네이션
+                if _PAGINATION_URL_RE.search(href) and "mode=view" not in href:
+                    continue
+                # 3) 공고 상세 URL이 아닌 네비게이션 링크 (mode=view, board_seq 없음)
+                if "mode=view" not in href and "board_seq" not in href \
+                        and "seq=" not in href and "idx=" not in href \
+                        and "no=" not in href and "wr_id=" not in href \
+                        and "nttId=" not in href:
+                    # 실제 게시글 URL 식별자가 하나도 없으면 네비게이션 링크
+                    continue
+
+                seen.add(full)
                 row = a.find_parent("tr") or a.find_parent("li") or a.parent
                 text = row.get_text(" ", strip=True) if row else title
                 dates = _extract_dates(text)
@@ -259,9 +277,41 @@ class BtpCollector(_TechnoBaseCollector):
     site_key = "btp"
     agency   = "부산테크노파크"
     ministry = "부산광역시"
-    BASE_URL = "https://www.btp.or.kr"
+    BASE_URL = "https://www.btp.or.kr/kor/CMS/Board/Board.do"
     LIST_URL = "https://www.btp.or.kr/kor/CMS/Board/Board.do?mCode=MN013&page={page}"
     LINK_PATTERN = "mCode=MN013"
+
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        """BTP 커스텀 파싱: mode=view 링크만, 제목 중복(titleHover+subjectWr) 제거."""
+        notices: List[Notice] = []
+        seen: set = set()
+
+        for a in soup.find_all("a", href=True):
+            href = (a.get("href") or "").strip()
+            if "mode=view" not in href or "board_seq" not in href:
+                continue
+
+            full = href if href.startswith("http") else urljoin(self.BASE_URL, href)
+            if full in seen:
+                continue
+            seen.add(full)
+
+            # 제목: span.subjectWr 또는 첫 번째 span (중복 방지)
+            span = a.select_one("span.subjectWr") or a.select_one("span")
+            title = span.get_text(strip=True) if span else a.get_text(strip=True)
+            if not title or len(title) < 3:
+                continue
+
+            row = a.find_parent("tr") or a.find_parent("li") or a.parent
+            text = row.get_text(" ", strip=True) if row else title
+            dates = _extract_dates(text)
+            notices.append(self._make_notice(
+                execution_id, title, full,
+                dates[-1] if dates else "",
+                dates[0] if len(dates) >= 2 else "",
+            ))
+
+        return notices
 
 
 class UtpCollector(_TechnoBaseCollector):
