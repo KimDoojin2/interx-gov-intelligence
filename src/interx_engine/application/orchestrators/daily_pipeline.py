@@ -313,7 +313,8 @@ class DailyPipelineOrchestrator:
         if self.sheet_gateway:
             self._upload(master_rows, l3_rows, urgent_rows,
                          kpi_rows, site_stats, error_rows,
-                         exec_log_row, elapsed, len(notices))
+                         exec_log_row, elapsed, len(notices),
+                         status_rows=status_rows)
 
         # ── 15. SQLite 저장 ───────────────────────────────────────────────────
         if sqlite_writer:
@@ -342,7 +343,7 @@ class DailyPipelineOrchestrator:
     # ─────────────────────────────────────────────────────────────────────────
     def _upload(self, master_rows, l3_rows, urgent_rows,
                 kpi_rows, site_stats, error_rows,
-                exec_log_row, elapsed, total):
+                exec_log_row, elapsed, total, status_rows=None):
         gw = self.sheet_gateway
 
         try:
