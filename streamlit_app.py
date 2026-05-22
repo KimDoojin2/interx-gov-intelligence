@@ -94,37 +94,28 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     color:{S8} !important;
 }}
 
-/* ── Full-bleed: 모든 Streamlit 내부 패딩 제거 ── */
+/* ── Full-bleed: Streamlit 기본 패딩 줄이기 ── */
 .stApp > header{{display:none !important}}
-.stMainBlockContainer,
-[data-testid="stMainBlockContainer"],
-[data-testid="stAppViewBlockContainer"],
-.block-container{{
-    padding:0 !important;max-width:100% !important;width:100% !important;
+.block-container,
+[data-testid="stMainBlockContainer"]{{
+    padding-top:0 !important;padding-bottom:0 !important;
+    padding-left:1rem !important;padding-right:1rem !important;
+    max-width:100% !important;
 }}
-[data-testid="stAppViewContainer"]{{padding:0 !important}}
-[data-testid="stAppViewContainer"] > section{{padding:0 !important}}
-[data-testid="stAppViewContainer"] > section > div{{padding:0 !important}}
-[data-testid="stVerticalBlock"]{{gap:0 !important}}
-.stApp [data-testid="stAppViewContainer"] [data-testid="stVerticalBlock"] > div:first-child {{padding:0 !important}}
-/* Streamlit 1.x top padding kill */
-.appview-container .main .block-container{{padding-top:0 !important;padding-bottom:0 !important;padding-left:0 !important;padding-right:0 !important;max-width:100% !important}}
 
-/* ── Page content area 내부 패딩 ── */
-.page-content{{padding:20px 32px}}
-
-/* ── Footer를 화면 하단 고정 ── */
-.stApp [data-testid="stAppViewContainer"]{{min-height:100vh;display:flex;flex-direction:column}}
-.stApp [data-testid="stAppViewContainer"] > section{{flex:1;display:flex;flex-direction:column}}
-.stApp [data-testid="stAppViewContainer"] > section > div{{flex:1;display:flex;flex-direction:column}}
-.ix-footer-wrap{{margin-top:auto}}
-
-/* ── Top Navigation Bar ── */
+/* ── Top Navigation Bar — 음수 마진으로 부모 패딩 돌파 ── */
 .nav-bar{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    border-radius:0;padding:14px 36px;margin:0;width:100%;
+    padding:14px 36px;
+    margin:-0rem -1rem 0 -1rem;
     display:flex;align-items:center;justify-content:space-between;
     border-bottom:1px solid rgba(255,128,0,.15);box-sizing:border-box;
+}}
+
+/* ── Footer — 음수 마진으로 좌우 돌파 + 하단 밀착 ── */
+.ix-footer{{
+    background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
+    margin:40px -1rem 0 -1rem;padding:48px 40px 36px;box-sizing:border-box;
 }}
 .nav-bar .brand{{font-size:1.4rem;font-weight:900;letter-spacing:-1.5px}}
 .nav-bar .brand span{{color:#fff}} .nav-bar .brand b{{color:{P}}}
@@ -250,11 +241,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     box-shadow:0 2px 12px rgba(255,128,0,.2);
 }}
 
-/* ── Footer Banner — interxlab.com ── */
-.ix-footer{{
-    background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    margin:0;padding:48px 40px 36px;width:100%;box-sizing:border-box;
-}}
+/* ── Footer Banner children ── */
 .ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
 .ix-footer .ft-brand span{{color:#fff}} .ix-footer .ft-brand b{{color:{P}}}
 .ix-footer .ft-email{{color:rgba(255,255,255,.4);font-size:.82rem;margin-bottom:24px;font-weight:400}}
@@ -330,7 +317,7 @@ with st.sidebar:
     st.markdown(f'<div style="border-top:1px solid rgba(0,0,0,.06);margin:16px 0 12px"></div>', unsafe_allow_html=True)
     st.markdown(f'<div style="padding:0 12px"><div style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:{S4}"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block"></span> LIVE · v5.9 · 25 Sites · ML v2</div></div>', unsafe_allow_html=True)
 
-# ── Compact Top Bar (full-width) ──
+# ── Compact Top Bar (full-width via negative margin) ──
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
     <div class="meta">
@@ -339,8 +326,7 @@ st.markdown(f"""<div class="nav-bar">
         <div class="meta-item">25 SITES</div>
         <div class="meta-item">ML v2</div>
     </div>
-</div>
-<div class="page-content">""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
                       ("collection_history", []), ("selected_notice_id", None)]:
@@ -1585,8 +1571,7 @@ if page == "💬 AI 챗봇":
 #  FOOTER — interxlab.com 스타일
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# page-content div 닫기 + footer (margin-top:auto로 화면 하단 밀착)
-st.markdown(f"""</div><div class="ix-footer-wrap"><div class="ix-footer">
+st.markdown(f"""<div class="ix-footer">
     <div class="ft-brand"><span>INTER</span><b>X</b></div>
     <div class="ft-email">Email : ixg.innovation.dx_security@interxlab.com</div>
     <hr class="ft-divider">
@@ -1596,4 +1581,4 @@ st.markdown(f"""</div><div class="ix-footer-wrap"><div class="ix-footer">
         <a href="https://interx-gov-intel.streamlit.app" target="_blank">Intelligence Engine</a>
         <a href="https://github.com/KimDoojin2/interx-gov-intelligence" target="_blank">GitHub</a>
     </div>
-</div></div>""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
