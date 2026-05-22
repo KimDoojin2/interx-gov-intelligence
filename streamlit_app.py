@@ -34,7 +34,7 @@ P_BG = "rgba(255,128,0,0.05)"
 A2 = "#3A7BEE"      # --accent2-color (interxlab.com 공식 블루)
 BK = "#000000"      # --primary-color (블랙)
 CH = "#333333"      # --secondary-color
-S8 = "#1A1A1A"      # near-black
+S8 = "#1A1A2E"      # deep navy-black
 S7 = "#444444"
 S5 = "#666666"      # muted text
 S4 = "#999999"
@@ -54,122 +54,203 @@ if "intro_shown" not in st.session_state:
     st.session_state.intro_shown = True
     st.markdown('<style>@keyframes ix-fade{0%{opacity:0;transform:scale(.85) translateY(14px)}15%{opacity:1;transform:scale(1.02)}40%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.97) translateY(-8px)}}@keyframes ix-bg{0%,70%{opacity:1}100%{opacity:0;pointer-events:none;visibility:hidden}}.ix-intro{position:fixed;inset:0;z-index:99999;background:#000;display:flex;align-items:center;justify-content:center;animation:ix-bg 2.4s ease forwards}.ix-intro .logo{animation:ix-fade 2.4s ease forwards;text-align:center}.ix-intro .mark{font-size:3rem;font-weight:900;letter-spacing:-2px;font-family:Inter,system-ui,sans-serif}.ix-intro .mark b{color:#FF8000}.ix-intro .mark span{color:#fff}.ix-intro .sub{color:rgba(255,255,255,.4);font-size:.78rem;letter-spacing:4px;margin-top:10px;font-weight:500}</style><div class="ix-intro"><div class="logo"><div class="mark"><span>INTER</span><b>X</b></div><div class="sub">INTELLIGENCE ENGINE</div></div></div>', unsafe_allow_html=True)
 
-# ── Enterprise CSS ──
+# ── Enterprise CSS v6 — Professional Grade ──
 st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 /* ── Global ── */
-.stApp{{background:{W};font-family:'Inter',system-ui,-apple-system,sans-serif}}
+.stApp{{background:#FAFAFA;font-family:'Inter',system-ui,-apple-system,sans-serif}}
 section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
 
-/* ── Top Navigation Bar — interxlab.com 스타일 ── */
+/* ── Top Navigation Bar ── */
 .nav-bar{{
-    background:{BK};border-radius:0;padding:16px 32px;margin:-1rem -1rem 28px;
+    background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
+    border-radius:0;padding:14px 36px;margin:-1rem -1rem 0;
     display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid rgba(255,128,0,.15);
 }}
-.nav-bar .brand{{font-size:1.3rem;font-weight:900;letter-spacing:-1px}}
+.nav-bar .brand{{font-size:1.4rem;font-weight:900;letter-spacing:-1.5px}}
 .nav-bar .brand span{{color:#fff}} .nav-bar .brand b{{color:{P}}}
-.nav-bar .meta{{color:rgba(255,255,255,.3);font-size:.72rem;font-weight:500;letter-spacing:.8px}}
+.nav-bar .meta{{display:flex;align-items:center;gap:16px}}
+.nav-bar .meta-item{{
+    color:rgba(255,255,255,.35);font-size:.68rem;font-weight:500;letter-spacing:.5px;
+    display:flex;align-items:center;gap:5px;
+}}
+.nav-bar .meta-dot{{width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block}}
 
-/* ── Metric Card — interxlab.com 호버 글로우 ── */
+/* ── Hero Banner ── */
+.hero-banner{{
+    position:relative;margin:0 -1rem 0;overflow:hidden;
+    height:180px;background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 50%,#0D0D0D 100%);
+}}
+.hero-banner img{{
+    width:100%;height:100%;object-fit:cover;object-position:center 60%;
+    opacity:.6;display:block;filter:saturate(.8);
+}}
+.hero-overlay{{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:linear-gradient(180deg,rgba(13,13,13,.3) 0%,rgba(26,26,46,.7) 100%);
+}}
+.hero-overlay .hero-brand{{
+    font-size:2.8rem;font-weight:900;letter-spacing:-2px;
+    font-family:'Inter',system-ui,sans-serif;
+    text-shadow:0 4px 30px rgba(0,0,0,.8);
+}}
+.hero-overlay .hero-brand span{{color:#fff}}
+.hero-overlay .hero-brand b{{color:{P}}}
+.hero-overlay .hero-sub{{
+    color:rgba(255,255,255,.4);font-size:.72rem;letter-spacing:6px;
+    margin-top:6px;font-weight:500;text-shadow:0 2px 12px rgba(0,0,0,.6);
+}}
+
+/* ── Content wrapper spacing ── */
+.content-spacer{{height:28px}}
+
+/* ── Metric Card v6 — Glass morphism ── */
 .m-card{{
-    background:{W};border:1px solid {S2};border-radius:12px;padding:20px 18px;
-    box-shadow:0 1px 2px rgba(0,0,0,.03);position:relative;overflow:hidden;
-    transition:all .3s ease;
+    background:{W};border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:22px 20px;
+    box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.02);
+    position:relative;overflow:hidden;transition:all .35s cubic-bezier(.25,.8,.25,1);
 }}
-.m-card::after{{
+.m-card::before{{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
-    background:{P};transform:scaleX(0);transform-origin:left;transition:transform .3s ease;
+    background:linear-gradient(90deg,{P},#FFB347);transform:scaleX(0);transform-origin:left;
+    transition:transform .35s cubic-bezier(.25,.8,.25,1);
 }}
-.m-card:hover{{border-color:{P};box-shadow:2px 2px 20px rgba(255,128,0,.15);transform:translateY(-2px)}}
-.m-card:hover::after{{transform:scaleX(1)}}
-.m-val{{font-size:1.75rem;font-weight:800;color:{CH};line-height:1.15;letter-spacing:-.5px}}
-.m-label{{font-size:.7rem;color:{S5};margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.8px}}
+.m-card:hover{{
+    border-color:rgba(255,128,0,.2);
+    box-shadow:0 4px 20px rgba(255,128,0,.1),0 1px 3px rgba(0,0,0,.04);
+    transform:translateY(-3px);
+}}
+.m-card:hover::before{{transform:scaleX(1)}}
+.m-val{{font-size:1.85rem;font-weight:800;color:#1A1A2E;line-height:1.1;letter-spacing:-1px}}
+.m-label{{font-size:.65rem;color:{S5};margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px}}
 
-/* ── Section Header ── */
+/* ── Section Header v6 ── */
 .sec-h{{
-    display:flex;align-items:center;gap:10px;margin:28px 0 16px;
+    display:flex;align-items:center;gap:10px;margin:30px 0 16px;
 }}
-.sec-h .dot{{width:4px;height:20px;border-radius:2px;background:{P}}}
-.sec-h .txt{{font-size:.92rem;font-weight:700;color:{CH};letter-spacing:-.2px}}
+.sec-h .dot{{width:3px;height:22px;border-radius:2px;background:linear-gradient(180deg,{P},#FFB347)}}
+.sec-h .txt{{font-size:.9rem;font-weight:700;color:#1A1A2E;letter-spacing:-.3px}}
 
-/* ── Notice Row ── */
+/* ── Notice Row v6 ── */
 .n-row{{
-    background:{W};border:1px solid {S2};border-radius:12px;padding:14px 18px;margin-bottom:8px;
-    border-left:3px solid transparent;transition:all .2s ease;cursor:default;
-    display:flex;align-items:center;gap:14px;
+    background:{W};border:1px solid rgba(0,0,0,.06);border-radius:12px;
+    padding:14px 18px;margin-bottom:6px;
+    border-left:3px solid transparent;transition:all .25s cubic-bezier(.25,.8,.25,1);
+    cursor:default;display:flex;align-items:center;gap:14px;
 }}
-.n-row:hover{{border-left-color:{P};background:{S0};box-shadow:0 2px 8px rgba(0,0,0,.03)}}
+.n-row:hover{{
+    border-left-color:{P};background:#FEFAF6;
+    box-shadow:0 2px 12px rgba(255,128,0,.06);transform:translateX(2px);
+}}
 .n-badge{{
-    min-width:36px;height:28px;display:inline-flex;align-items:center;justify-content:center;
-    border-radius:6px;font-size:.78rem;font-weight:800;color:{W};flex-shrink:0;
+    min-width:34px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:7px;font-size:.72rem;font-weight:800;color:{W};flex-shrink:0;
+    box-shadow:0 1px 3px rgba(0,0,0,.12);
 }}
-.n-title{{font-size:.88rem;font-weight:600;color:{S8};flex:1;line-height:1.35}}
-.n-meta{{font-size:.73rem;color:{S4};font-weight:500}}
+.n-title{{font-size:.85rem;font-weight:600;color:#1A1A2E;flex:1;line-height:1.4}}
+.n-meta{{font-size:.72rem;color:{S4};font-weight:500}}
 
-/* ── Status Pill ── */
-.pill{{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600}}
+/* ── Status Pill v6 ── */
+.pill{{
+    display:inline-flex;align-items:center;gap:4px;
+    padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:600;
+    backdrop-filter:blur(4px);
+}}
 .pill-a{{background:#ECFDF5;color:#065F46}} .pill-b{{background:#EFF6FF;color:#1E40AF}}
 .pill-c{{background:#FFFBEB;color:#92400E}} .pill-d{{background:#FEF2F2;color:#991B1B}}
 .pill-l3{{background:#FDF2F8;color:#9D174D}}
-.pill-urgent{{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}}
+.pill-urgent{{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;animation:pulse-urgent 2s ease infinite}}
+@keyframes pulse-urgent{{0%,100%{{opacity:1}}50%{{opacity:.7}}}}
 
-/* ── Data Table Override ── */
-.stDataFrame{{border-radius:12px;overflow:hidden;border:1px solid {S2}}}
+/* ── Data Table ── */
+.stDataFrame{{border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.06)}}
 .stDataFrame [data-testid="stDataFrameResizable"]{{border-radius:12px}}
 
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"]{{gap:2px;background:{S0};border-radius:12px;padding:4px;border:1px solid {S2}}}
-.stTabs [data-baseweb="tab"]{{color:{S5};border-radius:10px;padding:10px 20px;font-weight:600;font-size:.8rem;transition:all .15s}}
-.stTabs [data-baseweb="tab"]:hover{{color:{P};background:{P_BG}}}
-.stTabs [aria-selected="true"]{{background:{W};color:{P_D};font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.06)}}
-
-/* ── Button — interxlab.com 스타일 ── */
-.stButton>button{{
-    background:{BK};color:{W};font-weight:700;border:none;border-radius:8px;
-    padding:.65rem 2rem;font-size:.85rem;letter-spacing:.3px;transition:all .3s ease;
+/* ── Tabs v6 — Compact Pro ── */
+.stTabs [data-baseweb="tab-list"]{{
+    gap:1px;background:#F0F0F0;border-radius:10px;padding:3px;
+    border:1px solid rgba(0,0,0,.06);
 }}
-.stButton>button:hover{{background:{P};box-shadow:2px 2px 20px rgba(255,128,0,.3);transform:translateY(-1px)}}
+.stTabs [data-baseweb="tab"]{{
+    color:{S5};border-radius:8px;padding:8px 14px;
+    font-weight:600;font-size:.75rem;transition:all .2s;white-space:nowrap;
+}}
+.stTabs [data-baseweb="tab"]:hover{{color:{P};background:rgba(255,128,0,.04)}}
+.stTabs [aria-selected="true"]{{
+    background:{W};color:#1A1A2E;font-weight:700;
+    box-shadow:0 1px 4px rgba(0,0,0,.08);
+}}
+
+/* ── Button v6 ── */
+.stButton>button{{
+    background:linear-gradient(135deg,#1A1A2E,#2D2D44);
+    color:{W};font-weight:700;border:none;border-radius:10px;
+    padding:.65rem 2rem;font-size:.83rem;letter-spacing:.3px;
+    transition:all .35s cubic-bezier(.25,.8,.25,1);
+    box-shadow:0 2px 8px rgba(0,0,0,.12);
+}}
+.stButton>button:hover{{
+    background:linear-gradient(135deg,{P},{P_L});
+    box-shadow:0 4px 20px rgba(255,128,0,.3);transform:translateY(-2px);
+}}
+
+/* ── Form submit (primary) ── */
+.stFormSubmitButton>button{{
+    background:linear-gradient(135deg,{P},{P_L});
+    border:none;font-weight:700;border-radius:10px;
+    box-shadow:0 2px 12px rgba(255,128,0,.2);
+}}
+.stFormSubmitButton>button:hover{{
+    box-shadow:0 4px 24px rgba(255,128,0,.35);transform:translateY(-2px);
+}}
 
 /* ── Progress ── */
 .stProgress>div>div>div>div{{background:linear-gradient(90deg,{P},{P_L});border-radius:4px}}
 
 /* ── Inputs ── */
-.stSelectbox label,.stMultiSelect label,.stSlider label{{font-weight:600;color:{S8};font-size:.82rem}}
+.stSelectbox label,.stMultiSelect label,.stSlider label{{font-weight:600;color:#1A1A2E;font-size:.8rem}}
+.stTextInput>div>div>input{{border-radius:10px;border-color:rgba(0,0,0,.08)}}
+.stTextInput>div>div>input:focus{{border-color:{P};box-shadow:0 0 0 2px rgba(255,128,0,.1)}}
+
+/* ── Expander ── */
+.streamlit-expanderHeader{{font-weight:600;font-size:.83rem;color:#1A1A2E}}
 
 /* ── Empty State ── */
-.empty{{text-align:center;padding:4.5rem 0}}
-.empty .icon{{font-size:2.2rem;margin-bottom:12px;opacity:.6}}
-.empty .heading{{font-size:1rem;font-weight:700;color:{CH};margin-bottom:6px}}
-.empty .desc{{font-size:.85rem;color:{S5};line-height:1.5}}
-.empty .action{{display:inline-block;margin-top:16px;padding:8px 20px;background:{P};color:{W};border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none}}
+.empty{{text-align:center;padding:5rem 0}}
+.empty .icon{{font-size:2.5rem;margin-bottom:14px;opacity:.5}}
+.empty .heading{{font-size:1.05rem;font-weight:700;color:#1A1A2E;margin-bottom:8px}}
+.empty .desc{{font-size:.83rem;color:{S5};line-height:1.6;max-width:440px;margin:0 auto}}
+.empty .action{{
+    display:inline-block;margin-top:20px;padding:10px 24px;
+    background:linear-gradient(135deg,{P},{P_L});color:{W};
+    border-radius:10px;font-size:.82rem;font-weight:700;text-decoration:none;
+    box-shadow:0 2px 12px rgba(255,128,0,.2);
+}}
 
-/* ── Hero Banner ── */
-.hero-banner{{
-    position:relative;margin:-28px -1rem 28px;overflow:hidden;
-    height:220px;background:#000;
+/* ── Footer Banner — interxlab.com ── */
+.ix-footer{{
+    background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
+    margin:60px -1rem -1rem;padding:48px 40px 36px;
+    border-top:1px solid rgba(255,128,0,.1);
 }}
-.hero-banner img{{
-    width:100%;height:100%;object-fit:cover;object-position:center 60%;
-    opacity:.85;display:block;
+.ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
+.ix-footer .ft-brand span{{color:#fff}} .ix-footer .ft-brand b{{color:{P}}}
+.ix-footer .ft-email{{color:rgba(255,255,255,.4);font-size:.82rem;margin-bottom:24px;font-weight:400}}
+.ix-footer .ft-divider{{border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0}}
+.ix-footer .ft-copy{{color:rgba(255,255,255,.2);font-size:.72rem;letter-spacing:.5px}}
+.ix-footer .ft-links{{display:flex;gap:20px;margin-top:12px}}
+.ix-footer .ft-links a{{
+    color:rgba(255,255,255,.3);font-size:.72rem;text-decoration:none;font-weight:500;
+    transition:color .2s;
 }}
-.hero-overlay{{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    background:linear-gradient(180deg,rgba(0,0,0,.25) 0%,rgba(0,0,0,.55) 100%);
-}}
-.hero-overlay .hero-brand{{
-    font-size:3.2rem;font-weight:900;letter-spacing:-2px;
-    font-family:'Inter',system-ui,sans-serif;
-    text-shadow:0 2px 24px rgba(0,0,0,.6);
-}}
-.hero-overlay .hero-brand span{{color:#fff}}
-.hero-overlay .hero-brand b{{color:{P}}}
-.hero-overlay .hero-sub{{
-    color:rgba(255,255,255,.55);font-size:.82rem;letter-spacing:5px;
-    margin-top:8px;font-weight:500;text-shadow:0 1px 8px rgba(0,0,0,.5);
-}}
+.ix-footer .ft-links a:hover{{color:{P}}}
+
+/* ── Chat ── */
+.stChatMessage{{border-radius:12px}}
 </style>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -220,7 +301,12 @@ HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence
 
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
-    <div class="meta">INTELLIGENCE ENGINE &nbsp;·&nbsp; v5.9 &nbsp;·&nbsp; 25 SITES &nbsp;·&nbsp; ML v2 ENGINE</div>
+    <div class="meta">
+        <div class="meta-item"><span class="meta-dot"></span> LIVE</div>
+        <div class="meta-item">v5.9</div>
+        <div class="meta-item">25 SITES</div>
+        <div class="meta-item">ML v2</div>
+    </div>
 </div>
 <div class="hero-banner">
     <img src="{HERO_IMG}" alt="InterX Hero">
@@ -228,7 +314,8 @@ st.markdown(f"""<div class="nav-bar">
         <div class="hero-brand"><span>INTER</span><b>X</b></div>
         <div class="hero-sub">GOVERNMENT INTELLIGENCE ENGINE</div>
     </div>
-</div>""", unsafe_allow_html=True)
+</div>
+<div class="content-spacer"></div>""", unsafe_allow_html=True)
 
 tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
 tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history, tab_news, tab_ai_chat = st.tabs([
@@ -1473,3 +1560,20 @@ with tab_ai_chat:
         if st.button("🗑️ 대화 초기화", key="clear_chat"):
             st.session_state.ai_chat_history = []
             st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  FOOTER — interxlab.com 스타일
+# ═══════════════════════════════════════════════════════════════════════════════
+
+st.markdown(f"""<div class="ix-footer">
+    <div class="ft-brand"><span>INTER</span><b>X</b></div>
+    <div class="ft-email">Email : ixg.innovation.dx_security@interxlab.com</div>
+    <hr class="ft-divider">
+    <div class="ft-copy">Copyright &copy; INTERX All rights reserved</div>
+    <div class="ft-links">
+        <a href="https://interxlab.com" target="_blank">interxlab.com</a>
+        <a href="https://interx-gov-intel.streamlit.app" target="_blank">Intelligence Engine</a>
+        <a href="https://github.com/KimDoojin2/interx-gov-intelligence" target="_blank">GitHub</a>
+    </div>
+</div>""", unsafe_allow_html=True)
