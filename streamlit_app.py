@@ -47,7 +47,7 @@ GA = "#059669"; GB = "#2563EB"; GC = "#D97706"; GD = "#DC2626"
 GRADE = {"A": GA, "B": GB, "C": GC, "D": GD}
 
 # ── Page Config ──
-st.set_page_config(page_title="InterX Intelligence", page_icon="🔶", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="InterX Intelligence", page_icon="🔶", layout="wide", initial_sidebar_state="expanded")
 
 # ── Intro (CSS only — Streamlit은 <script> 미실행) ──
 if "intro_shown" not in st.session_state:
@@ -60,8 +60,39 @@ st.markdown(f"""<style>
 
 /* ── Global ── */
 .stApp{{background:#FAFAFA;font-family:'Inter',system-ui,-apple-system,sans-serif}}
-section[data-testid="stSidebar"]{{display:none}}
 #MainMenu,footer,header{{visibility:hidden}}
+
+/* ── Sidebar Dark Theme ── */
+section[data-testid="stSidebar"]{{
+    background:linear-gradient(180deg,#0D0D0D 0%,#1A1A2E 100%);
+    min-width:240px;max-width:240px;
+}}
+section[data-testid="stSidebar"] .stRadio label{{
+    color:rgba(255,255,255,.75) !important;font-weight:600;font-size:.82rem;
+}}
+section[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"]{{
+    color:rgba(255,255,255,.75) !important;
+}}
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label{{
+    padding:10px 16px !important;border-radius:8px !important;margin:1px 0;
+    transition:all .2s;
+}}
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover{{
+    background:rgba(255,128,0,.08) !important;
+}}
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[data-checked="true"],
+section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:has(input:checked){{
+    background:rgba(255,128,0,.12) !important;
+    border-left:3px solid {P} !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{{
+    color:rgba(255,255,255,.5) !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2,
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
+    color:#fff !important;
+}}
 
 /* ── Top Navigation Bar ── */
 .nav-bar{{
@@ -79,31 +110,7 @@ section[data-testid="stSidebar"]{{display:none}}
 }}
 .nav-bar .meta-dot{{width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block}}
 
-/* ── Hero Banner ── */
-.hero-banner{{
-    position:relative;margin:0 -1rem 0;overflow:hidden;
-    height:180px;background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 50%,#0D0D0D 100%);
-}}
-.hero-banner img{{
-    width:100%;height:100%;object-fit:cover;object-position:center 60%;
-    opacity:.6;display:block;filter:saturate(.8);
-}}
-.hero-overlay{{
-    position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    background:linear-gradient(180deg,rgba(13,13,13,.3) 0%,rgba(26,26,46,.7) 100%);
-}}
-.hero-overlay .hero-brand{{
-    font-size:2.8rem;font-weight:900;letter-spacing:-2px;
-    font-family:'Inter',system-ui,sans-serif;
-    text-shadow:0 4px 30px rgba(0,0,0,.8);
-}}
-.hero-overlay .hero-brand span{{color:#fff}}
-.hero-overlay .hero-brand b{{color:{P}}}
-.hero-overlay .hero-sub{{
-    color:rgba(255,255,255,.4);font-size:.72rem;letter-spacing:6px;
-    margin-top:6px;font-weight:500;text-shadow:0 2px 12px rgba(0,0,0,.6);
-}}
+/* ── Hero Banner (removed — sidebar branding) ── */
 
 /* ── Content wrapper spacing ── */
 .content-spacer{{height:28px}}
@@ -170,20 +177,7 @@ section[data-testid="stSidebar"]{{display:none}}
 .stDataFrame{{border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.06)}}
 .stDataFrame [data-testid="stDataFrameResizable"]{{border-radius:12px}}
 
-/* ── Tabs v6 — Compact Pro ── */
-.stTabs [data-baseweb="tab-list"]{{
-    gap:1px;background:#F0F0F0;border-radius:10px;padding:3px;
-    border:1px solid rgba(0,0,0,.06);
-}}
-.stTabs [data-baseweb="tab"]{{
-    color:{S5};border-radius:8px;padding:8px 14px;
-    font-weight:600;font-size:.75rem;transition:all .2s;white-space:nowrap;
-}}
-.stTabs [data-baseweb="tab"]:hover{{color:{P};background:rgba(255,128,0,.04)}}
-.stTabs [aria-selected="true"]{{
-    background:{W};color:#1A1A2E;font-weight:700;
-    box-shadow:0 1px 4px rgba(0,0,0,.08);
-}}
+/* ── Tabs (hidden — using sidebar nav) ── */
 
 /* ── Button v6 ── */
 .stButton>button{{
@@ -297,8 +291,22 @@ def _layout(**kw):
 #  Navigation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-HERO_IMG = "https://raw.githubusercontent.com/KimDoojin2/interx-gov-intelligence/master/assets/hero_earth.png"
+# ── Sidebar Navigation ──
+with st.sidebar:
+    st.markdown(f'<div style="padding:18px 12px 10px;text-align:center"><div style="font-size:1.5rem;font-weight:900;letter-spacing:-1.5px"><span style="color:#fff">INTER</span><span style="color:{P}">X</span></div><div style="color:rgba(255,255,255,.3);font-size:.62rem;letter-spacing:4px;margin-top:4px">INTELLIGENCE ENGINE</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="border-top:1px solid rgba(255,255,255,.06);margin:8px 0 12px"></div>', unsafe_allow_html=True)
 
+    NAV_ITEMS = [
+        "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
+        "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자",
+        "🕐 히스토리", "🤖 AI 뉴스", "💬 AI 챗봇",
+    ]
+    page = st.radio("메뉴", NAV_ITEMS, label_visibility="collapsed", key="nav_page")
+
+    st.markdown(f'<div style="border-top:1px solid rgba(255,255,255,.06);margin:16px 0 12px"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="padding:0 12px"><div style="display:flex;align-items:center;gap:6px;font-size:.68rem;color:rgba(255,255,255,.25)"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block"></span> LIVE · v5.9 · 25 Sites · ML v2</div></div>', unsafe_allow_html=True)
+
+# ── Compact Top Bar ──
 st.markdown(f"""<div class="nav-bar">
     <div><div class="brand"><span>INTER</span><b>X</b></div></div>
     <div class="meta">
@@ -308,20 +316,7 @@ st.markdown(f"""<div class="nav-bar">
         <div class="meta-item">ML v2</div>
     </div>
 </div>
-<div class="hero-banner">
-    <img src="{HERO_IMG}" alt="InterX Hero">
-    <div class="hero-overlay">
-        <div class="hero-brand"><span>INTER</span><b>X</b></div>
-        <div class="hero-sub">GOVERNMENT INTELLIGENCE ENGINE</div>
-    </div>
-</div>
-<div class="content-spacer"></div>""", unsafe_allow_html=True)
-
-tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
-tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history, tab_news, tab_ai_chat = st.tabs([
-    "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
-    "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자", "🕐 히스토리", "🤖 AI 뉴스", "💬 AI 챗봇",
-])
+<div style="height:16px"></div>""", unsafe_allow_html=True)
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
                       ("collection_history", []), ("selected_notice_id", None)]:
@@ -332,10 +327,10 @@ ALL_SITES = ["bizinfo","kiat","nipa","innopolis","bipa","uipa","gicon","ttp","gj
              "seoultp","gdtp","gwtp","sjtp","cbtp","ctp","btp","utp","gntp","ptp"]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 1 · Dashboard
+#  PAGE · Dashboard
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_dash:
+if page == "📊 대시보드":
     result = _result()
     if not result:
         st.markdown(_empty("📡", "데이터를 수집해주세요",
@@ -551,10 +546,10 @@ with tab_dash:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 2 · Pipeline Runner
+#  PAGE · Pipeline Runner
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_run:
+if page == "⚡ 수집 실행":
     # ── 실행 중이면 설정 폼 숨기고 상태만 표시 ──
     if not st.session_state.pipeline_running:
         st.markdown(_section("수집 설정"), unsafe_allow_html=True)
@@ -648,10 +643,10 @@ with tab_run:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 3 · Notice List + Detail
+#  PAGE · Notice List + Detail
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_notices:
+if page == "📋 공고 목록":
     result = _result()
     if not result:
         st.markdown(_empty("📋", "공고 데이터 없음", "수집 실행 후 이 탭에서 공고를 조회할 수 있습니다."), unsafe_allow_html=True)
@@ -832,10 +827,10 @@ with tab_notices:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 4 · Proposals
+#  PAGE · Proposals
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_proposal:
+if page == "📝 제안서":
     result = _result()
     if not result:
         st.markdown(_empty("📝", "제안서 데이터 없음", "수집 실행 시 A/B등급 공고에 대해 제안서가 자동 생성됩니다."), unsafe_allow_html=True)
@@ -857,10 +852,10 @@ with tab_proposal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 5 · Competitor Analysis
+#  PAGE · Competitor Analysis
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_compete:
+if page == "🏢 경쟁사":
     result = _result()
     if not result:
         st.markdown(_empty("🏢", "경쟁사 분석 데이터 없음", "수집 실행 후 경쟁사 관련 공고를 자동으로 분석합니다."), unsafe_allow_html=True)
@@ -896,10 +891,10 @@ with tab_compete:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 6 · Win Prediction
+#  PAGE · Win Prediction
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_predict:
+if page == "🎯 수주 예측":
     result = _result()
     if not result:
         st.markdown(_empty("🎯", "수주 예측 데이터 없음", "수집 실행 후 공고별 수주 확률을 예측합니다."), unsafe_allow_html=True)
@@ -1024,10 +1019,10 @@ with tab_predict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 7 · Deadline Calendar
+#  PAGE · Deadline Calendar
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_calendar:
+if page == "📅 마감 캘린더":
     result = _result()
     if not result:
         st.markdown(_empty("📅", "마감 캘린더 데이터 없음", "수집 실행 후 마감일 관리를 할 수 있습니다."), unsafe_allow_html=True)
@@ -1069,10 +1064,10 @@ with tab_calendar:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 8 · Solution Matching
+#  PAGE · Solution Matching
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_solution:
+if page == "🔧 솔루션":
     result = _result()
     if not result:
         st.markdown(_empty("🔧", "솔루션 분석 데이터 없음", "수집 실행 후 8개 솔루션별 매칭 분석을 제공합니다."), unsafe_allow_html=True)
@@ -1119,10 +1114,10 @@ with tab_solution:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 9 · Keyword Trends
+#  PAGE · Keyword Trends
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_keyword:
+if page == "📈 키워드":
     result = _result()
     if not result:
         st.markdown(_empty("📈", "키워드 데이터 없음", "수집 실행 후 시장 키워드 트렌드를 분석합니다."), unsafe_allow_html=True)
@@ -1174,10 +1169,10 @@ with tab_keyword:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 10 · Manager Overview
+#  PAGE · Manager Overview
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_manager:
+if page == "👤 담당자":
     result = _result()
     if not result:
         st.markdown(_empty("👤","담당자 현황 없음","수집 실행 후 담당자별 공고 배분을 확인할 수 있습니다."), unsafe_allow_html=True)
@@ -1211,10 +1206,10 @@ with tab_manager:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 11 · Collection History
+#  PAGE · Collection History
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_history:
+if page == "🕐 히스토리":
     history = st.session_state.get("collection_history",[])
     if not history:
         st.markdown(_empty("🕐","수집 히스토리 없음","수집을 실행하면 결과가 여기에 기록됩니다."), unsafe_allow_html=True)
@@ -1279,10 +1274,10 @@ with tab_history:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 12 · AI News & Trends
+#  PAGE · AI News & Trends
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_news:
+if page == "🤖 AI 뉴스":
     import xml.etree.ElementTree as ET
     import requests as _req
     from html import unescape as _unescape
@@ -1461,10 +1456,10 @@ with tab_news:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  TAB 13 · AI Chatbot (RAG)
+#  PAGE · AI Chatbot (RAG)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab_ai_chat:
+if page == "💬 AI 챗봇":
     st.markdown(_section("💬 AI 공고 분석 챗봇"), unsafe_allow_html=True)
     st.markdown(f'<p style="font-size:.8rem;color:{S4}">수집된 공고 데이터 기반 자연어 질의응답 · Gemini 무료 API · GEMINI_API_KEY 설정 필요</p>', unsafe_allow_html=True)
 
