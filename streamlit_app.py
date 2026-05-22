@@ -94,22 +94,37 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
     color:{S8} !important;
 }}
 
-/* ── Main content flush — 상하좌우 빈공간 완전 제거 ── */
-.stMainBlockContainer,
-[data-testid="stAppViewBlockContainer"],
-.block-container,
-[data-testid="stMainBlockContainer"]{{
-    padding:0 !important;max-width:100% !important;
-}}
+/* ── Full-bleed: 모든 Streamlit 내부 패딩 제거 ── */
 .stApp > header{{display:none !important}}
+.stMainBlockContainer,
+[data-testid="stMainBlockContainer"],
+[data-testid="stAppViewBlockContainer"],
+.block-container{{
+    padding:0 !important;max-width:100% !important;width:100% !important;
+}}
+[data-testid="stAppViewContainer"]{{padding:0 !important}}
+[data-testid="stAppViewContainer"] > section{{padding:0 !important}}
 [data-testid="stAppViewContainer"] > section > div{{padding:0 !important}}
+[data-testid="stVerticalBlock"]{{gap:0 !important}}
+.stApp [data-testid="stAppViewContainer"] [data-testid="stVerticalBlock"] > div:first-child {{padding:0 !important}}
+/* Streamlit 1.x top padding kill */
+.appview-container .main .block-container{{padding-top:0 !important;padding-bottom:0 !important;padding-left:0 !important;padding-right:0 !important;max-width:100% !important}}
+
+/* ── Page content area 내부 패딩 ── */
+.page-content{{padding:20px 32px}}
+
+/* ── Footer를 화면 하단 고정 ── */
+.stApp [data-testid="stAppViewContainer"]{{min-height:100vh;display:flex;flex-direction:column}}
+.stApp [data-testid="stAppViewContainer"] > section{{flex:1;display:flex;flex-direction:column}}
+.stApp [data-testid="stAppViewContainer"] > section > div{{flex:1;display:flex;flex-direction:column}}
+.ix-footer-wrap{{margin-top:auto}}
 
 /* ── Top Navigation Bar ── */
 .nav-bar{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
     border-radius:0;padding:14px 36px;margin:0;width:100%;
     display:flex;align-items:center;justify-content:space-between;
-    border-bottom:1px solid rgba(255,128,0,.15);
+    border-bottom:1px solid rgba(255,128,0,.15);box-sizing:border-box;
 }}
 .nav-bar .brand{{font-size:1.4rem;font-weight:900;letter-spacing:-1.5px}}
 .nav-bar .brand span{{color:#fff}} .nav-bar .brand b{{color:{P}}}
@@ -238,8 +253,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
 /* ── Footer Banner — interxlab.com ── */
 .ix-footer{{
     background:linear-gradient(135deg,#0D0D0D 0%,#1A1A2E 100%);
-    margin:40px 0 0 0;padding:48px 40px 36px;width:100%;
-    border-top:none;
+    margin:0;padding:48px 40px 36px;width:100%;box-sizing:border-box;
 }}
 .ix-footer .ft-brand{{font-size:1.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:20px}}
 .ix-footer .ft-brand span{{color:#fff}} .ix-footer .ft-brand b{{color:{P}}}
@@ -326,8 +340,7 @@ st.markdown(f"""<div class="nav-bar">
         <div class="meta-item">ML v2</div>
     </div>
 </div>
-<div style="height:16px"></div>
-<style>.stMainBlockContainer > div > div > div {{padding-left:24px !important;padding-right:24px !important}}</style>""", unsafe_allow_html=True)
+<div class="page-content">""", unsafe_allow_html=True)
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
                       ("collection_history", []), ("selected_notice_id", None)]:
@@ -1572,7 +1585,8 @@ if page == "💬 AI 챗봇":
 #  FOOTER — interxlab.com 스타일
 # ═══════════════════════════════════════════════════════════════════════════════
 
-st.markdown(f"""<div class="ix-footer">
+# page-content div 닫기 + footer (margin-top:auto로 화면 하단 밀착)
+st.markdown(f"""</div><div class="ix-footer-wrap"><div class="ix-footer">
     <div class="ft-brand"><span>INTER</span><b>X</b></div>
     <div class="ft-email">Email : ixg.innovation.dx_security@interxlab.com</div>
     <hr class="ft-divider">
@@ -1582,4 +1596,4 @@ st.markdown(f"""<div class="ix-footer">
         <a href="https://interx-gov-intel.streamlit.app" target="_blank">Intelligence Engine</a>
         <a href="https://github.com/KimDoojin2/interx-gov-intelligence" target="_blank">GitHub</a>
     </div>
-</div>""", unsafe_allow_html=True)
+</div></div>""", unsafe_allow_html=True)
