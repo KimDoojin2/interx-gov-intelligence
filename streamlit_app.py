@@ -231,9 +231,9 @@ st.markdown(f"""<div class="nav-bar">
 </div>""", unsafe_allow_html=True)
 
 tab_dash, tab_run, tab_notices, tab_proposal, tab_compete, \
-tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history, tab_news = st.tabs([
+tab_predict, tab_calendar, tab_solution, tab_keyword, tab_manager, tab_history, tab_news, tab_ai_chat = st.tabs([
     "📊 대시보드", "⚡ 수집 실행", "📋 공고 목록", "📝 제안서", "🏢 경쟁사",
-    "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자", "🕐 히스토리", "🤖 AI 뉴스",
+    "🎯 수주 예측", "📅 마감 캘린더", "🔧 솔루션", "📈 키워드", "👤 담당자", "🕐 히스토리", "🤖 AI 뉴스", "💬 AI 챗봇",
 ])
 
 for key, default in [("pipeline_result", None), ("pipeline_running", False),
@@ -696,6 +696,34 @@ with tab_notices:
                             st.caption("📄 전체 본문")
                             st.text(body[:5000])
                             if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
+
+                # ── AI 분석 ──
+                _ai_key = f"ai_analysis_{sn.notice_id}"
+                if st.button("💡 AI 분석", key=_ai_key, help="Gemini AI로 공고 적합도 분석 및 제안 전략 생성"):
+                    with st.spinner("AI 분석 중..."):
+                        try:
+                            from interx_engine.infrastructure.ai.notice_analyzer import analyze_notice
+                            _ai_result = analyze_notice(
+                                title=sn.title,
+                                body_text=body,
+                                summary=_sn_summary,
+                                structured=_sn_struct,
+                                matched_keywords=", ".join(ssc.positive_keywords[:8]) if ssc and ssc.positive_keywords else "",
+                                grade=grade,
+                                score=ssc.fitness_score if ssc else 0,
+                                budget=sn.budget or "",
+                                solution_scores=ssc.solution_scores if ssc else None,
+                            )
+                            st.markdown(f"""<div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:12px;padding:16px 20px;margin:10px 0">
+                                <div style="font-size:.85rem;font-weight:700;color:#0369a1;margin-bottom:8px">💡 AI 분석 결과</div>
+                                <div style="font-size:.82rem;color:#1e3a5f;margin-bottom:6px"><b>적합도:</b> {_ai_result.get('fit_reason','')}</div>
+                                <div style="font-size:.82rem;color:#1e3a5f;margin-bottom:6px"><b>제안 전략:</b> {_ai_result.get('proposal_strategy','')}</div>
+                                <div style="font-size:.82rem;color:#1e3a5f;margin-bottom:6px"><b>솔루션 매핑:</b> {_ai_result.get('solution_mapping','')}</div>
+                                <div style="font-size:.82rem;color:#1e3a5f;margin-bottom:6px"><b>핵심 요구:</b> {_ai_result.get('key_requirements','')}</div>
+                                <div style="font-size:.78rem;color:#b45309"><b>리스크:</b> {_ai_result.get('risk_factors','')}</div>
+                            </div>""", unsafe_allow_html=True)
+                        except Exception as _ai_err:
+                            st.error(f"AI 분석 실패: {_ai_err}")
 
                 # ── 원문 바로가기 ──
                 _sn_link = getattr(sn, "detail_url", "") or ""
@@ -1335,3 +1363,105 @@ with tab_news:
                      "컴퓨터비전", "AI반도체", "엣지AI", "DTaaS", "로보틱스"]
     _kw_html = " ".join(f'<span style="background:{S0};color:{CH};padding:5px 14px;border-radius:20px;font-size:.8rem;font-weight:600;display:inline-block;margin:3px">{k}</span>' for k in _ai_keywords)
     st.markdown(f'<div style="line-height:2.2">{_kw_html}</div>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  TAB 13 · AI Chatbot (RAG)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab_ai_chat:
+    st.markdown(_section("💬 AI 공고 분석 챗봇"), unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:.8rem;color:{S4}">수집된 공고 데이터 기반 자연어 질의응답 · Gemini 무료 API · GEMINI_API_KEY 설정 필요</p>', unsafe_allow_html=True)
+
+    # Gemini API 상태 표시
+    try:
+        from interx_engine.infrastructure.ai.gemini_client import is_available as _ai_available
+        _has_ai = _ai_available()
+    except Exception:
+        _has_ai = False
+
+    if _has_ai:
+        st.markdown(f'<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:8px 14px;font-size:.8rem;color:#065f46;margin-bottom:12px">✅ Gemini AI 연결됨 — 자연어 질문이 가능합니다</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 14px;font-size:.8rem;color:#92400e;margin-bottom:12px">⚠️ GEMINI_API_KEY 미설정 — 규칙 기반 검색만 가능합니다. <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#d97706;font-weight:700">무료 발급 →</a></div>', unsafe_allow_html=True)
+
+    # 채팅 히스토리
+    if "ai_chat_history" not in st.session_state:
+        st.session_state.ai_chat_history = []
+
+    # 예시 질문
+    st.markdown(f'<div style="font-size:.78rem;color:{S5};margin-bottom:8px">💡 예시 질문:</div>', unsafe_allow_html=True)
+    _example_qs = ["A등급 공고 중 스마트공장 관련은?", "마감 7일 이내 공고 요약해줘", "이번에 수집된 L3 강공고는?", "디지털트윈 관련 공고 추천해줘"]
+    _eq_cols = st.columns(len(_example_qs))
+    for _eqi, _eq in enumerate(_example_qs):
+        if _eq_cols[_eqi].button(_eq, key=f"eq_{_eqi}", use_container_width=True):
+            st.session_state.ai_chat_input = _eq
+
+    # 채팅 표시
+    for _msg in st.session_state.ai_chat_history:
+        with st.chat_message(_msg["role"]):
+            st.markdown(_msg["content"])
+
+    # 입력
+    _default_input = st.session_state.pop("ai_chat_input", "")
+    _user_q = st.chat_input("공고에 대해 무엇이든 질문하세요...", key="ai_chat_box")
+    if _default_input and not _user_q:
+        _user_q = _default_input
+
+    if _user_q:
+        # 사용자 메시지 표시
+        st.session_state.ai_chat_history.append({"role": "user", "content": _user_q})
+        with st.chat_message("user"):
+            st.markdown(_user_q)
+
+        # AI 답변
+        with st.chat_message("assistant"):
+            with st.spinner("분석 중..."):
+                try:
+                    result = _result()
+                    _all_notices = result.get("notices", []) if result else []
+                    _all_scores = result.get("score_cards", []) if result else []
+                    _sc_map = {s.notice_id: s for s in _all_scores}
+
+                    from interx_engine.infrastructure.ai.chatbot import answer_question
+                    _answer = answer_question(
+                        question=_user_q,
+                        notices=_all_notices,
+                        score_map=_sc_map,
+                        chat_history=st.session_state.ai_chat_history[:-1],  # 현재 질문 제외
+                    )
+                    st.markdown(_answer)
+                    st.session_state.ai_chat_history.append({"role": "assistant", "content": _answer})
+                except Exception as _chat_err:
+                    _err_msg = f"답변 생성 실패: {_chat_err}"
+                    st.error(_err_msg)
+                    st.session_state.ai_chat_history.append({"role": "assistant", "content": _err_msg})
+
+    # 일일 브리핑 버튼
+    st.markdown("---")
+    st.markdown(f'<div style="font-size:.9rem;font-weight:700;color:{S8};margin:8px 0">📋 일일 브리핑 자동 생성</div>', unsafe_allow_html=True)
+    if st.button("📋 오늘의 브리핑 생성", key="gen_briefing"):
+        with st.spinner("브리핑 생성 중..."):
+            try:
+                result = _result()
+                _all_notices = result.get("notices", []) if result else []
+                _all_scores = result.get("score_cards", []) if result else []
+                _sc_map = {s.notice_id: s for s in _all_scores}
+                _exec_id = result.get("execution_id", "") if result else ""
+
+                from interx_engine.infrastructure.ai.briefing_generator import generate_briefing
+                _briefing = generate_briefing(
+                    notices=_all_notices,
+                    score_map=_sc_map,
+                    execution_id=_exec_id,
+                )
+                st.markdown(f'<div style="background:{S0};border:1px solid {S2};border-radius:12px;padding:16px 20px;font-size:.85rem;color:{CH};white-space:pre-wrap;line-height:1.7">{_briefing}</div>', unsafe_allow_html=True)
+                st.download_button("📥 브리핑 텍스트 다운로드", _briefing, "interx_briefing.txt", "text/plain")
+            except Exception as _br_err:
+                st.error(f"브리핑 생성 실패: {_br_err}")
+
+    # 히스토리 초기화
+    if st.session_state.ai_chat_history:
+        if st.button("🗑️ 대화 초기화", key="clear_chat"):
+            st.session_state.ai_chat_history = []
+            st.rerun()

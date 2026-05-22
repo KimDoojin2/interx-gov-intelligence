@@ -338,6 +338,23 @@ class DailyPipelineOrchestrator:
         except Exception as e:
             log.warning("[Pipeline] 자동분석 실패 (무시): %s", e)
 
+        # ── 18. AI 일일 브리핑 생성 (Gemini 무료) ────────────────────────────
+        try:
+            from interx_engine.infrastructure.ai.briefing_generator import generate_briefing
+            sc_map = {s.notice_id: s for s in score_cards}
+            briefing_text = generate_briefing(
+                notices=notices,
+                score_map=sc_map,
+                execution_id=execution_id,
+                new_count=result.get("new_count", 0),
+                changed_count=result.get("changed_count", 0),
+            )
+            if briefing_text:
+                result["ai_briefing"] = briefing_text
+                log.info("[Pipeline] AI 브리핑 생성 완료 (%d자)", len(briefing_text))
+        except Exception as e:
+            log.warning("[Pipeline] AI 브리핑 생성 실패 (무시): %s", e)
+
         return result
 
     # ─────────────────────────────────────────────────────────────────────────

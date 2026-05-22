@@ -36,6 +36,15 @@
 
 **🏗️ 프로덕션 Ready + ML 엔진 v2 + OCR 완료**
 
+**AI Agent 4기능 (Gemini 무료 API):**
+- 공고 분석 에이전트: "이 공고가 InterX에 왜 맞는지" 1문장 + 제안 전략 자동 생성
+- 질의응답 챗봇: "A등급 스마트공장 관련은?" 자연어 질문 → 수집 데이터 기반 RAG 답변
+- 일일 브리핑 자동 생성: 등급별/긴급/L3/정기공고 요약 → Slack/Telegram 전달
+- 제안서 초안 LLM 강화: 공고 요구사항 → InterX 솔루션 매핑 → 전략 자동 작성
+- Streamlit 대시보드: 공고 상세에 💡 AI 분석 버튼 + 💬 AI 챗봇 탭 (13번째)
+- API 키 없어도 규칙 기반 fallback 동작 (무료 발급: aistudio.google.com/apikey)
+- 파이프라인 Step 18: 실행 완료 시 AI 브리핑 자동 생성
+
 **엔진 최적화 — 개발팀 즉시 연동 가능:**
 - `pyproject.toml`: 표준 Python 패키지 (`pip install -e ".[dev]"`)
 - `Dockerfile` + `docker-compose.yml`: 원커맨드 빌드/실행
@@ -219,7 +228,7 @@
 | 항목 | 수치 |
 |------|------|
 | 수집 사이트 | 27개 활성 (requests 22개, Playwright 5개) |
-| 파이프라인 단계 | 17단계 |
+| 파이프라인 단계 | 18단계 (AI 브리핑 포함) |
 | 유즈케이스 | 25개 (스코어링, 중복제거, 경쟁사, 제안서, ML예측 등) |
 | 정기공고 패턴 | 18그룹, 120+ aliases (priority 1/2/3 등급) |
 | 콤보 키워드 | 38쌍 (두 키워드 동시 출현 시 가점) |
@@ -232,7 +241,8 @@
 | 웹 플랫폼 | FastAPI + Tailwind (4페이지 + 6 API) |
 | REST API | FastAPI 7 엔드포인트 (Swagger UI 자동 생성) |
 | 팀 배포 앱 | Streamlit Cloud (11개 탭, 무료 호스팅) |
-| 단위 테스트 | 201 passed (unit 143 + integration 58) |
+| AI Agent | Gemini 무료 (공고분석 + 챗봇 + 브리핑 + 제안서) |
+| 단위 테스트 | 215 passed (unit 157 + integration 58) |
 | CI/CD | GitHub Actions (자동 lint + test on push) |
 | 패키징 | pyproject.toml + Docker + docker-compose |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
