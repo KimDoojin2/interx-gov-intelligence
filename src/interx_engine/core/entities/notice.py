@@ -44,6 +44,7 @@ class Notice:
     bd_milestone: str = ""               # BD 마일스톤 코드 (M01~M18 / P01~P10)
     recurring_flag: str = "N"           # 정기공고 여부 (Y/N)
     recurring_group: str = ""           # 정기공고 그룹명 (e.g. 스마트공장구축, AI바우처)
+    apply_status: str = ""             # 접수상태 (접수중/접수예정/마감)
 
     @property
     def notice_key(self) -> str:

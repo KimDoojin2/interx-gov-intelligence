@@ -103,7 +103,7 @@ class TestNoticeToMasterRow:
 
     def test_exactly_25_keys(self):
         row = notice_to_master_row(_notice(), _score())
-        assert len(row) == 27, f"마스터 행은 27개 컬럼이어야 함. 현재: {len(row)}"
+        assert len(row) == 28, f"마스터 행은 28개 컬럼이어야 함. 현재: {len(row)}"
 
     def test_score_fills_grade_and_fitness(self):
         sc  = _score(priority_grade="A", fitness_score=91.0)

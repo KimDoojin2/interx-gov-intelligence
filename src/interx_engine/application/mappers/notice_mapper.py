@@ -75,6 +75,7 @@ def notice_to_master_row(notice: Notice, score: Optional[ScoreCard] = None) -> d
         "상세URL":      notice.detail_url,
         "정기공고여부":  getattr(notice, "recurring_flag",  "N"),
         "정기공고그룹":  getattr(notice, "recurring_group", ""),
+        "접수상태":     notice.apply_status or "",
     }
 
 

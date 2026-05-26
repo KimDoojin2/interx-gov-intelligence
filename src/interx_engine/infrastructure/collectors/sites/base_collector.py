@@ -489,8 +489,8 @@ class BaseCollector(NoticeCollectorPort, ABC):
                 # P4: 접수상태 자동 분류
                 source_text = data.get("body_text", "") or notice.body_text or ""
                 apply_status = classify_apply_status(source_text, notice.deadline_date)
-                if apply_status and hasattr(notice, '__dict__'):
-                    notice.__dict__['apply_status'] = apply_status
+                if apply_status:
+                    notice.apply_status = apply_status
 
                 # OCR: body_text가 짧고 첨부파일이 있으면 PDF/HWP 텍스트 보강
                 if len(notice.body_text or "") < 200 and notice.attachment_items:

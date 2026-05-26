@@ -25,7 +25,7 @@ from interx_engine.application.use_cases.site_quality_grader import grade_site_q
 from interx_engine.application.use_cases.log_status_change import (
     detect_status_changes, load_snapshot, save_snapshot,
 )
-from interx_engine.application.use_cases.generate_proposal import generate_proposals
+from interx_engine.application.use_cases.generate_proposal_v2 import generate_proposals_v2
 from interx_engine.application.mappers.notice_mapper import (
     notice_to_master_row, notice_to_urgent_row, _calc_dday,
 )
@@ -250,7 +250,7 @@ class DailyPipelineOrchestrator:
 
         # ── 11-E. 제안서 초안 자동 생성 (A/B 등급) ───────────────────────────
         try:
-            proposal_files = generate_proposals(notices, score_cards)
+            proposal_files = generate_proposals_v2(notices, score_cards)
         except Exception as e:
             log.warning("[Pipeline] 제안서 생성 실패 (무시): %s", e)
             proposal_files = []

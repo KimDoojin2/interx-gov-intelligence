@@ -54,7 +54,7 @@ def build_notice_payload(notice, score_card=None) -> Dict[str, Any]:
         "detail_url": getattr(n, "detail_url", "") or getattr(n, "notice_link", ""),
         "body_text": (getattr(n, "body_text", "") or "")[:8000],
         "summary": getattr(n, "summary", ""),
-        "apply_status": getattr(n, "__dict__", {}).get("apply_status", ""),
+        "apply_status": getattr(n, "apply_status", ""),
     }
 
     if sc:
