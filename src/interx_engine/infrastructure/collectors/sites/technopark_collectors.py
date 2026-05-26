@@ -218,10 +218,11 @@ class ItpCollector(_TechnoBaseCollector):
 
 
 class GwtpCollector(_TechnoBaseCollector):
-    """강원테크노파크 — gwtp.or.kr (HTTP only — HTTPS 404)"""
+    """강원테크노파크 — gwtp.or.kr (HTTP only — detail 페이지 404 반환하므로 enrich 비활성)"""
     site_key = "gwtp"
     agency   = "강원테크노파크"
     ministry = "강원특별자치도"
+    fetch_detail = False   # 상세 페이지 URL 전부 404 반환 (2025-05 확인)
     BASE_URL = "http://www.gwtp.or.kr"
     LIST_URL = "http://www.gwtp.or.kr/gwtp/bbsNew_list.php?code=sub01b&keyvalue=sub01&startPage={page}"
     LINK_PATTERN = "bbsNew_view"

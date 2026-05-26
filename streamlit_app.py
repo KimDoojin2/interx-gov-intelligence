@@ -336,7 +336,7 @@ with st.sidebar:
     # Feature #8: Dark mode toggle
     _current_theme = _get_theme()
     _theme_label = "🌙 다크 모드" if _current_theme == "light" else "☀️ 라이트 모드"
-    if st.button(_theme_label, key="theme_toggle", use_container_width=True):
+    if st.button(_theme_label, key="theme_toggle", width="stretch"):
         st.session_state.theme_mode = "dark" if _current_theme == "light" else "light"
         st.rerun()
 
@@ -421,7 +421,7 @@ if page == "📊 대시보드":
             fig.update_layout(title=dict(text="등급 분포", font=dict(size=14, color=t['text'])),
                               height=320, yaxis=dict(gridcolor=t['border']),
                               xaxis=dict(gridcolor=t['border']), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col_search:
             st.markdown(_section("빠른 검색"), unsafe_allow_html=True)
@@ -558,7 +558,7 @@ if page == "📊 대시보드":
                     text=[v for _, v in top3], textposition='outside',
                 ))
                 fig.update_layout(height=300, yaxis=dict(gridcolor=t['border']), **_layout())
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         with col_site:
             site_c = Counter(n.site for n in notices)
@@ -570,7 +570,7 @@ if page == "📊 대시보드":
                     orientation='h', marker_color=P,
                 ))
                 fig.update_layout(height=300, xaxis=dict(gridcolor=t['border']), **_layout(margin=dict(l=100, r=16, t=40, b=36)))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
 
 # =============================================================================
@@ -714,7 +714,7 @@ if page == "📋 공고 목록":
                 "진행": _action,
             })
         if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, height=420)
+            st.dataframe(pd.DataFrame(rows), width="stretch", height=420)
 
             dl1, dl2, _ = st.columns([1, 1, 5])
             df = pd.DataFrame(rows)
@@ -942,7 +942,7 @@ if page == "🔍 공고 비교":
                 text=[f"{w:.0f}%" for w in wps], textposition='outside',
             ))
             fig.update_layout(height=300, yaxis=dict(range=[0, 100], title="확률 (%)", gridcolor=t['border']), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             # Recommendation
             best_idx = wps.index(max(wps))
@@ -1012,14 +1012,14 @@ if page == "🏢 경쟁사":
                                           orientation='h', marker_color=P))
                     fig.update_layout(height=380, yaxis=dict(autorange="reversed"),
                                       xaxis=dict(gridcolor=t['border'], title="탐지 횟수"), **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 if cn:
                     st.markdown(_section(f"경쟁사 관련 공고 ({len(cn)}건)"), unsafe_allow_html=True)
                     st.dataframe(pd.DataFrame([{
                         "등급": c["grade"], "공고명": c["title"][:55], "사이트": c["site"],
                         "마감일": c["deadline"] or "-", "경쟁사": " / ".join(c["competitors"]),
                         "Tier": " / ".join(c["tiers"])
-                    } for c in cn]), use_container_width=True, height=380)
+                    } for c in cn]), width="stretch", height=380)
             except Exception as e:
                 st.error(f"경쟁사 분석 실패: {e}")
 
@@ -1076,7 +1076,7 @@ if page == "🎯 수주 예측":
                                    marker_color=[GD, GC, "#FBBF24", GB, GA]))
             fig.update_layout(title=dict(text="확률 분포", font=dict(size=14, color=t['text'])),
                               height=330, xaxis=dict(title="구간"), yaxis=dict(title="건수", gridcolor=t['border']), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col_t:
             st.markdown(_section("수주 유망 TOP 10"), unsafe_allow_html=True)
@@ -1139,7 +1139,7 @@ if page == "🎯 수주 예측":
                                                           orientation='h', marker_color=P))
                                 fig_fi.update_layout(title=dict(text="피처 중요도", font=dict(size=14, color=t['text'])),
                                                      height=300, xaxis=dict(title="중요도"), **_layout())
-                                st.plotly_chart(fig_fi, use_container_width=True)
+                                st.plotly_chart(fig_fi, width="stretch")
                         except Exception as e:
                             st.error(f"학습 실패: {e}")
         else:
@@ -1181,7 +1181,7 @@ if page == "📅 마감 캘린더":
             fig = go.Figure(go.Bar(x=dates, y=[dc[d] for d in dates], marker_color=[
                 GD if _dday(d) <= 3 else GC if _dday(d) <= 7 else P for d in dates]))
             fig.update_layout(height=280, xaxis=dict(title="마감일"), yaxis=dict(title="건수", gridcolor=t['border']), **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         st.markdown(_section(f"긴급 마감 D-7 이내 ({d7}건)"), unsafe_allow_html=True)
         for u in upcoming:
@@ -1236,7 +1236,7 @@ if page == "📈 분석":
                         polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor=t['border']),
                                    bgcolor=t['bg3'], angularaxis=dict(gridcolor=t['border'])),
                         height=380, **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 with cb:
                     names = [SOL.get(k, k) for k, _ in ss]; avgs = [v for _, v in ss]; cnts = [sol_cnt[k] for k, _ in ss]
                     fig = go.Figure()
@@ -1246,7 +1246,7 @@ if page == "📈 분석":
                                       barmode='group', height=380,
                                       xaxis=dict(gridcolor=t['border']), yaxis=dict(gridcolor=t['border']),
                                       legend=dict(orientation="h", y=1.12), **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
             else:
                 st.markdown(_empty("🔧", "솔루션 데이터 없음", "매칭되는 솔루션이 없습니다."), unsafe_allow_html=True)
 
@@ -1290,7 +1290,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="스코어링 키워드 TOP 20", font=dict(size=14, color=t['text'])),
                                       height=480, xaxis=dict(title="횟수", gridcolor=t['border']),
                                       **_layout(margin=dict(l=110, r=16, t=40, b=36)))
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
             with ct:
                 if title_w:
                     t20t = title_w.most_common(20)
@@ -1299,7 +1299,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="제목 빈출 단어 TOP 20", font=dict(size=14, color=t['text'])),
                                       height=480, xaxis=dict(title="횟수", gridcolor=t['border']),
                                       **_layout(margin=dict(l=110, r=16, t=40, b=36)))
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
 
     elif _an_tab == "🕐 히스토리":
         history = st.session_state.get("collection_history", [])
@@ -1326,7 +1326,7 @@ if page == "📈 분석":
                       "C": h["grades"].get("C", 0), "D": h["grades"].get("D", 0),
                       "L3": h.get("l3_count", 0), "제안서": h.get("proposals", 0),
                       "사이트": len(h.get("sites", {}))} for i, h in enumerate(reversed(history), 1)]
-            st.dataframe(pd.DataFrame(hrows), use_container_width=True, height=280)
+            st.dataframe(pd.DataFrame(hrows), width="stretch", height=280)
 
             try:
                 buf = io.BytesIO()
@@ -1350,7 +1350,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="수집 추이", font=dict(size=14, color=t['text'])), height=330,
                                       xaxis=dict(gridcolor=t['border']), yaxis=dict(title="건수", gridcolor=t['border']),
                                       legend=dict(orientation="h", y=1.12), **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 with cg_col:
                     lg = history[-1]["grades"]; pg = history[-2]["grades"]
                     gl = ["A", "B", "C", "D"]
@@ -1361,7 +1361,7 @@ if page == "📈 분석":
                                       barmode='group', xaxis=dict(gridcolor=t['border']),
                                       yaxis=dict(title="건수", gridcolor=t['border']),
                                       legend=dict(orientation="h", y=1.12), **_layout())
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
 
                 st.markdown(_section("사이트별 변화"), unsafe_allow_html=True)
                 ls = history[-1].get("sites", {}); ps = history[-2].get("sites", {})
@@ -1370,7 +1370,7 @@ if page == "📈 분석":
                     sr = [{"사이트": s, "최근": ls.get(s, 0), "이전": ps.get(s, 0),
                            "변화": f"+{ls.get(s, 0) - ps.get(s, 0)}" if ls.get(s, 0) - ps.get(s, 0) > 0
                            else str(ls.get(s, 0) - ps.get(s, 0))} for s in asn]
-                    st.dataframe(pd.DataFrame(sr), use_container_width=True, height=280)
+                    st.dataframe(pd.DataFrame(sr), width="stretch", height=280)
 
 
 # =============================================================================
@@ -1405,12 +1405,12 @@ if page == "👤 담당자":
                               legend=dict(orientation="h", y=1.12),
                               xaxis=dict(gridcolor=t['border']), yaxis=dict(title="건수", gridcolor=t['border']),
                               **_layout())
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         st.markdown(_section("담당자 상세"), unsafe_allow_html=True)
         mrows = [{"담당자": m, "전체": d["total"], "A": d["A"], "B": d["B"], "C": d["C"], "D": d["D"],
                   "A비율": f'{d["A"] / max(1, d["total"]) * 100:.0f}%'} for m, d in sorted(md.items(), key=lambda x: -x[1]["total"])]
-        st.dataframe(pd.DataFrame(mrows), use_container_width=True, height=350)
+        st.dataframe(pd.DataFrame(mrows), width="stretch", height=350)
 
 
 # =============================================================================
@@ -1596,7 +1596,7 @@ if page == "💬 AI 챗봇":
     _example_qs = ["A등급 공고 중 스마트공장 관련은?", "마감 7일 이내 공고 요약해줘", "이번에 수집된 L3 강공고는?", "디지털트윈 관련 공고 추천해줘"]
     _eq_cols = st.columns(len(_example_qs))
     for _eqi, _eq in enumerate(_example_qs):
-        if _eq_cols[_eqi].button(_eq, key=f"eq_{_eqi}", use_container_width=True):
+        if _eq_cols[_eqi].button(_eq, key=f"eq_{_eqi}", width="stretch"):
             st.session_state.ai_chat_input = _eq
 
     for _msg in st.session_state.ai_chat_history:
