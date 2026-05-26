@@ -60,7 +60,14 @@ st.markdown(f"""<style>
 
 /* ── Global ── */
 .stApp{{background:#FAFAFA;font-family:'Inter',system-ui,-apple-system,sans-serif}}
-#MainMenu,footer,header{{visibility:hidden}}
+#MainMenu,footer{{visibility:hidden}}
+header[data-testid="stHeader"]{{background:transparent !important;backdrop-filter:none !important}}
+/* 사이드바 접힌 상태에서 열기 버튼(>) 항상 표시 */
+button[kind="headerNoPadding"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"]{{
+    visibility:visible !important;z-index:999 !important;
+}}
 
 /* ── Sidebar Light Theme ── */
 section[data-testid="stSidebar"]{{
