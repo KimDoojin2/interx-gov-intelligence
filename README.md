@@ -32,10 +32,38 @@
 
 ## 📋 최근 업데이트
 
+### v6.1 — 2026-05-26
+
+**🔧 6기능 완전 구현 + 제안서 v2 전환 + UI 안정화**
+
+**P1~P6 기능 구현 완료:**
+- **P1 콤보 키워드**: 80쌍 (scoring.yaml + priority_scoring_policy.py 연동 완료)
+- **P2 정기공고 aliases**: 18그룹, 120+ aliases, priority 순 정렬 매칭
+- **P3 네거티브 3단계**: Strong(91개/×6.0) + Medium(48개/×4.0) + Weak(12개/×2.0)
+- **P4 접수상태 자동 분류**: `classify_apply_status()` → Notice.apply_status 정식 필드화
+  - 본문에서 접수기간 파싱 → 접수중/접수예정/마감 자동 판별
+  - Sheets 매퍼 28컬럼으로 확장 (접수상태 컬럼 추가)
+- **P5 Telegram/Slack 알림**: 환경변수 자동감지, L3 강공고 즉시알림 + 일별요약
+- **P6 제안서 v2 고도화**: 솔루션별 역량 프로필, 경쟁분석, 정기공고 이력, 8섹션 자동생성
+  - 파이프라인 기본 제안서 v1 → v2 전환 완료
+
+**엔진 안정화:**
+- Python 3.14 호환성 검증 완료
+- Gemini API 키 보안: URL 파라미터 → `x-goog-api-key` 헤더 방식 전환
+- 스코어링 fallback 값 scoring.yaml 실제값과 동기화 (grade_a=48/b=30/c=18)
+- bare `except:` → `except Exception:` 전환 (코드 품질)
+- 157 unit tests + P1-P6 통합 테스트 전체 통과
+
+**UI 수정:**
+- 사이드바 네비게이션: 하얀 배경 + 오렌지 액센트
+- 사이드바 접기/펼치기: `<<` 클릭 후에도 `>` 버튼 항상 표시 (header 투명화)
+- 솔루션+키워드+히스토리 3탭 → "📈 분석" 단일 페이지로 병합
+- 하단 배너 제거 (불필요 UI 정리)
+
 ### v6.0 — 2026-05-22
 
 **🎨 사이드바 네비게이션 전면 리팩토링**
-- 13개 수평 탭 → 좌측 다크 사이드바 네비게이션 (HASHSCRAPER 스타일)
+- 13개 수평 탭 → 좌측 사이드바 네비게이션
 - 사이드바: INTERX 브랜딩 + 시스템 상태 (LIVE/v5.9/25Sites/ML v2)
 - 히어로 배너 제거 → 컴팩트 탑바만 유지 (화면 공간 최적화)
 - `st.tabs()` → `st.sidebar.radio()` + `if/elif` 페이지 라우팅
@@ -239,8 +267,8 @@
 | 파이프라인 단계 | 18단계 (AI 브리핑 포함) |
 | 유즈케이스 | 25개 (스코어링, 중복제거, 경쟁사, 제안서, ML예측 등) |
 | 정기공고 패턴 | 18그룹, 120+ aliases (priority 1/2/3 등급) |
-| 콤보 키워드 | 38쌍 (두 키워드 동시 출현 시 가점) |
-| 감점 분류 | 3단계 (strong 6.0 / medium 4.0 / weak 2.0) |
+| 콤보 키워드 | 80쌍 (두 키워드 동시 출현 시 가점) |
+| 감점 분류 | 3단계 — Strong 91개(×6.0) / Medium 48개(×4.0) / Weak 12개(×2.0) |
 | 등급 | A / B / C / D |
 | 경쟁사 추적 | Tier1(6사) + Tier2(10사) + 파트너(7곳) |
 | 솔루션 프로필 | 8개 (ManufacturingDT ~ PdM) |
@@ -250,7 +278,7 @@
 | REST API | FastAPI 7 엔드포인트 (Swagger UI 자동 생성) |
 | 팀 배포 앱 | Streamlit Cloud (11개 탭, 무료 호스팅) |
 | AI Agent | Gemini 무료 (공고분석 + 챗봇 + 브리핑 + 제안서) |
-| 단위 테스트 | 215 passed (unit 157 + integration 58) |
+| 단위 테스트 | 157 unit + P1-P6 통합 전체 통과 |
 | CI/CD | GitHub Actions (자동 lint + test on push) |
 | 패키징 | pyproject.toml + Docker + docker-compose |
 | 실행 주기 | 1일 2회 (07:00 / 14:00, Colab 또는 로컬) |
@@ -719,7 +747,7 @@ Step 2. 가점 계산 (scored_text 기준)
         예산 정보 존재 시 +3.0 보너스
         pos_score = Σ(키워드 가중치) × struct_bonus
 
-Step 2B. 콤보 키워드 보너스 (38쌍)
+Step 2B. 콤보 키워드 보너스 (80쌍)
          두 키워드가 scored_text에 동시 존재 시 추가 가점
          예: ("상생형", "선도모델") → +8, ("ai", "제조") → +5
          combo_bonus = Σ(매칭된 콤보 보너스)
@@ -801,7 +829,7 @@ Step F. 긴급도 부스트 (Urgency × Grade)
 | `InfraDS` | 데이터스페이스, AAS, Catena-X, 클라우드 | 데이터 인프라 |
 | `PdM` | 예지보전, 설비관리, 고장예측, PHM | 예지보전 |
 
-### 7-4. 콤보 키워드 (38쌍)
+### 7-4. 콤보 키워드 (80쌍)
 
 두 키워드가 동시에 scored_text에 존재할 때 추가 가점. 핵심 공고 탐지력 향상.
 
