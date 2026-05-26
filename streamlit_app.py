@@ -459,18 +459,84 @@ if page == "📊 대시보드":
                     dc1, dc2 = st.columns(2)
                     with dc1:
                         st.markdown(f"**주관기관**: {n.agency or n.ministry or '-'}")
+                        st.markdown(f"**부처**: {getattr(n, 'ministry', '-') or '-'}")
                         st.markdown(f"**마감일**: {n.deadline_date or '-'} ({dd_str})")
                         st.markdown(f"**예산**: {n.budget or '-'}")
+                        st.markdown(f"**공고일**: {getattr(n, 'notice_date', '-') or '-'}")
+                        st.markdown(f"**신청기간**: {getattr(n, 'apply_period', '-') or '-'}")
+                        st.markdown(f"**접수상태**: {getattr(n, 'apply_status', '-') or '-'}")
                         link = getattr(n, "detail_url", "") or ""
                         if link.startswith("http"):
                             st.markdown(f"[원문 바로가기 ↗]({link})")
                     with dc2:
                         if sc:
-                            st.metric("적합도", f"{sc.fitness_score:.1f}")
-                            st.metric("우선순위", f"{sc.priority_score:.1f}")
+                            _sc1, _sc2, _sc3 = st.columns(3)
+                            _sc1.metric("적합도", f"{sc.fitness_score:.1f}")
+                            _sc2.metric("우선순위", f"{sc.priority_score:.1f}")
+                            _sc3.metric("산업점수", f"{sc.industry_score:.1f}")
+                            wp_c = GA if wp >= 60 else GB if wp >= 40 else GC if wp >= 20 else GD
+                            st.markdown(f"**수주 확률** &nbsp; <span style='color:{wp_c};font-size:1.3rem;font-weight:800'>{wp:.0f}%</span>", unsafe_allow_html=True)
                             if sc.positive_keywords:
                                 tags = " ".join(f'`{k}`' for k in sc.positive_keywords[:8])
                                 st.markdown(f"**키워드**: {tags}")
+                            if sc.solution_scores:
+                                SOL_D = {"ManufacturingDT": "제조DT", "RecipeAI": "레시피AI", "QualityAI": "품질AI",
+                                         "InspectionAI": "비전검사", "SafetyAI": "안전AI", "GenAI": "GenAI",
+                                         "InfraDS": "데이터인프라", "PdM": "예지보전"}
+                                sols_d = sorted([(SOL_D.get(k, k), v) for k, v in sc.solution_scores.items() if v > 0], key=lambda x: -x[1])
+                                if sols_d:
+                                    st.markdown("**솔루션 매칭**: " + " · ".join(f"**{name}** {score:.0f}" for name, score in sols_d[:5]))
+
+                    # 공고 핵심 내용
+                    _body_d = getattr(n, "body_text", "") or ""
+                    _body_d = re.sub(r'\{\{[^}]+\}\}', '', _body_d).strip()
+                    _struct_d = getattr(n, "structured", None) or {}
+                    _summary_d = getattr(n, "summary", "") or ""
+                    _summary_d = re.sub(r'\{\{[^}]+\}\}', '', _summary_d).strip()
+                    if _struct_d or _summary_d or (_body_d and len(_body_d) > 20):
+                        st.markdown("---")
+                        for _sk, _sl in [("사업목적", "🎯 사업목적"), ("지원내용", "💰 지원내용"),
+                                         ("지원대상", "👥 지원대상"), ("지원금액", "💵 지원금액"),
+                                         ("신청방법", "📝 신청방법")]:
+                            _sv = _struct_d.get(_sk, "")
+                            if _sv:
+                                st.markdown(f"**{_sl}**")
+                                st.markdown(f"> {_sv[:300]}")
+                        if not _struct_d and _summary_d and len(_summary_d) > 20:
+                            st.markdown("**📌 핵심 요약**")
+                            st.markdown(f"> {_summary_d[:400]}")
+                        if _body_d and len(_body_d) > 50:
+                            st.caption("📄 전체 본문")
+                            st.text(_body_d[:3000])
+
+                    # AI 분석 (캐시 지원)
+                    _dk = _ai_cache_key(n.notice_id)
+                    _dc = st.session_state.get(_dk)
+                    if _dc:
+                        st.markdown(f'<div style="background:{t["bg3"]};border:1px solid {t["border"]};border-radius:10px;padding:12px 16px;margin:8px 0;font-size:.82rem"><b style="color:{A2}">💡 AI 분석 (캐시)</b><br><b>적합도:</b> {_dc.get("fit_reason","")}<br><b>제안 전략:</b> {_dc.get("proposal_strategy","")}<br><b>솔루션:</b> {_dc.get("solution_mapping","")}</div>', unsafe_allow_html=True)
+                    if st.button("💡 AI 분석" + (" (재분석)" if _dc else ""), key=f"dash_ai_{n.notice_id}"):
+                        with st.spinner("AI 분석 중..."):
+                            try:
+                                from interx_engine.infrastructure.ai.notice_analyzer import analyze_notice
+                                _ai_r = analyze_notice(
+                                    title=n.title, body_text=_body_d, summary=_summary_d,
+                                    structured=_struct_d,
+                                    matched_keywords=", ".join(sc.positive_keywords[:8]) if sc and sc.positive_keywords else "",
+                                    grade="A", score=sc.fitness_score if sc else 0,
+                                    budget=n.budget or "", solution_scores=sc.solution_scores if sc else None,
+                                )
+                                st.session_state[_dk] = _ai_r
+                                st.markdown(f'<div style="background:{t["bg3"]};border:1px solid {t["border"]};border-radius:10px;padding:12px 16px;margin:8px 0;font-size:.82rem"><b style="color:{A2}">💡 AI 분석 결과</b><br><b>적합도:</b> {_ai_r.get("fit_reason","")}<br><b>제안 전략:</b> {_ai_r.get("proposal_strategy","")}<br><b>솔루션:</b> {_ai_r.get("solution_mapping","")}<br><b>핵심 요구:</b> {_ai_r.get("key_requirements","")}<br><span style="color:{GC}"><b>리스크:</b> {_ai_r.get("risk_factors","")}</span></div>', unsafe_allow_html=True)
+                            except Exception as _ae:
+                                st.error(f"AI 분석 실패: {_ae}")
+
+                    # 원문 사이트 미리보기 (iframe)
+                    _link_d = getattr(n, "detail_url", "") or ""
+                    if _link_d and _link_d.startswith("http"):
+                        st.markdown(f"🔗 **[원문 바로가기 (새 탭)]({_link_d})**")
+                        with st.expander("🌐 원문 사이트 미리보기", expanded=False):
+                            st.caption("⚠️ 일부 사이트는 보안 정책으로 미리보기가 차단됩니다.")
+                            st.iframe(_link_d, height=500)
 
         # ── Solution TOP3 + Site Stats ──
         col_sol, col_site = st.columns(2)
