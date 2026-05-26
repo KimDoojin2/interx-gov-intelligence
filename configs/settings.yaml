@@ -1,9 +1,8 @@
 pipeline:
-  source_site: iris
-  enabled_sites: ["bizinfo", "ntis", "iris"]
+  # enabled_sites는 sites.yaml의 enabled 플래그로 관리
   download_mode: best_effort
   parse_mode: best_effort
-  max_pages: 3
+  max_pages: 5
 
 storage:
   backend: dual

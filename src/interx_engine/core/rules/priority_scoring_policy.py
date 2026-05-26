@@ -14,9 +14,9 @@ log = logging.getLogger("interx.scoring")
 # ── 기본 임계값 (scoring.yaml 로드 실패 시 fallback) ──────────────────────────
 _L3_DEFAULT      = 35
 _PARTNER_DEFAULT = 20
-_GRADE_A         = 55
-_GRADE_B         = 40
-_GRADE_C         = 25
+_GRADE_A         = 48
+_GRADE_B         = 30
+_GRADE_C         = 18
 _NEG_MULT        = 6.0
 _POS_MULT        = 5.0
 _STRUCT_BONUS    = 1.5

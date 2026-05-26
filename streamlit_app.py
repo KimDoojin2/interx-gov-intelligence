@@ -247,7 +247,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{
 
 def _dday(dl: str) -> int:
     try: return (datetime.strptime(dl, "%Y-%m-%d").date() - date.today()).days
-    except: return -1
+    except Exception: return -1
 
 def _metric(val, label, accent=""):
     ac = f' style="color:{accent}"' if accent else ""
@@ -413,7 +413,7 @@ if page == "📊 대시보드":
                                 else:
                                     _bm3 = re.search(r'(\d[\d,.]*)\s*만', _budget_raw)
                                     if _bm3: _budget_val = float(_bm3.group(1).replace(",","")) / 10000
-                        except: pass
+                        except Exception: pass
                     if _budget_val is not None:
                         if _budget_val >= 2.1:
                             _bdg_label = f"💰 **예산: {_budget_raw}**"
@@ -493,7 +493,7 @@ if page == "📊 대시보드":
             try:
                 _m = re.search(r'(\d[\d,.]*)\s*억', _bgt_r)
                 if _m: _bv = float(_m.group(1).replace(",",""))
-            except: pass
+            except Exception: pass
             _rec.append((n, sc, dd, _bv))
         _rec.sort(key=lambda x: -x[1].priority_score)
         if _rec:
@@ -671,7 +671,7 @@ if page == "📋 공고 목록":
             try:
                 _m = re.search(r'(\d[\d,.]*)\s*억', _bgt)
                 if _m: _bv = float(_m.group(1).replace(",",""))
-            except: pass
+            except Exception: pass
             _action = "인터엑스" if _bv and _bv >= 2.1 else "파트너이관" if _bv and _bv < 2.0 else "-"
             rows.append({"등급": sc.priority_grade if sc else "D", "점수": f"{sc.priority_score:.0f}" if sc else "-",
                          "공고명": n.title[:70] if n.title else "-", "주관기관": n.agency or n.ministry or "-",
@@ -691,7 +691,7 @@ if page == "📋 공고 목록":
                 dl2.download_button("📊 Excel", buf.getvalue(),
                                     f"interx_{datetime.now().strftime('%Y%m%d')}.xlsx",
                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            except: pass
+            except Exception: pass
 
             # ── Detail Panel ──
             st.markdown(_section("공고 상세"), unsafe_allow_html=True)
@@ -1190,7 +1190,7 @@ if page == "📈 분석":
                 st.download_button("📊 히스토리 Excel", buf.getvalue(),
                                    f"interx_history_{datetime.now().strftime('%Y%m%d')}.xlsx",
                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            except: pass
+            except Exception: pass
 
             if len(history)>=2:
                 ct,cg = st.columns(2)

@@ -69,7 +69,11 @@ def generate(
     _rate_limit()
     api_key = _get_api_key()
 
-    url = f"{_API_BASE}/{model}:generateContent?key={api_key}"
+    url = f"{_API_BASE}/{model}:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
 
     payload = {
         "contents": [{
@@ -87,7 +91,7 @@ def generate(
         }
 
     try:
-        resp = requests.post(url, json=payload, timeout=timeout)
+        resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
 
