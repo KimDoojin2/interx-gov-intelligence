@@ -311,6 +311,67 @@ def _ai_cache_key(notice_id):
     return f"ai_cache_{notice_id}"
 
 
+# ── 요약/본문 잡음 제거 ──────────────────────────────────────────────────────
+_JUNK_PATTERNS = re.compile(
+    r"HOME\s+정책정보|본문\s*바로가기|대메뉴\s*바로가기|"
+    r"해시태그\s*#|본문출력파일|바로보기\s+다운로드|링크복사\s+QR코드|"
+    r"정보에\s*만족하셨|욕설.*삭제될\s*있음|기업마당\s*정책정보에|"
+    r"공고를\s*열람한\s*사용자가|조회수\s*\d+|"
+    r"<title[^>]*>.*?</title>|"
+    r"\{\{[^}]+\}\}",
+    re.I | re.DOTALL,
+)
+_RELATED_POST_RE = re.compile(
+    r"NO\.\s+\d{4}\.\d{2}\.\d{2}~\d{4}\.\d{2}\.\d{2}\s+#.+",
+    re.DOTALL,
+)
+
+def _clean_summary(text: str) -> str:
+    """핵심 요약에서 네비게이션/해시태그/관련 공고 등 잡음 제거."""
+    if not text:
+        return ""
+    text = _JUNK_PATTERNS.sub("", text)
+    text = _RELATED_POST_RE.sub("", text)
+    # 해시태그 블록 제거
+    text = re.sub(r'#\w+(\s+#\w+){2,}', '', text)
+    # 연속 공백 정리
+    text = re.sub(r'\s{2,}', ' ', text).strip()
+    # "HOME 정책정보 지원사업 지원사업" 같은 breadcrumb 제거
+    text = re.sub(r'^(HOME\s+)?(정책정보\s+)?(지원사업\s+)*', '', text).strip()
+    return text
+
+
+def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
+    """공고 핵심 요약 추출: 구조화 섹션 > 핵심 문장 > 정제된 summary."""
+    # 1) 구조화 섹션이 있으면 조합
+    parts = []
+    for key in ["사업목적", "지원내용", "지원대상"]:
+        v = (structured or {}).get(key, "")
+        if v and len(v) > 15:
+            parts.append(v[:200])
+    if parts:
+        return " | ".join(parts)
+
+    # 2) body에서 핵심 키워드 문장 추출
+    src = _clean_summary(body or summary or "")
+    if not src:
+        return ""
+    _KEY_RE = re.compile(
+        r"(지원\s*대상|지원\s*내용|지원\s*규모|사업\s*개요|사업\s*목적|"
+        r"신청\s*자격|접수\s*기간|총\s*사업비|과제당|선정\s*규모|공모\s*분야)"
+    )
+    sents = [s.strip() for s in re.split(r'(?<=[.다요됨함!\n])\s+', src) if len(s.strip()) > 15]
+    important = [s for s in sents if _KEY_RE.search(s)]
+    if important:
+        return " ".join(important[:3])[:500]
+
+    # 3) 첫 유의미 문장
+    for s in sents:
+        if len(s) >= 25:
+            return s[:300]
+    return src[:300]
+
+
 # =============================================================================
 #  Navigation
 # =============================================================================
@@ -489,25 +550,24 @@ if page == "📊 대시보드":
 
                     # 공고 핵심 내용
                     _body_d = getattr(n, "body_text", "") or ""
-                    _body_d = re.sub(r'\{\{[^}]+\}\}', '', _body_d).strip()
                     _struct_d = getattr(n, "structured", None) or {}
                     _summary_d = getattr(n, "summary", "") or ""
-                    _summary_d = re.sub(r'\{\{[^}]+\}\}', '', _summary_d).strip()
-                    if _struct_d or _summary_d or (_body_d and len(_body_d) > 20):
+                    _key_summ = _extract_key_summary(_summary_d, _body_d, _struct_d)
+                    if _struct_d or _key_summ or (_body_d and len(_body_d) > 20):
                         st.markdown("---")
                         for _sk, _sl in [("사업목적", "🎯 사업목적"), ("지원내용", "💰 지원내용"),
                                          ("지원대상", "👥 지원대상"), ("지원금액", "💵 지원금액"),
                                          ("신청방법", "📝 신청방법")]:
-                            _sv = _struct_d.get(_sk, "")
-                            if _sv:
+                            _sv = _clean_summary(_struct_d.get(_sk, ""))
+                            if _sv and len(_sv) > 10:
                                 st.markdown(f"**{_sl}**")
                                 st.markdown(f"> {_sv[:300]}")
-                        if not _struct_d and _summary_d and len(_summary_d) > 20:
+                        if not _struct_d and _key_summ and len(_key_summ) > 20:
                             st.markdown("**📌 핵심 요약**")
-                            st.markdown(f"> {_summary_d[:400]}")
+                            st.markdown(f"> {_key_summ}")
                         if _body_d and len(_body_d) > 50:
                             st.caption("📄 전체 본문")
-                            st.text(_body_d[:3000])
+                            st.text(_clean_summary(_body_d[:3000]))
 
                     # AI 분석 (캐시 지원)
                     _dk = _ai_cache_key(n.notice_id)
@@ -795,24 +855,24 @@ if page == "📋 공고 목록":
 
                 _sn_struct = getattr(sn, "structured", None) or {}
                 _sn_summary = getattr(sn, "summary", "") or ""
-                _sn_summary = re.sub(r'\{\{[^}]+\}\}', '', _sn_summary).strip()
+                _sn_key_summ = _extract_key_summary(_sn_summary, body, _sn_struct)
 
-                if _sn_struct or _sn_summary or (body and len(body) > 20):
+                if _sn_struct or _sn_key_summ or (body and len(body) > 20):
                     with st.expander("📋 공고 핵심 내용", expanded=False):
                         for _sk2, _sl2 in [("사업목적", "🎯 사업목적"), ("지원내용", "💰 지원내용"),
                                            ("지원대상", "👥 지원대상"), ("지원금액", "💵 지원금액"),
                                            ("신청방법", "📝 신청방법"), ("추진일정", "📅 추진일정")]:
-                            _sv2 = _sn_struct.get(_sk2, "")
-                            if _sv2:
+                            _sv2 = _clean_summary(_sn_struct.get(_sk2, ""))
+                            if _sv2 and len(_sv2) > 10:
                                 st.markdown(f"**{_sl2}**")
                                 st.markdown(f"> {_sv2[:300]}")
-                        if not _sn_struct and _sn_summary and len(_sn_summary) > 20:
+                        if not _sn_struct and _sn_key_summ and len(_sn_key_summ) > 20:
                             st.markdown("**📌 핵심 요약**")
-                            st.markdown(f"> {_sn_summary[:400]}")
+                            st.markdown(f"> {_sn_key_summ}")
                         if body and len(body) > 50:
                             st.markdown("---")
                             st.caption("📄 전체 본문")
-                            st.text(body[:5000])
+                            st.text(_clean_summary(body[:5000]))
                             if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
 
                 # ── Feature #3: AI Analysis with Caching ──
