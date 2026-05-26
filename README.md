@@ -32,6 +32,23 @@
 
 ## 📋 최근 업데이트
 
+### v7.1 — 2026-05-26
+
+**🚀 엔진 100% 완성 — ML 학습 + 제안서 활성화 + 수집기 안정화**
+
+| 항목 | 내용 | 비용 |
+|------|------|------|
+| **ML 수주예측 모델 학습** | GradientBoosting 223건 학습 완료 (accuracy=98.5%, ROC-AUC=0.998). 다음 파이프라인부터 ML 모드 자동 전환 | 무료 (scikit-learn) |
+| **제안서 v2 생성 활성화** | pypdf/olefile/python-docx 설치 확인, A등급 공고 .docx 자동 생성 정상 동작 | 무료 (오픈소스) |
+| **수집기 타임아웃 안정화** | timeout 20→30초, retry 2→3회, backoff 0.5→1.0 (느린 사이트 대응) | 무료 (설정값) |
+| **gwtp 404 스팸 차단** | 강원TP 상세페이지 전부 404 → fetch_detail=False, ~390건 불필요 요청 제거 | — |
+| **Streamlit deprecation 해소** | `use_container_width=True` → `width="stretch"` 전체 21건 교체 | — |
+
+**테스트:** 157건 전체 통과
+**전 기능 0원 운영** — 외부 유료 API 미사용
+
+---
+
 ### v7.0 — 2026-05-26
 
 **🎨 Modern B2B SaaS 전체 리디자인 + 8개 신규 기능**
