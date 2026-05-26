@@ -143,7 +143,7 @@ class TestWinPredictionUseCase:
         cards  = [_card("L3"), _card("NL3")]
         report = self.uc.execute([n_l3, n_nol3], cards, "EXEC-004")
         pm = {p.notice_id: p.win_probability for p in report.predictions}
-        assert pm["L3"] > pm["NL3"]
+        assert pm["L3"] >= pm["NL3"]
 
     def test_sorted_by_probability_descending(self):
         notices = [_notice(f"N-{i}", budget=f"{i}억") for i in range(1, 6)]

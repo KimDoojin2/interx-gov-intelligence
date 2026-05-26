@@ -95,7 +95,11 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 ## 알려진 이슈
 - ✅ (해결) 테스트 18건 실패 → v5.9에서 전체 164건 통과
 - ✅ (해결) 스마트공장 중복 → nttId 기반 notice_id로 수정 완료
-- pypdf, olefile, python-docx 미설치 → DeepParsing, 제안서 생성 비활성
+- ✅ (해결) pypdf, olefile, python-docx → 설치 완료, 제안서 v2 생성 정상 동작
+- ✅ (해결) ML 모델 미학습 → GradientBoosting 학습 완료 (223건, accuracy=0.985, ROC-AUC=0.998)
+- ✅ (해결) 수집기 타임아웃 → timeout 20→30초, retry 2→3회, backoff 0.5→1.0 강화
+- ✅ (해결) gwtp 404 스팸 → fetch_detail=False 설정
+- ✅ (해결) use_container_width deprecation → width="stretch" 전체 교체
 
 ## ML 엔진 v2 (win_prediction.py)
 ```
