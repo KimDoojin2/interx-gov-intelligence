@@ -101,6 +101,18 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 - ✅ (해결) gwtp 404 스팸 → fetch_detail=False 설정
 - ✅ (해결) use_container_width deprecation → width="stretch" 전체 교체
 
+## 사업계획서 AI 생성기 (generate_business_plan.py)
+```
+하이브리드 모드:
+  MODE 1 (공고 분석): 공고 본문 → Gemini가 섹션 구조 추출 → 내용 생성
+  MODE 2 (양식 업로드): HWP/HWPX/PDF 양식 → 섹션 파싱 → 내용 채우기
+사업 유형별 동적 구조: 스마트공장 / R&D / 바우처 / 일반 자동 분류
+비용/예산 정보 자동 제외
+Gemini 2.0 Flash 무료 API (15 RPM)
+출력: DOCX (한글에서도 열림)
+Streamlit 대시보드 "📄 사업계획서" 탭
+```
+
 ## ML 엔진 v2 (win_prediction.py)
 ```
 피처 12개 (v2):

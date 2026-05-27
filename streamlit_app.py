@@ -378,7 +378,7 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
 
 NAV_ITEMS = [
     "📊 대시보드", "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
-    "📝 제안서", "🏢 경쟁사", "🎯 수주 예측", "📅 마감 캘린더",
+    "📝 제안서", "📄 사업계획서", "🏢 경쟁사", "🎯 수주 예측", "📅 마감 캘린더",
     "📈 분석", "👤 담당자", "🤖 AI 뉴스", "💬 AI 챗봇",
 ]
 
@@ -1039,6 +1039,190 @@ if page == "📝 제안서":
                         cd.download_button("다운로드", f.read(), fp.name,
                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                            key=f"dl_{_pi}_{fp.name}")
+
+
+# =============================================================================
+#  PAGE: Business Plan Generator
+# =============================================================================
+
+if page == "📄 사업계획서":
+    st.markdown(_section("사업계획서 AI 생성기"), unsafe_allow_html=True)
+    st.markdown(f'<p style="color:{t["text2"]};margin-bottom:24px">'
+                f'공고 맞춤형 사업계획서 초안을 AI가 자동 생성합니다. '
+                f'양식 파일 업로드 또는 공고 본문 분석 중 선택하세요.</p>',
+                unsafe_allow_html=True)
+
+    result = _result()
+    notices = result.get("notices", []) if result else []
+    score_cards = result.get("score_cards", []) if result else []
+    smap_bp = {s.notice_id: s for s in score_cards}
+
+    bp_tab1, bp_tab2 = st.tabs(["📋 공고 선택 → 자동 생성", "📁 양식 업로드 → 내용 채우기"])
+
+    with bp_tab1:
+        st.markdown(f'<p style="color:{t["text2"]}">수집된 공고 중 하나를 선택하면, '
+                    f'공고 본문을 AI가 분석하여 맞춤형 사업계획서 구조를 만들고 내용을 생성합니다.</p>',
+                    unsafe_allow_html=True)
+
+        if not notices:
+            st.info("수집된 공고가 없습니다. 먼저 '수집 실행'을 해주세요.")
+        else:
+            # 공고 선택 (A/B 등급 우선 정렬)
+            def _bp_sort_key(n):
+                sc = smap_bp.get(n.notice_id)
+                grade_order = {"A": 0, "B": 1, "C": 2, "D": 3}
+                g = grade_order.get(sc.priority_grade, 3) if sc else 3
+                return (g, n.title)
+
+            sorted_notices = sorted(notices, key=_bp_sort_key)
+            options = []
+            for n in sorted_notices:
+                sc = smap_bp.get(n.notice_id)
+                grade = sc.priority_grade if sc else "?"
+                options.append(f"[{grade}] {n.title[:60]} ({n.site})")
+
+            selected_idx = st.selectbox("공고 선택", range(len(options)),
+                                        format_func=lambda i: options[i])
+            selected_notice = sorted_notices[selected_idx]
+            selected_sc = smap_bp.get(selected_notice.notice_id)
+
+            # 공고 미리보기
+            with st.expander("선택한 공고 정보", expanded=False):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("등급", selected_sc.priority_grade if selected_sc else "-")
+                c2.metric("마감일", selected_notice.deadline_date or "-")
+                c3.metric("기관", selected_notice.agency or "-")
+                if selected_notice.summary:
+                    st.write(selected_notice.summary[:300])
+
+            bp_company = st.text_input("기업명", value="(주)인터엑스", key="bp_company1")
+
+            if st.button("사업계획서 생성", key="bp_gen1", type="primary", width="stretch"):
+                try:
+                    from interx_engine.application.use_cases.generate_business_plan import (
+                        generate_business_plan,
+                    )
+
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    def _bp_progress(pct, msg):
+                        progress_bar.progress(min(pct, 100))
+                        status_text.text(f"{msg}")
+
+                    with st.spinner("AI가 사업계획서를 생성하고 있습니다..."):
+                        path = generate_business_plan(
+                            notice=selected_notice,
+                            score_card=selected_sc,
+                            template_text="",
+                            company_name=bp_company,
+                            progress_callback=_bp_progress,
+                        )
+
+                    progress_bar.progress(100)
+
+                    if path:
+                        status_text.success(f"생성 완료!")
+                        with open(path, "rb") as f:
+                            st.download_button(
+                                label="📥 사업계획서 다운로드 (.docx)",
+                                data=f.read(),
+                                file_name=Path(path).name,
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                width="stretch",
+                            )
+                    else:
+                        status_text.error("생성 실패 — Gemini API 키를 확인하세요.")
+
+                except Exception as e:
+                    st.error(f"생성 실패: {e}")
+
+    with bp_tab2:
+        st.markdown(f'<p style="color:{t["text2"]}">해당 사업의 양식 파일(HWP/HWPX/PDF/TXT)을 업로드하면, '
+                    f'AI가 양식 구조를 파악하고 각 섹션의 내용을 자동 채웁니다.</p>',
+                    unsafe_allow_html=True)
+
+        uploaded = st.file_uploader(
+            "양식 파일 업로드",
+            type=["hwp", "hwpx", "pdf", "txt"],
+            key="bp_upload",
+        )
+
+        bp_title = st.text_input("사업/공고명", key="bp_title2",
+                                  placeholder="예: 2025년 제조AI특화 스마트공장 구축지원사업")
+        bp_agency = st.text_input("주관기관", key="bp_agency2", placeholder="예: 중소벤처기업부")
+        bp_company2 = st.text_input("기업명", value="(주)인터엑스", key="bp_company2")
+        bp_summary = st.text_area("사업 요약 (선택)", key="bp_summary2",
+                                   placeholder="사업 내용을 간단히 설명하면 더 정확한 내용이 생성됩니다.",
+                                   height=100)
+
+        if st.button("양식 기반 사업계획서 생성", key="bp_gen2", type="primary",
+                     width="stretch"):
+            if not uploaded and not bp_title:
+                st.warning("양식 파일 또는 사업명을 입력하세요.")
+            else:
+                try:
+                    from interx_engine.application.use_cases.generate_business_plan import (
+                        generate_business_plan,
+                        parse_uploaded_file,
+                    )
+
+                    template_text = ""
+                    if uploaded:
+                        with st.spinner("양식 파일 분석 중..."):
+                            template_text = parse_uploaded_file(
+                                uploaded.read(), uploaded.name
+                            )
+                        if template_text:
+                            st.success(f"양식 파싱 완료: {len(template_text):,}자 추출")
+                        else:
+                            st.warning("양식 텍스트 추출 실패 — 공고 분석 모드로 전환")
+
+                    # 가상 Notice 생성
+                    from interx_engine.core.entities.notice import Notice
+                    virtual_notice = Notice(
+                        execution_id="MANUAL",
+                        site="manual",
+                        notice_id="MANUAL-BP",
+                        title=bp_title or "사업계획서",
+                        agency=bp_agency,
+                        summary=bp_summary,
+                        body_text=bp_summary or "",
+                    )
+
+                    progress_bar2 = st.progress(0)
+                    status_text2 = st.empty()
+
+                    def _bp_progress2(pct, msg):
+                        progress_bar2.progress(min(pct, 100))
+                        status_text2.text(f"{msg}")
+
+                    with st.spinner("AI가 사업계획서를 생성하고 있습니다..."):
+                        path = generate_business_plan(
+                            notice=virtual_notice,
+                            score_card=None,
+                            template_text=template_text,
+                            company_name=bp_company2,
+                            progress_callback=_bp_progress2,
+                        )
+
+                    progress_bar2.progress(100)
+
+                    if path:
+                        status_text2.success("생성 완료!")
+                        with open(path, "rb") as f:
+                            st.download_button(
+                                label="📥 사업계획서 다운로드 (.docx)",
+                                data=f.read(),
+                                file_name=Path(path).name,
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                width="stretch",
+                            )
+                    else:
+                        status_text2.error("생성 실패 — Gemini API 키를 확인하세요.")
+
+                except Exception as e:
+                    st.error(f"생성 실패: {e}")
 
 
 # =============================================================================
