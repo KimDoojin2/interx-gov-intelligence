@@ -101,7 +101,7 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 - ✅ (해결) gwtp 404 스팸 → fetch_detail=False 설정
 - ✅ (해결) use_container_width deprecation → width="stretch" 전체 교체
 
-## 사업계획서 AI 생성기 (generate_business_plan.py)
+## 사업계획서 AI 생성기 v3 (generate_business_plan.py)
 ```
 하이브리드 모드:
   MODE 1 (공고 분석): 공고 본문 → Gemini가 섹션 구조 추출 → 내용 생성
@@ -111,6 +111,16 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 Gemini 2.0 Flash 무료 API (15 RPM)
 출력: DOCX (한글에서도 열림)
 Streamlit 대시보드 "📄 사업계획서" 탭
+
+v3 핵심 개선 (지식베이스 기반):
+  configs/company_knowledge.yaml — 회사 기술역량/시장데이터/경쟁사/표준 지식베이스
+  섹션 유형별 특화 프롬프트 (overview/necessity/goals/strategy/commercialization/effects)
+  Gemini max_tokens 1200→4096, 1500자+ 상세 콘텐츠 생성
+  시장 데이터 자동 주입 (DT 시장 $444.6M→$3.69B, AI Agent $51B→$471B)
+  경쟁사 분석 자동 포함 (삼성SDS/현대오토에버/유비씨/Siemens/Microsoft 등)
+  기술 표준 자동 포함 (AAS IEC 63278-1, KS X ISO 23247 등)
+  인터엑스 멀티-Agent 플랫폼 상세 기술 내용 자동 반영
+  fallback도 지식베이스 기반 풍부한 콘텐츠 (플레이스홀더 제거)
 ```
 
 ## ML 엔진 v2 (win_prediction.py)

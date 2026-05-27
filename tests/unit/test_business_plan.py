@@ -200,7 +200,9 @@ class TestFallbackContent:
         sec = {"title": "99. 알 수 없는 섹션", "subsections": [], "guidance": ""}
         n = _notice(title="테스트")
         content = _fallback_content(sec, n, [], "(주)인터엑스")
-        assert "작성 필요" in content
+        # v3: fallback도 지식베이스 기반 실제 콘텐츠 생성
+        assert "인터엑스" in content
+        assert len(content) > 30
 
 
 # ── 파일 파싱 테스트 ─────────────────────────────────────────────────────────
