@@ -914,6 +914,40 @@ if page == "📋 공고 목록":
                         except Exception as _ai_err:
                             st.error(f"AI 분석 실패: {_ai_err}")
 
+                # ── 사업계획서 바로 생성 ──
+                if grade in ("A", "B"):
+                    st.markdown(f'<div style="border-top:1px solid {t["border"]};margin:12px 0"></div>', unsafe_allow_html=True)
+                    _bp_key = f"bp_gen_{sn.notice_id}"
+                    if st.button(f"📄 사업계획서 AI 생성 →", key=_bp_key, type="primary", width="stretch"):
+                        try:
+                            from interx_engine.application.use_cases.generate_business_plan import generate_business_plan
+                            _bp_bar = st.progress(0)
+                            _bp_status = st.empty()
+                            def _bp_cb(pct, msg):
+                                _bp_bar.progress(min(pct, 100))
+                                _bp_status.text(msg)
+                            with st.spinner("AI가 사업계획서를 생성 중..."):
+                                _bp_path = generate_business_plan(
+                                    notice=sn, score_card=ssc,
+                                    company_name="(주)인터엑스",
+                                    progress_callback=_bp_cb,
+                                )
+                            _bp_bar.progress(100)
+                            if _bp_path:
+                                _bp_status.success("사업계획서 생성 완료!")
+                                with open(_bp_path, "rb") as _bf:
+                                    st.download_button(
+                                        "📥 사업계획서 다운로드 (.docx)",
+                                        _bf.read(),
+                                        file_name=Path(_bp_path).name,
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        width="stretch",
+                                    )
+                            else:
+                                _bp_status.error("생성 실패 — GEMINI_API_KEY 환경변수를 확인하세요.")
+                        except Exception as _bp_err:
+                            st.error(f"사업계획서 생성 실패: {_bp_err}")
+
                 # ── 원문 바로가기 ──
                 _sn_link = getattr(sn, "detail_url", "") or ""
                 if _sn_link and _sn_link.startswith("http"):
