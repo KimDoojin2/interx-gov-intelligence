@@ -14,11 +14,8 @@ from interx_engine.core.entities.score_card import ScoreCard
 log = logging.getLogger("interx.dedup")
 
 def _sim_threshold() -> float:
-    try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return settings.sim_threshold()
-    except Exception:
-        return 0.82
+    from interx_engine.application.ports.settings_port import sim_threshold
+    return sim_threshold()
 
 
 def deduplicate_by_tfidf(

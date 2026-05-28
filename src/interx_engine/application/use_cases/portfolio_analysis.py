@@ -15,7 +15,7 @@ from interx_engine.core.entities.score_card import ScoreCard
 from interx_engine.core.entities.analysis_report import (
     AnalysisReport, ClusterGroup, MinistryBudget, MonthlyTrend,
 )
-from interx_engine.infrastructure.utils.budget_parser import normalize_budget
+from interx_engine.application.ports.budget_utils_port import normalize_budget
 
 log = logging.getLogger("interx.portfolio")
 

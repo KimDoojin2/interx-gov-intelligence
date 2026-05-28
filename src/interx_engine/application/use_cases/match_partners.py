@@ -8,8 +8,8 @@ from interx_engine.application.ports.partner_repository_port import PartnerRepos
 
 def _top_k() -> int:
     try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return settings.top_k()
+        from interx_engine.application.ports.settings_port import top_k
+        return top_k()
     except Exception:
         return 3
 

@@ -35,7 +35,7 @@ def _imports_ok() -> bool:
 def _parse_budget(x: str) -> int:
     """예산 문자열 → 만원 단위 정수. budget_parser.normalize_budget 결과를 재파싱."""
     try:
-        from interx_engine.infrastructure.utils.budget_parser import normalize_budget
+        from interx_engine.application.ports.budget_utils_port import normalize_budget
         norm = normalize_budget(str(x))
         # normalize_budget 반환값이 숫자 문자열인 경우 (예: "30000")
         import re

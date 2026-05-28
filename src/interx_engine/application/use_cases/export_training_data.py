@@ -31,8 +31,8 @@ def export_training_data(
     """
     if not output_dir:
         try:
-            from interx_engine.infrastructure.config.settings_loader import settings
-            output_dir = str(Path(settings.project_root) / "data" / "exports" / "training")
+            from interx_engine.application.ports.settings_port import project_root
+            output_dir = str(Path(project_root()) / "data" / "exports" / "training")
         except Exception:
             output_dir = str(Path.cwd() / "data" / "exports" / "training")
 

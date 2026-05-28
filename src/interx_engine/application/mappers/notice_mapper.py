@@ -9,9 +9,10 @@ from typing import Optional
 
 from interx_engine.core.entities.notice import Notice
 from interx_engine.core.entities.score_card import ScoreCard
-from interx_engine.infrastructure.utils.budget_parser import (
-    is_open_ended, normalize_budget,
-)
+from interx_engine.application.ports.budget_utils_port import normalize_budget
+
+# is_open_ended는 core-level 유틸리티 (순수 문자열 판별)
+from interx_engine.application.ports.budget_utils_port import is_open_ended
 
 
 def _calc_dday(deadline: str) -> str:

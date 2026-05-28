@@ -380,12 +380,14 @@ class BaseCollector(NoticeCollectorPort, ABC):
 
         # ── 3) 텍스트 추출 + 잡음 제거 ──
         raw_text = target.get_text(" ", strip=True)
-        # 줄 단위로 잡음 필터링
-        lines = raw_text.split(" ")
+        # 줄 단위로 잡음 필터링 (단어 단위 분할 → 잡음 패턴 라인 단위 판정)
+        # 개행·연속공백 정리 후 의미 단위로 분할
+        raw_text = re.sub(r"\s+", " ", raw_text).strip()
+        lines = re.split(r"(?<=[.다요됨함!\n])\s+", raw_text)
         clean_lines = []
         for line in lines:
             line = line.strip()
-            if not line or len(line) < 3:
+            if not line or len(line) < 2:
                 continue
             if self._JUNK_RE.search(line):
                 continue

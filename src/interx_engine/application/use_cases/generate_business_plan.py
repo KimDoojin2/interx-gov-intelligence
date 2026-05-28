@@ -373,7 +373,7 @@ def extract_sections_from_notice(notice: Notice) -> List[Dict]:
         return _default_sections(notice)
 
     try:
-        from interx_engine.infrastructure.ai.gemini_client import generate, is_available
+        from interx_engine.application.ports.gemini_port import generate, is_available
         if not is_available():
             return _default_sections(notice)
     except ImportError:
@@ -414,7 +414,7 @@ def extract_sections_from_template(template_text: str, notice_title: str = "") -
         return []
 
     try:
-        from interx_engine.infrastructure.ai.gemini_client import generate, is_available
+        from interx_engine.application.ports.gemini_port import generate, is_available
         if not is_available():
             return _parse_sections_regex(template_text)
     except ImportError:
@@ -459,7 +459,7 @@ def generate_section_content(
 ) -> str:
     """한 섹션의 내용을 Gemini로 생성 — 지식베이스 기반 상세 콘텐츠."""
     try:
-        from interx_engine.infrastructure.ai.gemini_client import generate, is_available
+        from interx_engine.application.ports.gemini_port import generate, is_available
         if not is_available():
             return _fallback_content(section, notice, solutions, company_name)
     except ImportError:

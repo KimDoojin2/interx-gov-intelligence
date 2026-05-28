@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Tuple
 from interx_engine.core.entities.notice import Notice
 from interx_engine.core.entities.score_card import ScoreCard
 from interx_engine.core.entities.prediction_result import PredictionResult, WinPredictionReport
-from interx_engine.infrastructure.utils.budget_parser import normalize_budget
+from interx_engine.application.ports.budget_utils_port import normalize_budget
 
 log = logging.getLogger("interx.win_prediction")
 
@@ -28,11 +28,8 @@ _MODEL_FILENAME = "win_pred_model.pkl"   # v2: 앙상블 모델
 
 def _model_path() -> Path:
     """data/models/win_pred_model.pkl 경로 반환."""
-    try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return Path(settings.project_root) / "data" / "models" / _MODEL_FILENAME
-    except Exception:
-        return Path.cwd() / "data" / "models" / _MODEL_FILENAME
+    from interx_engine.application.ports.settings_port import project_root
+    return Path(project_root()) / "data" / "models" / _MODEL_FILENAME
 
 
 def _legacy_model_path() -> Path:
@@ -273,11 +270,8 @@ def export_training_data(
     execution_id: str = "",
 ) -> Optional[Path]:
     """파이프라인 실행 결과를 JSONL 형식으로 data/exports/training/에 저장."""
-    try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        root = Path(settings.project_root)
-    except Exception:
-        root = Path.cwd()
+    from interx_engine.application.ports.settings_port import project_root
+    root = Path(project_root())
 
     out_dir = root / "data" / "exports" / "training"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -353,11 +347,8 @@ class WinPredictionTrainer:
     """
 
     def __init__(self, db_path: str = "", memos_path: str = ""):
-        try:
-            from interx_engine.infrastructure.config.settings_loader import settings
-            root = Path(settings.project_root)
-        except Exception:
-            root = Path.cwd()
+        from interx_engine.application.ports.settings_port import project_root
+        root = Path(project_root())
 
         self.db_path    = Path(db_path)    if db_path    else root / "data" / "interx_pipeline.db"
         self.memos_path = Path(memos_path) if memos_path else root / "data" / "crm_memos.json"

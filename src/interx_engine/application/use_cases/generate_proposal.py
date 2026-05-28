@@ -36,8 +36,8 @@ _SECTIONS = [
 
 def _default_output_dir() -> str:
     try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return str(settings.proposal_output_dir())
+        from interx_engine.application.ports.settings_port import proposal_output_dir
+        return proposal_output_dir()
     except Exception:
         import tempfile
         return str(Path(tempfile.gettempdir()) / "interx_proposals")

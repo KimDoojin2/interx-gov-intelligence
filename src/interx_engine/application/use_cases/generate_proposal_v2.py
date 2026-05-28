@@ -130,8 +130,8 @@ def generate_proposals_v2(
 
     if not output_dir:
         try:
-            from interx_engine.infrastructure.config.settings_loader import settings
-            output_dir = str(settings.proposal_output_dir())
+            from interx_engine.application.ports.settings_port import proposal_output_dir
+            output_dir = proposal_output_dir()
         except Exception:
             import tempfile
             output_dir = str(Path(tempfile.gettempdir()) / "interx_proposals")

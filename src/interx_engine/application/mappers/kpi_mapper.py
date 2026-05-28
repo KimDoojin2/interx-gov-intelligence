@@ -12,11 +12,8 @@ from interx_engine.core.entities.score_card import ScoreCard
 
 
 def _urgent_dday() -> int:
-    try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return settings.urgent_dday()
-    except Exception:
-        return 7
+    from interx_engine.application.ports.settings_port import urgent_dday
+    return urgent_dday()
 
 
 def _ts() -> str:
