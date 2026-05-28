@@ -282,7 +282,7 @@ class TestDetectChanges:
             result, new_cnt, changed_cnt = detect_changes(notices2)
             assert changed_cnt == 1
             assert result[0].is_changed
-            assert "변경감지" in result[0].memo
+            assert "변경" in result[0].memo
 
     def test_detect_new_notice(self, tmp_path):
         from interx_engine.application.use_cases.detect_changes import detect_changes

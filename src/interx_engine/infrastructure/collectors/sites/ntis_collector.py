@@ -30,10 +30,10 @@ class NtisCollector(BaseCollector):
     ssl_verify   = True
     fetch_detail = True
 
-    # NTIS 공고 목록 URL (pageNumber 기반 페이지네이션)
+    # NTIS 공고 목록 URL
     LIST_URL = (
-        "https://www.ntis.go.kr/rndgate/eg/announce/annEgAnncList.do"
-        "?pageNumber={page}&pageSize=20"
+        "https://www.ntis.go.kr/ThSearchRndAnncList.do"
+        "?pageNo={page}&pageSize=20"
     )
 
     # ── NTIS 목록 HTML 파싱 ──────────────────────────────────────────────────

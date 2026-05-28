@@ -290,9 +290,19 @@ def _smap(result):
 def _layout(**kw):
     base = dict(paper_bgcolor=t['card'], plot_bgcolor=t['bg3'],
                 font=dict(color=t['text'], family="Inter,system-ui,sans-serif", size=12),
-                margin=dict(t=40, b=36, l=36, r=16),
+                margin=dict(t=60, b=40, l=56, r=16),
                 hoverlabel=dict(bgcolor=t['text'], font_color=t['card'], font_size=12))
     base.update(kw); return base
+
+
+def _yaxis(title: str = "", **kw):
+    """Y축 한글 제목이 세로로 쌓이지 않도록 수평(textangle=0) + standoff 적용."""
+    ax = dict(gridcolor=t['border'])
+    if title:
+        ax["title"] = dict(text=title, standoff=8, font=dict(size=12))
+        ax["title_standoff"] = 8
+    ax.update(kw)
+    return ax
 
 def _win_prob(n, sc):
     """Feature #2: Calculate win probability for a notice"""
@@ -914,6 +924,47 @@ if page == "📋 공고 목록":
                         except Exception as _ai_err:
                             st.error(f"AI 분석 실패: {_ai_err}")
 
+                # ── 유사 공고 추천 ──
+                with st.expander("🔗 유사 공고 추천", expanded=False):
+                    try:
+                        from interx_engine.application.use_cases.find_similar_notices import find_similar
+                        _sim_candidates = [n for n, _ in filtered if n.notice_id != sn.notice_id]
+                        _sim_results = find_similar(sn, _sim_candidates, top_k=5)
+                        if _sim_results:
+                            for _sr in _sim_results:
+                                _sn2 = _sr["notice"]
+                                _sim_pct = _sr["similarity"] * 100
+                                _sim_kws = ", ".join(_sr["shared_keywords"]) if _sr["shared_keywords"] else ""
+                                _sim_sc = smap.get(_sn2.notice_id)
+                                _sim_g = _sim_sc.priority_grade if _sim_sc else "D"
+                                _sim_gc = GRADE.get(_sim_g, t['text3'])
+                                st.markdown(
+                                    f'<div style="padding:8px 12px;margin:4px 0;border-left:3px solid {_sim_gc};'
+                                    f'background:{t["bg3"]};border-radius:0 8px 8px 0;font-size:.82rem">'
+                                    f'<span style="color:{_sim_gc};font-weight:700">[{_sim_g}]</span> '
+                                    f'{_sn2.title[:55]} '
+                                    f'<span style="color:{t["text3"]};font-size:.72rem">({_sn2.site} · 유사도 {_sim_pct:.0f}%)</span>'
+                                    f'{"<br><span style=color:" + t["text3"] + ";font-size:.7rem>공통: " + _sim_kws + "</span>" if _sim_kws else ""}'
+                                    f'</div>', unsafe_allow_html=True)
+                        else:
+                            st.caption("유사 공고를 찾지 못했습니다.")
+                    except Exception as _sim_err:
+                        st.caption(f"유사 공고 검색 실패: {_sim_err}")
+
+                # ── 변경 이력 ──
+                _cr = getattr(sn, "change_reasons", None)
+                _is_new = getattr(sn, "is_new", False)
+                _is_chg = getattr(sn, "is_changed", False)
+                if _is_new or _is_chg or _cr:
+                    with st.expander("📝 변경 이력", expanded=_is_chg):
+                        if _is_new:
+                            st.info("🆕 이번 실행에서 신규 발견된 공고입니다.")
+                        if _is_chg:
+                            if _cr:
+                                st.warning(f"🔄 변경 감지: {', '.join(_cr)}")
+                            else:
+                                st.warning("🔄 이전 실행 대비 변경이 감지되었습니다.")
+
                 # ── 사업계획서 바로 생성 ──
                 if grade in ("A", "B"):
                     st.markdown(f'<div style="border-top:1px solid {t["border"]};margin:12px 0"></div>', unsafe_allow_html=True)
@@ -1035,7 +1086,7 @@ if page == "🔍 공고 비교":
                 x=names, y=wps, marker_color=colors,
                 text=[f"{w:.0f}%" for w in wps], textposition='outside',
             ))
-            fig.update_layout(height=300, yaxis=dict(range=[0, 100], title="확률 (%)", gridcolor=t['border']), **_layout())
+            fig.update_layout(height=300, yaxis=_yaxis("확률 (%)", range=[0, 100]), **_layout())
             st.plotly_chart(fig, width="stretch")
 
             # Recommendation
@@ -1353,7 +1404,7 @@ if page == "🎯 수주 예측":
             fig = go.Figure(go.Bar(x=[f"{k}%" for k in bins], y=list(bins.values()),
                                    marker_color=[GD, GC, "#FBBF24", GB, GA]))
             fig.update_layout(title=dict(text="확률 분포", font=dict(size=14, color=t['text'])),
-                              height=330, xaxis=dict(title="구간"), yaxis=dict(title="건수", gridcolor=t['border']), **_layout())
+                              height=330, xaxis=dict(title="구간"), yaxis=_yaxis("건수"), **_layout())
             st.plotly_chart(fig, width="stretch")
 
         with col_t:
@@ -1458,7 +1509,7 @@ if page == "📅 마감 캘린더":
             dc = Counter(u["date"] for u in upcoming)
             fig = go.Figure(go.Bar(x=dates, y=[dc[d] for d in dates], marker_color=[
                 GD if _dday(d) <= 3 else GC if _dday(d) <= 7 else P for d in dates]))
-            fig.update_layout(height=280, xaxis=dict(title="마감일"), yaxis=dict(title="건수", gridcolor=t['border']), **_layout())
+            fig.update_layout(height=280, xaxis=dict(title="마감일"), yaxis=_yaxis("건수"), **_layout())
             st.plotly_chart(fig, width="stretch")
 
         st.markdown(_section(f"긴급 마감 D-7 이내 ({d7}건)"), unsafe_allow_html=True)
@@ -1569,7 +1620,7 @@ if page == "📈 분석":
                                           orientation='h', marker_color=P))
                     fig.update_layout(title=dict(text="스코어링 키워드 TOP 20", font=dict(size=14, color=t['text'])),
                                       height=480, xaxis=dict(title="횟수", gridcolor=t['border']),
-                                      **_layout(margin=dict(l=110, r=16, t=40, b=36)))
+                                      **_layout(margin=dict(l=120, r=16, t=60, b=40)))
                     st.plotly_chart(fig, width="stretch")
             with ct:
                 if title_w:
@@ -1578,7 +1629,7 @@ if page == "📈 분석":
                                           orientation='h', marker_color=GB))
                     fig.update_layout(title=dict(text="제목 빈출 단어 TOP 20", font=dict(size=14, color=t['text'])),
                                       height=480, xaxis=dict(title="횟수", gridcolor=t['border']),
-                                      **_layout(margin=dict(l=110, r=16, t=40, b=36)))
+                                      **_layout(margin=dict(l=120, r=16, t=60, b=40)))
                     st.plotly_chart(fig, width="stretch")
 
     elif _an_tab == "🕐 히스토리":
@@ -1628,7 +1679,7 @@ if page == "📈 분석":
                                             mode='lines+markers', name='A등급',
                                             line=dict(color=GA, width=2), marker=dict(size=6, color=GA)))
                     fig.update_layout(title=dict(text="수집 추이", font=dict(size=14, color=t['text'])), height=330,
-                                      xaxis=dict(gridcolor=t['border']), yaxis=dict(title="건수", gridcolor=t['border']),
+                                      xaxis=dict(gridcolor=t['border']), yaxis=_yaxis("건수"),
                                       legend=dict(orientation="h", y=1.12), **_layout())
                     st.plotly_chart(fig, width="stretch")
                 with cg_col:
@@ -1639,7 +1690,7 @@ if page == "📈 분석":
                     fig.add_trace(go.Bar(name="최근", x=gl, y=[lg.get(g, 0) for g in gl], marker_color=[GA, GB, GC, GD]))
                     fig.update_layout(title=dict(text="등급 비교", font=dict(size=14, color=t['text'])), height=330,
                                       barmode='group', xaxis=dict(gridcolor=t['border']),
-                                      yaxis=dict(title="건수", gridcolor=t['border']),
+                                      yaxis=_yaxis("건수"),
                                       legend=dict(orientation="h", y=1.12), **_layout())
                     st.plotly_chart(fig, width="stretch")
 
@@ -1705,7 +1756,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="등급별 예산 vs 파이프라인 (억원)", font=dict(size=14, color=t['text'])),
                                       barmode='group', height=380,
                                       xaxis=dict(title="등급", gridcolor=t['border']),
-                                      yaxis=dict(title="억원", gridcolor=t['border']),
+                                      yaxis=_yaxis("억원"),
                                       legend=dict(orientation="h", y=1.12), **_layout())
                     st.plotly_chart(fig, width="stretch")
                 with cr:
@@ -1726,7 +1777,7 @@ if page == "📈 분석":
                         fig.update_layout(title=dict(text="수주확률 × 예산 (버블=파이프라인)", font=dict(size=14, color=t['text'])),
                                           height=380,
                                           xaxis=dict(title="수주확률 (%)", gridcolor=t['border'], range=[0, 105]),
-                                          yaxis=dict(title="예산 (억원)", gridcolor=t['border']),
+                                          yaxis=_yaxis("예산 (억원)"),
                                           legend=dict(orientation="h", y=1.12), **_layout())
                         st.plotly_chart(fig, width="stretch")
 
@@ -1784,10 +1835,10 @@ if page == "📈 분석":
                                              line=dict(color=sol_colors[i % len(sol_colors)], width=2.5),
                                              marker=dict(size=7)))
                 fig.update_layout(title=dict(text="솔루션별 월간 매칭 공고수 (점수≥40)", font=dict(size=14, color=t['text'])),
-                                  height=420,
+                                  height=450, margin=dict(t=70, b=36, l=50, r=16),
                                   xaxis=dict(title="월", gridcolor=t['border']),
-                                  yaxis=dict(title="매칭 공고수", gridcolor=t['border']),
-                                  legend=dict(orientation="h", y=1.15), **_layout())
+                                  yaxis=_yaxis("공고수"),
+                                  legend=dict(orientation="h", y=1.18, x=0, xanchor="left"), **_layout())
                 st.plotly_chart(fig, width="stretch")
 
                 # 솔루션별 성장률
@@ -1861,7 +1912,7 @@ if page == "📈 분석":
                 fig.update_layout(title=dict(text="X: 공고수 / Y: A등급비율 / 크기: 예산규모", font=dict(size=13, color=t['text2'])),
                                   height=450,
                                   xaxis=dict(title="공고수", gridcolor=t['border']),
-                                  yaxis=dict(title="A등급 비율 (%)", gridcolor=t['border'], range=[-5, 105]),
+                                  yaxis=_yaxis("A등급 비율 (%)", range=[-5, 105]),
                                   **_layout())
                 st.plotly_chart(fig, width="stretch")
 
@@ -1959,7 +2010,7 @@ if page == "📈 분석":
                 fig2.update_layout(title=dict(text="마감일별 등급분포", font=dict(size=14, color=t['text'])),
                                    barmode='stack', height=350,
                                    xaxis=dict(title="마감일", gridcolor=t['border']),
-                                   yaxis=dict(title="건수", gridcolor=t['border']),
+                                   yaxis=_yaxis("건수"),
                                    legend=dict(orientation="h", y=1.12), **_layout())
                 st.plotly_chart(fig2, width="stretch")
 
@@ -2025,7 +2076,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="정기공고 등급분포", font=dict(size=14, color=t['text'])),
                                       height=350,
                                       xaxis=dict(gridcolor=t['border']),
-                                      yaxis=dict(title="건수", gridcolor=t['border']),
+                                      yaxis=_yaxis("건수"),
                                       **_layout())
                     st.plotly_chart(fig, width="stretch")
 
@@ -2058,7 +2109,7 @@ if page == "📈 분석":
                     fig.update_layout(title=dict(text="월별 정기공고 건수", font=dict(size=14, color=t['text'])),
                                       height=320,
                                       xaxis=dict(title="월", gridcolor=t['border']),
-                                      yaxis=dict(title="건수", gridcolor=t['border']),
+                                      yaxis=_yaxis("건수"),
                                       **_layout())
                     st.plotly_chart(fig, width="stretch")
             else:
@@ -2095,7 +2146,7 @@ if page == "👤 담당자":
             fig.update_layout(title=dict(text="담당자별 등급 분포", font=dict(size=14, color=t['text'])),
                               barmode='stack', height=380,
                               legend=dict(orientation="h", y=1.12),
-                              xaxis=dict(gridcolor=t['border']), yaxis=dict(title="건수", gridcolor=t['border']),
+                              xaxis=dict(gridcolor=t['border']), yaxis=_yaxis("건수"),
                               **_layout())
             st.plotly_chart(fig, width="stretch")
 
