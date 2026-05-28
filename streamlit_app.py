@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import io, json, os, re, sys, time, hashlib
 from collections import Counter, defaultdict
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 
 import streamlit as st
@@ -1478,7 +1478,9 @@ if page == "📅 마감 캘린더":
 
 if page == "📈 분석":
     result = _result()
-    _an_tab = st.radio("분석 항목", ["🔧 솔루션", "📈 키워드", "🕐 히스토리"], horizontal=True, label_visibility="collapsed")
+    _an_tab = st.radio("분석 항목", ["🔧 솔루션", "📈 키워드", "🕐 히스토리",
+                                    "💰 파이프라인", "📊 솔루션트렌드", "🏛️ 부처별", "📅 마감히트맵", "🔄 정기공고"],
+                       horizontal=True, label_visibility="collapsed")
 
     if _an_tab == "🔧 솔루션":
         if not result:
@@ -1649,6 +1651,418 @@ if page == "📈 분석":
                            "변화": f"+{ls.get(s, 0) - ps.get(s, 0)}" if ls.get(s, 0) - ps.get(s, 0) > 0
                            else str(ls.get(s, 0) - ps.get(s, 0))} for s in asn]
                     st.dataframe(pd.DataFrame(sr), width="stretch", height=280)
+
+    # ── 💰 예상 수주 파이프라인 밸류 ──────────────────────────────────────────
+    elif _an_tab == "💰 파이프라인":
+        if not result:
+            st.markdown(_empty("💰", "파이프라인 데이터 없음", "수집 실행 후 예상 수주 파이프라인 밸류를 분석합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            from interx_engine.infrastructure.utils.budget_parser import parse_budget_eok
+            notices = result.get("notices", []); smap = _smap(result)
+            pipe_data = []
+            for n in notices:
+                sc = smap.get(n.notice_id)
+                bval = parse_budget_eok(n.budget or "") or 0
+                wp = _win_prob(n, sc)
+                grade = sc.priority_grade if sc else "D"
+                pipe_data.append({"title": n.title[:40], "agency": n.agency or "-",
+                                  "grade": grade, "budget": bval, "win_prob": wp,
+                                  "pipeline_val": bval * wp / 100,
+                                  "deadline": n.deadline_date or ""})
+            if pipe_data and any(d["budget"] > 0 for d in pipe_data):
+                pipe_data.sort(key=lambda x: -x["pipeline_val"])
+                total_pipe = sum(d["pipeline_val"] for d in pipe_data)
+                total_budget = sum(d["budget"] for d in pipe_data)
+                avg_wp = sum(d["win_prob"] for d in pipe_data) / len(pipe_data) if pipe_data else 0
+                top_pipe = pipe_data[0] if pipe_data else None
+
+                k1, k2, k3, k4 = st.columns(4)
+                k1.markdown(_kpi(f"{total_pipe:.1f}억", "파이프라인 총액", P), unsafe_allow_html=True)
+                k2.markdown(_kpi(f"{total_budget:.1f}억", "총 예산규모"), unsafe_allow_html=True)
+                k3.markdown(_kpi(f"{avg_wp:.0f}%", "평균 수주확률"), unsafe_allow_html=True)
+                k4.markdown(_kpi(f"{sum(1 for d in pipe_data if d['budget'] > 0)}건", "예산 공고"), unsafe_allow_html=True)
+
+                st.markdown(_section("등급별 파이프라인 구성"), unsafe_allow_html=True)
+                cl, cr = st.columns(2)
+                with cl:
+                    # 등급별 파이프라인 스택 바
+                    grade_pipe = defaultdict(float)
+                    grade_budget = defaultdict(float)
+                    grade_cnt = defaultdict(int)
+                    for d in pipe_data:
+                        if d["budget"] > 0:
+                            grade_pipe[d["grade"]] += d["pipeline_val"]
+                            grade_budget[d["grade"]] += d["budget"]
+                            grade_cnt[d["grade"]] += 1
+                    gl = ["A", "B", "C", "D"]
+                    gc = [GA, GB, GC, GD]
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(x=gl, y=[grade_budget.get(g, 0) for g in gl],
+                                         name="총 예산", marker_color=[c + "66" for c in gc]))
+                    fig.add_trace(go.Bar(x=gl, y=[grade_pipe.get(g, 0) for g in gl],
+                                         name="파이프라인 밸류", marker_color=gc))
+                    fig.update_layout(title=dict(text="등급별 예산 vs 파이프라인 (억원)", font=dict(size=14, color=t['text'])),
+                                      barmode='group', height=380,
+                                      xaxis=dict(title="등급", gridcolor=t['border']),
+                                      yaxis=dict(title="억원", gridcolor=t['border']),
+                                      legend=dict(orientation="h", y=1.12), **_layout())
+                    st.plotly_chart(fig, width="stretch")
+                with cr:
+                    # 수주확률 vs 예산 버블
+                    bub = [d for d in pipe_data if d["budget"] > 0]
+                    if bub:
+                        fig = go.Figure()
+                        for g, gc_c in [("A", GA), ("B", GB), ("C", GC), ("D", GD)]:
+                            gd = [d for d in bub if d["grade"] == g]
+                            if gd:
+                                fig.add_trace(go.Scatter(
+                                    x=[d["win_prob"] for d in gd], y=[d["budget"] for d in gd],
+                                    mode='markers', name=f"{g}등급",
+                                    marker=dict(size=[max(8, d["pipeline_val"] * 3) for d in gd],
+                                                color=gc_c, opacity=0.7, line=dict(width=1, color=gc_c)),
+                                    text=[d["title"] for d in gd], hovertemplate="%{text}<br>수주확률: %{x:.0f}%<br>예산: %{y:.1f}억<extra></extra>"
+                                ))
+                        fig.update_layout(title=dict(text="수주확률 × 예산 (버블=파이프라인)", font=dict(size=14, color=t['text'])),
+                                          height=380,
+                                          xaxis=dict(title="수주확률 (%)", gridcolor=t['border'], range=[0, 105]),
+                                          yaxis=dict(title="예산 (억원)", gridcolor=t['border']),
+                                          legend=dict(orientation="h", y=1.12), **_layout())
+                        st.plotly_chart(fig, width="stretch")
+
+                st.markdown(_section("파이프라인 TOP 15"), unsafe_allow_html=True)
+                top15 = [d for d in pipe_data if d["budget"] > 0][:15]
+                if top15:
+                    tdf = pd.DataFrame([{
+                        "등급": d["grade"], "공고": d["title"], "기관": d["agency"],
+                        "예산(억)": f"{d['budget']:.1f}", "수주확률": f"{d['win_prob']:.0f}%",
+                        "파이프라인(억)": f"{d['pipeline_val']:.2f}", "마감": d["deadline"]
+                    } for d in top15])
+                    st.dataframe(tdf, width="stretch", height=min(400, 40 + len(top15) * 35))
+            else:
+                st.markdown(_empty("💰", "예산 데이터 부족", "예산 정보가 포함된 공고가 없어 파이프라인 분석이 불가합니다."), unsafe_allow_html=True)
+
+    # ── 📊 솔루션별 시장 트렌드 ──────────────────────────────────────────────
+    elif _an_tab == "📊 솔루션트렌드":
+        if not result:
+            st.markdown(_empty("📊", "트렌드 데이터 없음", "수집 실행 후 솔루션별 시장 트렌드를 분석합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            notices = result.get("notices", []); smap = _smap(result)
+            SOL = {"ManufacturingDT": "제조 DT", "RecipeAI": "레시피 AI", "QualityAI": "품질 AI",
+                   "InspectionAI": "비전검사", "SafetyAI": "안전 AI", "GenAI": "GenAI",
+                   "InfraDS": "데이터 인프라", "PdM": "예지보전"}
+            # 월별 솔루션 매칭 집계
+            monthly_sol = defaultdict(lambda: defaultdict(int))
+            sol_total = defaultdict(int)
+            for n in notices:
+                sc = smap.get(n.notice_id)
+                if not sc or not sc.solution_scores: continue
+                month = (n.posted_date or n.deadline_date or "")[:7]
+                if not month or len(month) < 7: continue
+                for sol, score in sc.solution_scores.items():
+                    if score >= 40:
+                        monthly_sol[month][sol] += 1
+                        sol_total[sol] += 1
+            if monthly_sol:
+                months = sorted(monthly_sol.keys())
+                top_sols = sorted(sol_total.items(), key=lambda x: -x[1])[:6]
+                top_sol_keys = [s[0] for s in top_sols]
+                sol_colors = [P, GB, GA, GC, GD, A2, "#8B5CF6", "#EC4899"]
+
+                k1, k2, k3 = st.columns(3)
+                k1.markdown(_kpi(len(months), "분석 기간(월)"), unsafe_allow_html=True)
+                k2.markdown(_kpi(SOL.get(top_sol_keys[0], top_sol_keys[0]) if top_sol_keys else "-", "최다 매칭 솔루션"), unsafe_allow_html=True)
+                k3.markdown(_kpi(f"{sol_total.get(top_sol_keys[0], 0)}건" if top_sol_keys else "-", "최다 매칭 건수"), unsafe_allow_html=True)
+
+                st.markdown(_section("월별 솔루션 매칭 트렌드"), unsafe_allow_html=True)
+                fig = go.Figure()
+                for i, sol in enumerate(top_sol_keys):
+                    ys = [monthly_sol[m].get(sol, 0) for m in months]
+                    fig.add_trace(go.Scatter(x=months, y=ys, mode='lines+markers',
+                                             name=SOL.get(sol, sol),
+                                             line=dict(color=sol_colors[i % len(sol_colors)], width=2.5),
+                                             marker=dict(size=7)))
+                fig.update_layout(title=dict(text="솔루션별 월간 매칭 공고수 (점수≥40)", font=dict(size=14, color=t['text'])),
+                                  height=420,
+                                  xaxis=dict(title="월", gridcolor=t['border']),
+                                  yaxis=dict(title="매칭 공고수", gridcolor=t['border']),
+                                  legend=dict(orientation="h", y=1.15), **_layout())
+                st.plotly_chart(fig, width="stretch")
+
+                # 솔루션별 성장률
+                st.markdown(_section("솔루션별 트렌드 요약"), unsafe_allow_html=True)
+                trend_rows = []
+                for sol in top_sol_keys:
+                    vals = [monthly_sol[m].get(sol, 0) for m in months]
+                    first_half = sum(vals[:len(vals)//2]) if len(vals) >= 2 else sum(vals)
+                    second_half = sum(vals[len(vals)//2:]) if len(vals) >= 2 else 0
+                    trend = "📈 상승" if second_half > first_half else "📉 하락" if second_half < first_half else "➡️ 유지"
+                    trend_rows.append({"솔루션": SOL.get(sol, sol), "총 매칭": sol_total[sol],
+                                       "전반기": first_half, "후반기": second_half, "트렌드": trend})
+                st.dataframe(pd.DataFrame(trend_rows), width="stretch", height=min(300, 40 + len(trend_rows) * 35))
+            else:
+                st.markdown(_empty("📊", "솔루션 트렌드 데이터 부족", "월별 분석을 위한 날짜 정보가 부족합니다."), unsafe_allow_html=True)
+
+    # ── 🏛️ 부처·기관별 포트폴리오 ────────────────────────────────────────────
+    elif _an_tab == "🏛️ 부처별":
+        if not result:
+            st.markdown(_empty("🏛️", "부처별 데이터 없음", "수집 실행 후 부처·기관별 포트폴리오를 분석합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            from interx_engine.infrastructure.utils.budget_parser import parse_budget_eok
+            notices = result.get("notices", []); smap = _smap(result)
+            agency_data = defaultdict(lambda: {"count": 0, "A": 0, "total_budget": 0, "grades": defaultdict(int)})
+            for n in notices:
+                sc = smap.get(n.notice_id)
+                grade = sc.priority_grade if sc else "D"
+                ag = n.agency or n.ministry or "기타"
+                agency_data[ag]["count"] += 1
+                agency_data[ag]["grades"][grade] += 1
+                if grade == "A": agency_data[ag]["A"] += 1
+                bval = parse_budget_eok(n.budget or "") or 0
+                agency_data[ag]["total_budget"] += bval
+
+            if agency_data:
+                top_agencies = sorted(agency_data.items(), key=lambda x: -x[1]["count"])
+                top_ag = top_agencies[0][0] if top_agencies else "-"
+                total_ag = len(agency_data)
+                max_a = max((v["A"] for v in agency_data.values()), default=0)
+
+                k1, k2, k3 = st.columns(3)
+                k1.markdown(_kpi(total_ag, "참여 기관수"), unsafe_allow_html=True)
+                k2.markdown(_kpi(top_ag[:12], "최다 공고 기관"), unsafe_allow_html=True)
+                k3.markdown(_kpi(f"{max_a}건", "최다 A등급"), unsafe_allow_html=True)
+
+                st.markdown(_section("기관별 포트폴리오 버블차트"), unsafe_allow_html=True)
+                # 버블: x=공고수, y=A등급비율, size=예산합계
+                bub_data = []
+                for ag, d in top_agencies[:30]:
+                    a_ratio = (d["A"] / d["count"] * 100) if d["count"] > 0 else 0
+                    bub_data.append({"agency": ag, "count": d["count"], "a_ratio": a_ratio,
+                                     "budget": d["total_budget"], "A": d["A"]})
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=[d["count"] for d in bub_data],
+                    y=[d["a_ratio"] for d in bub_data],
+                    mode='markers+text',
+                    marker=dict(
+                        size=[max(12, min(60, d["budget"] * 2 + 10)) for d in bub_data],
+                        color=[d["a_ratio"] for d in bub_data],
+                        colorscale=[[0, GD], [0.5, GC], [1, GA]],
+                        showscale=True, colorbar=dict(title="A등급%"),
+                        opacity=0.7, line=dict(width=1, color=t['border'])
+                    ),
+                    text=[d["agency"][:8] for d in bub_data],
+                    textposition="top center", textfont=dict(size=9, color=t['text2']),
+                    hovertemplate="%{text}<br>공고수: %{x}<br>A등급비율: %{y:.0f}%<br><extra></extra>"
+                ))
+                fig.update_layout(title=dict(text="X: 공고수 / Y: A등급비율 / 크기: 예산규모", font=dict(size=13, color=t['text2'])),
+                                  height=450,
+                                  xaxis=dict(title="공고수", gridcolor=t['border']),
+                                  yaxis=dict(title="A등급 비율 (%)", gridcolor=t['border'], range=[-5, 105]),
+                                  **_layout())
+                st.plotly_chart(fig, width="stretch")
+
+                st.markdown(_section("기관별 상세 현황"), unsafe_allow_html=True)
+                ag_rows = [{"기관": ag, "공고수": d["count"], "A": d["grades"].get("A", 0),
+                            "B": d["grades"].get("B", 0), "C": d["grades"].get("C", 0),
+                            "D": d["grades"].get("D", 0),
+                            "A비율": f"{d['A']/d['count']*100:.0f}%" if d["count"] > 0 else "0%",
+                            "예산합(억)": f"{d['total_budget']:.1f}"}
+                           for ag, d in top_agencies[:20]]
+                st.dataframe(pd.DataFrame(ag_rows), width="stretch", height=min(400, 40 + len(ag_rows) * 35))
+            else:
+                st.markdown(_empty("🏛️", "기관 데이터 없음", "분석할 기관 정보가 없습니다."), unsafe_allow_html=True)
+
+    # ── 📅 마감 타임라인 히트맵 ──────────────────────────────────────────────
+    elif _an_tab == "📅 마감히트맵":
+        if not result:
+            st.markdown(_empty("📅", "마감 데이터 없음", "수집 실행 후 마감 타임라인 히트맵을 제공합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            notices = result.get("notices", []); smap = _smap(result)
+            today = date.today()
+            # 향후 12주 히트맵
+            deadline_data = defaultdict(lambda: {"A": 0, "B": 0, "C": 0, "D": 0, "total": 0, "titles": []})
+            for n in notices:
+                dl = n.deadline_date or ""
+                if not dl: continue
+                try:
+                    dl_date = datetime.strptime(dl, "%Y-%m-%d").date()
+                except Exception: continue
+                diff = (dl_date - today).days
+                if diff < -7 or diff > 84: continue  # -1주 ~ +12주
+                sc = smap.get(n.notice_id)
+                grade = sc.priority_grade if sc else "D"
+                deadline_data[dl]["total"] += 1
+                deadline_data[dl][grade] += 1
+                deadline_data[dl]["titles"].append(f"[{grade}] {n.title[:30]}")
+
+            if deadline_data:
+                this_week = sum(1 for dl, d in deadline_data.items() if 0 <= _dday(dl) <= 7)
+                urgent = sum(d["A"] for d in deadline_data.values())
+                total_upcoming = sum(d["total"] for d in deadline_data.values())
+                peak_day = max(deadline_data.items(), key=lambda x: x[1]["total"])[0] if deadline_data else "-"
+
+                k1, k2, k3, k4 = st.columns(4)
+                k1.markdown(_kpi(f"{total_upcoming}건", "마감 예정 공고"), unsafe_allow_html=True)
+                k2.markdown(_kpi(f"{this_week}건", "이번주 마감", GD), unsafe_allow_html=True)
+                k3.markdown(_kpi(f"{urgent}건", "A등급 마감", GA), unsafe_allow_html=True)
+                k4.markdown(_kpi(peak_day[5:] if len(peak_day) >= 7 else peak_day, "최다 마감일"), unsafe_allow_html=True)
+
+                st.markdown(_section("주간 마감 히트맵"), unsafe_allow_html=True)
+                # 주별 x 요일별 히트맵
+                week_labels = []
+                day_labels = ["월", "화", "수", "목", "금", "토", "일"]
+                hm = []  # [week][day] = count
+                hm_text = []
+                num_weeks = 12
+                for w in range(num_weeks):
+                    week_start = today + timedelta(days=-today.weekday() + w * 7)
+                    week_labels.append(week_start.strftime("%m/%d"))
+                    week_row = []
+                    text_row = []
+                    for d in range(7):
+                        dd = week_start + timedelta(days=d)
+                        ds = dd.strftime("%Y-%m-%d")
+                        info = deadline_data.get(ds, {"total": 0, "A": 0, "B": 0, "titles": []})
+                        week_row.append(info["total"])
+                        tip = f"{ds}\n총 {info['total']}건" + (f" (A:{info['A']})" if info["A"] > 0 else "")
+                        text_row.append(tip)
+                    hm.append(week_row)
+                    hm_text.append(text_row)
+
+                fig = go.Figure(go.Heatmap(
+                    z=list(zip(*hm)),  # transpose: [day][week]
+                    x=week_labels, y=day_labels,
+                    text=list(zip(*hm_text)),
+                    hovertemplate="%{text}<extra></extra>",
+                    colorscale=[[0, t['bg3']], [0.3, "#FCD34D"], [0.6, P], [1, GD]],
+                    showscale=True, colorbar=dict(title="건수"),
+                ))
+                fig.update_layout(title=dict(text="향후 12주 마감 현황 (요일 × 주차)", font=dict(size=14, color=t['text'])),
+                                  height=320,
+                                  xaxis=dict(title="주차 시작일", gridcolor=t['border']),
+                                  yaxis=dict(autorange="reversed"),
+                                  **_layout())
+                st.plotly_chart(fig, width="stretch")
+
+                # 일별 타임라인 (등급별 스택)
+                st.markdown(_section("일별 마감 타임라인"), unsafe_allow_html=True)
+                sorted_dates = sorted(deadline_data.keys())
+                fig2 = go.Figure()
+                for g, gc_c in [("A", GA), ("B", GB), ("C", GC), ("D", GD)]:
+                    fig2.add_trace(go.Bar(x=sorted_dates, y=[deadline_data[d].get(g, 0) for d in sorted_dates],
+                                          name=f"{g}등급", marker_color=gc_c))
+                fig2.update_layout(title=dict(text="마감일별 등급분포", font=dict(size=14, color=t['text'])),
+                                   barmode='stack', height=350,
+                                   xaxis=dict(title="마감일", gridcolor=t['border']),
+                                   yaxis=dict(title="건수", gridcolor=t['border']),
+                                   legend=dict(orientation="h", y=1.12), **_layout())
+                st.plotly_chart(fig2, width="stretch")
+
+                # 이번주 마감 리스트
+                upcoming = []
+                for dl in sorted_dates:
+                    dd = _dday(dl)
+                    if 0 <= dd <= 7:
+                        for title_str in deadline_data[dl]["titles"]:
+                            upcoming.append({"마감일": dl, "D-Day": f"D-{dd}" if dd > 0 else "D-DAY", "공고": title_str})
+                if upcoming:
+                    st.markdown(_section("⚠️ 이번주 마감 공고"), unsafe_allow_html=True)
+                    st.dataframe(pd.DataFrame(upcoming), width="stretch", height=min(300, 40 + len(upcoming) * 35))
+            else:
+                st.markdown(_empty("📅", "마감 정보 없음", "마감일이 포함된 공고가 없습니다."), unsafe_allow_html=True)
+
+    # ── 🔄 정기공고 패턴 분석 ────────────────────────────────────────────────
+    elif _an_tab == "🔄 정기공고":
+        if not result:
+            st.markdown(_empty("🔄", "정기공고 데이터 없음", "수집 실행 후 정기공고 패턴을 분석합니다."), unsafe_allow_html=True)
+        else:
+            import plotly.graph_objects as go
+            notices = result.get("notices", []); smap = _smap(result)
+            # recurring_flag / recurring_group 기반 분석
+            recurring = [n for n in notices if getattr(n, "recurring_flag", "N") == "Y"]
+            non_recurring = [n for n in notices if getattr(n, "recurring_flag", "N") != "Y"]
+
+            # 그룹별 집계
+            groups = defaultdict(list)
+            for n in recurring:
+                grp = getattr(n, "recurring_group", "") or n.title[:20]
+                groups[grp].append(n)
+
+            k1, k2, k3 = st.columns(3)
+            k1.markdown(_kpi(len(recurring), "정기공고", P), unsafe_allow_html=True)
+            k2.markdown(_kpi(len(groups), "정기공고 그룹"), unsafe_allow_html=True)
+            k3.markdown(_kpi(f"{len(recurring)/len(notices)*100:.0f}%" if notices else "0%", "정기공고 비율"), unsafe_allow_html=True)
+
+            if recurring:
+                st.markdown(_section("정기공고 vs 비정기공고"), unsafe_allow_html=True)
+                cl, cr = st.columns(2)
+                with cl:
+                    fig = go.Figure(go.Pie(
+                        labels=["정기공고", "비정기공고"],
+                        values=[len(recurring), len(non_recurring)],
+                        marker=dict(colors=[P, t['text3']]),
+                        hole=0.55, textinfo="label+percent",
+                        textfont=dict(size=13)
+                    ))
+                    fig.update_layout(title=dict(text="정기/비정기 비율", font=dict(size=14, color=t['text'])),
+                                      height=350, showlegend=False, **_layout())
+                    st.plotly_chart(fig, width="stretch")
+                with cr:
+                    # 정기공고 등급분포
+                    rg = defaultdict(int)
+                    for n in recurring:
+                        sc = smap.get(n.notice_id)
+                        g = sc.priority_grade if sc else "D"
+                        rg[g] += 1
+                    gl = ["A", "B", "C", "D"]
+                    fig = go.Figure(go.Bar(x=gl, y=[rg.get(g, 0) for g in gl],
+                                           marker_color=[GA, GB, GC, GD]))
+                    fig.update_layout(title=dict(text="정기공고 등급분포", font=dict(size=14, color=t['text'])),
+                                      height=350,
+                                      xaxis=dict(gridcolor=t['border']),
+                                      yaxis=dict(title="건수", gridcolor=t['border']),
+                                      **_layout())
+                    st.plotly_chart(fig, width="stretch")
+
+                if groups:
+                    st.markdown(_section("정기공고 그룹 상세"), unsafe_allow_html=True)
+                    grp_rows = []
+                    for grp, nlist in sorted(groups.items(), key=lambda x: -len(x[1])):
+                        agencies = list(set(n.agency or "-" for n in nlist))
+                        deadlines = sorted([n.deadline_date for n in nlist if n.deadline_date])
+                        grades = [smap.get(n.notice_id).priority_grade if smap.get(n.notice_id) else "D" for n in nlist]
+                        best = min(grades, key=lambda g: ["A", "B", "C", "D"].index(g)) if grades else "-"
+                        grp_rows.append({
+                            "그룹명": grp[:40], "공고수": len(nlist), "기관": ", ".join(agencies[:2]),
+                            "최고등급": best, "최근마감": deadlines[-1] if deadlines else "-",
+                        })
+                    st.dataframe(pd.DataFrame(grp_rows), width="stretch", height=min(400, 40 + len(grp_rows) * 35))
+
+                # 월별 정기공고 추이
+                monthly_recurring = defaultdict(int)
+                for n in recurring:
+                    month = (n.posted_date or n.deadline_date or "")[:7]
+                    if month and len(month) >= 7:
+                        monthly_recurring[month] += 1
+                if len(monthly_recurring) >= 2:
+                    st.markdown(_section("월별 정기공고 추이"), unsafe_allow_html=True)
+                    months = sorted(monthly_recurring.keys())
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(x=months, y=[monthly_recurring[m] for m in months],
+                                         marker_color=P, name="정기공고"))
+                    fig.update_layout(title=dict(text="월별 정기공고 건수", font=dict(size=14, color=t['text'])),
+                                      height=320,
+                                      xaxis=dict(title="월", gridcolor=t['border']),
+                                      yaxis=dict(title="건수", gridcolor=t['border']),
+                                      **_layout())
+                    st.plotly_chart(fig, width="stretch")
+            else:
+                st.markdown(_empty("🔄", "정기공고 감지 없음", "recurring_flag가 설정된 공고가 없습니다. 수집 시 정기공고 감지가 활성화되어 있는지 확인하세요."), unsafe_allow_html=True)
 
 
 # =============================================================================
