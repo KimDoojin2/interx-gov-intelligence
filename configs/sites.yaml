@@ -5,7 +5,7 @@ sites:
     collector_type: requests
   - code: ntis
     name: NTIS
-    enabled: true
+    enabled: false          # 봇 차단 — Playwright 전환 필요
     collector_type: requests
   - code: iris
     name: IRIS (국가연구개발사업)
