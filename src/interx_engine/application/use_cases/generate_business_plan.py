@@ -1,20 +1,21 @@
 """
-사업계획서 AI 자동 생성기 — 공고 맞춤형 DOCX 출력 (하이브리드) v3.
+사업계획서 AI 자동 생성기 v4 — 부처별 실제 양식 기반 + 공고 맞춤형
 
-두 가지 모드 지원:
-  MODE 1 (양식 업로드): HWP/HWPX/PDF 양식 → 섹션 추출 → AI가 내용 채움
-  MODE 2 (공고 분석):   공고 본문에서 요구사항/목차 → AI가 구조+내용 생성
+v4 핵심 변경:
+  - configs/business_plan_templates.yaml 기반 부처/사업별 실제 양식 구조 활용
+  - 공고 → 부처/기관/사업명 매칭 → 해당 양식의 섹션 구조 자동 선택
+  - A등급 공고의 실제 요구사항을 분석하여 각 섹션 내용 생성
+  - 양식 업로드 모드(MODE 1)도 여전히 지원
 
-v3 핵심 개선:
-  - configs/company_knowledge.yaml 기반 회사 지식베이스 활용
-  - 섹션별 특화 프롬프트 (개요/필요성/목표/추진체계/사업화 등)
-  - 시장 데이터, 경쟁사 정보, 기술 표준 자동 주입
-  - max_tokens 4096으로 상세 콘텐츠 생성
-  - fallback도 지식베이스 기반 풍부한 콘텐츠
+파이프라인:
+  1. 공고 분석 → 부처/사업 유형 판별 → 템플릿 매칭
+  2. 매칭된 템플릿의 섹션 구조로 목차 결정
+  3. 공고 본문 + 회사 지식베이스 → Gemini가 각 섹션 작성
+  4. DOCX 조립 → 파일 저장
 
 핵심 원칙:
-  - 사업마다 성격이 다르므로, 고정 템플릿 대신 공고별 동적 구조 생성
   - 비용/예산/금액 정보는 절대 포함하지 않음
+  - skip_ai_content: true인 섹션은 AI 생성 건너뜀 (수기 작성 필요)
   - Gemini 2.0 Flash 무료 API (15 RPM)
 """
 from __future__ import annotations
@@ -33,18 +34,110 @@ log = logging.getLogger("interx.business_plan")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  템플릿 레지스트리 로딩
+# ═════════════════════════════════════════════════════════════════════════════
+
+_TEMPLATE_REGISTRY: Optional[List[Dict]] = None
+
+def _load_template_registry() -> List[Dict]:
+    """configs/business_plan_templates.yaml 로드."""
+    global _TEMPLATE_REGISTRY
+    if _TEMPLATE_REGISTRY is not None:
+        return _TEMPLATE_REGISTRY
+
+    candidates = [
+        Path(__file__).resolve().parents[4] / "configs" / "business_plan_templates.yaml",
+        Path(__file__).resolve().parents[3] / "configs" / "business_plan_templates.yaml",
+        Path(__file__).resolve().parents[2] / "configs" / "business_plan_templates.yaml",
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                _TEMPLATE_REGISTRY = data.get("templates", [])
+                log.info("[BusinessPlan] 템플릿 레지스트리 로드: %d개", len(_TEMPLATE_REGISTRY))
+                return _TEMPLATE_REGISTRY
+            except Exception as e:
+                log.warning("[BusinessPlan] 템플릿 레지스트리 로드 실패: %s", e)
+
+    _TEMPLATE_REGISTRY = []
+    return _TEMPLATE_REGISTRY
+
+
+def match_template(notice: Notice) -> Dict:
+    """공고 정보를 분석하여 가장 적합한 템플릿을 매칭."""
+    templates = _load_template_registry()
+    if not templates:
+        return {}
+
+    text = f"{notice.title} {notice.summary or ''} {notice.body_text[:2000] if notice.body_text else ''}".lower()
+    ministry_text = f"{notice.ministry or ''} {notice.agency or ''}".lower()
+
+    best_score = 0
+    best_template = None
+    generic_template = None
+
+    for tmpl in templates:
+        if tmpl.get("id") == "generic":
+            generic_template = tmpl
+            continue
+
+        score = 0
+
+        for kw in tmpl.get("ministry_keywords", []):
+            if kw.lower() in ministry_text:
+                score += 10
+            elif kw.lower() in text:
+                score += 5
+
+        for kw in tmpl.get("agency_keywords", []):
+            if kw.lower() in ministry_text:
+                score += 8
+            elif kw.lower() in text:
+                score += 4
+
+        for kw in tmpl.get("program_keywords", []):
+            if kw.lower() in text:
+                score += 3
+
+        if score > best_score:
+            best_score = score
+            best_template = tmpl
+
+    if best_template and best_score >= 3:
+        log.info("[BusinessPlan] 템플릿 매칭: %s (점수: %d)", best_template["name"], best_score)
+        return best_template
+
+    log.info("[BusinessPlan] 매칭 템플릿 없음 → 범용 템플릿 사용")
+    return generic_template or {}
+
+
+def get_template_sections(template: Dict) -> List[Dict]:
+    """템플릿에서 섹션 목록을 추출."""
+    sections = []
+    for sec in template.get("sections", []):
+        if sec.get("skip_ai_content"):
+            continue
+        sections.append({
+            "title": sec["title"],
+            "subsections": sec.get("subsections", []),
+            "guidance": sec.get("guidance", ""),
+        })
+    return sections
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  회사 지식베이스 로딩
 # ═════════════════════════════════════════════════════════════════════════════
 
 _KNOWLEDGE_BASE: Optional[Dict] = None
 
 def _load_knowledge_base() -> Dict:
-    """configs/company_knowledge.yaml 로드 (싱글턴)."""
     global _KNOWLEDGE_BASE
     if _KNOWLEDGE_BASE is not None:
         return _KNOWLEDGE_BASE
 
-    # 프로젝트 루트에서 configs/ 찾기
     candidates = [
         Path(__file__).resolve().parents[4] / "configs" / "company_knowledge.yaml",
         Path(__file__).resolve().parents[3] / "configs" / "company_knowledge.yaml",
@@ -65,7 +158,6 @@ def _load_knowledge_base() -> Dict:
 
 
 def _get_company_context() -> str:
-    """회사 기본 정보를 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     company = kb.get("company", {})
     if not company:
@@ -86,12 +178,10 @@ def _get_company_context() -> str:
 
 
 def _get_solutions_context(solutions: List[str]) -> str:
-    """관련 솔루션의 상세 기술 역량을 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     sol_data = kb.get("solutions", {})
     lines = []
 
-    # INTERX_CAPABILITIES 기본 정보
     for s in solutions:
         cap = INTERX_CAPABILITIES.get(s, {})
         if cap:
@@ -102,7 +192,6 @@ def _get_solutions_context(solutions: List[str]) -> str:
                 lines.append(f"  - {st}")
             lines.append("")
 
-    # 지식베이스의 상세 솔루션 정보 추가
     sol_mapping = {
         "GenAI": ["multi_agent_platform", "ai_copilot", "ontology_knowledge"],
         "PdM": ["pdm_system"],
@@ -128,12 +217,9 @@ def _get_solutions_context(solutions: List[str]) -> str:
                     lines.append(f"  {desc.strip()[:500]}")
                 for feat in detail.get("key_features", [])[:5]:
                     lines.append(f"  - {feat}")
-
-                # Agent 정보 (멀티-Agent 플랫폼)
                 for agent in detail.get("agents", [])[:4]:
                     lines.append(f"  [{agent['name']}] {agent['role']}")
                     lines.append(f"    기술: {agent['tech']}")
-
                 arch = detail.get("architecture", "")
                 if arch:
                     lines.append(f"  아키텍처: {arch.strip()[:300]}")
@@ -143,7 +229,6 @@ def _get_solutions_context(solutions: List[str]) -> str:
 
 
 def _get_market_context() -> str:
-    """시장 데이터를 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     market = kb.get("market_data", {})
     if not market:
@@ -176,7 +261,6 @@ def _get_market_context() -> str:
 
 
 def _get_competitor_context() -> str:
-    """경쟁사 정보를 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     comp = kb.get("competitors", {})
     if not comp:
@@ -196,7 +280,6 @@ def _get_competitor_context() -> str:
 
 
 def _get_standards_context() -> str:
-    """기술 표준 정보를 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     std = kb.get("standards", {})
     if not std:
@@ -216,7 +299,6 @@ def _get_standards_context() -> str:
 
 
 def _get_track_record_context() -> str:
-    """수행실적 정보를 프롬프트 텍스트로 변환."""
     kb = _load_knowledge_base()
     tr = kb.get("track_record", {})
     if not tr:
@@ -234,7 +316,7 @@ def _get_track_record_context() -> str:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  InterX 솔루션 역량 DB (기본)
+#  InterX 솔루션 역량 DB
 # ═════════════════════════════════════════════════════════════════════════════
 
 INTERX_CAPABILITIES = {
@@ -341,56 +423,90 @@ INTERX_CAPABILITIES = {
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _classify_section(title: str) -> str:
-    """섹션 제목을 유형으로 분류 → 특화 프롬프트 선택용."""
     t = title.lower()
     if any(kw in t for kw in ["개요", "목적", "배경", "정의", "범위"]):
         return "overview"
     if any(kw in t for kw in ["필요성", "현황", "동향", "시장", "기술수준"]):
         return "necessity"
-    if any(kw in t for kw in ["목표", "내용", "개발내용", "세부목표", "구축내용"]):
+    if any(kw in t for kw in ["목표", "내용", "개발내용", "세부목표", "구축내용", "세부 추진"]):
         return "goals"
     if any(kw in t for kw in ["추진", "전략", "방법", "체계", "일정", "인력"]):
         return "strategy"
-    if any(kw in t for kw in ["사업화", "시장진출", "매출", "수출"]):
+    if any(kw in t for kw in ["상용화", "시장진출", "매출", "수출", "확산"]):
         return "commercialization"
     if any(kw in t for kw in ["기대효과", "성과", "KPI", "효과", "활용"]):
         return "effects"
-    if any(kw in t for kw in ["기업", "역량", "조직", "실적", "연구개발기관"]):
+    if any(kw in t for kw in ["기업", "역량", "조직", "실적", "연구개발기관", "수행기관"]):
         return "company"
+    if any(kw in t for kw in ["안전", "보안"]):
+        return "safety"
+    if any(kw in t for kw in ["TRL", "기술준비도"]):
+        return "trl"
+    if any(kw in t for kw in ["지원", "유지", "하자", "보수"]):
+        return "support"
     if any(kw in t for kw in ["구축", "시스템", "설계", "아키텍처"]):
         return "goals"
     return "general"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  Step 1: 공고 본문에서 요구 섹션 구조 추출 (AI 기반)
+#  Step 1: 공고 → 템플릿 매칭 → 섹션 결정
 # ═════════════════════════════════════════════════════════════════════════════
 
-def extract_sections_from_notice(notice: Notice) -> List[Dict]:
-    """공고 본문을 분석하여 사업계획서 요구 섹션 구조를 추출."""
+def determine_sections(
+    notice: Notice,
+    template_text: str = "",
+) -> Tuple[List[Dict], str]:
+    """공고 분석 → 적합한 템플릿 매칭 → 섹션 구조 결정.
+
+    Returns:
+        (sections, template_name)
+    """
+    # MODE 1: 사용자가 양식 업로드한 경우
+    if template_text:
+        sections = extract_sections_from_template(template_text, notice.title)
+        if sections:
+            return sections, "업로드 양식"
+
+    # MODE 2: 템플릿 레지스트리에서 매칭
+    template = match_template(notice)
+    if template and template.get("sections"):
+        sections = get_template_sections(template)
+        if sections:
+            return sections, template.get("name", "매칭 템플릿")
+
+    # MODE 3: Gemini로 공고 본문 분석
+    sections = _extract_sections_from_notice_ai(notice)
+    if sections:
+        return sections, "공고 분석"
+
+    # MODE 4: 기본 섹션
+    return _default_sections(notice), "기본 템플릿"
+
+
+def _extract_sections_from_notice_ai(notice: Notice) -> List[Dict]:
+    """Gemini로 공고 본문에서 섹션 구조 추출."""
     text = _prepare_notice_text(notice)
     if not text or len(text) < 50:
-        return _default_sections(notice)
+        return []
 
     try:
         from interx_engine.application.ports.gemini_port import generate, is_available
         if not is_available():
-            return _default_sections(notice)
+            return []
     except ImportError:
-        return _default_sections(notice)
+        return []
 
     system = (
         "당신은 한국 정부지원사업 전문가입니다. "
         "아래 공고 본문을 분석하여, 이 사업의 사업계획서에 들어가야 할 "
         "섹션 구조(목차)를 추출하세요.\n\n"
         "반드시 JSON 배열로만 응답하세요. 다른 텍스트 없이.\n"
-        "형식:\n"
         '[{"title":"1. 섹션제목","subsections":["1.1 소제목","1.2 소제목"],"guidance":"이 섹션에서 요구하는 내용 설명"}]\n\n'
         "규칙:\n"
         "- 공고에서 명시적으로 요구하는 항목을 최우선으로 추출\n"
-        "- 공고에 양식/목차가 없으면, 사업 성격에 맞는 표준 구조를 생성\n"
         "- 비용/예산/사업비 관련 섹션은 제외\n"
-        "- 6~10개 대섹션이 적절 (R&D는 더 많을 수 있음)\n"
+        "- 6~10개 대섹션이 적절\n"
     )
 
     prompt = f"[공고 정보]\n제목: {notice.title}\n기관: {notice.agency or '-'}\n\n[본문]\n{text[:5000]}"
@@ -400,12 +516,12 @@ def extract_sections_from_notice(notice: Notice) -> List[Dict]:
                        temperature=0.3, max_tokens=2048, timeout=40)
         sections = _parse_sections_json(raw)
         if sections:
-            log.info("[BusinessPlan] 공고 분석 → %d개 섹션 추출", len(sections))
+            log.info("[BusinessPlan] 공고 AI 분석 → %d개 섹션 추출", len(sections))
             return sections
     except Exception as e:
         log.warning("[BusinessPlan] 섹션 추출 실패: %s", e)
 
-    return _default_sections(notice)
+    return []
 
 
 def extract_sections_from_template(template_text: str, notice_title: str = "") -> List[Dict]:
@@ -448,16 +564,16 @@ def extract_sections_from_template(template_text: str, notice_title: str = "") -
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  Step 2: 각 섹션 AI 내용 생성 (v3 — 지식베이스 기반)
+#  Step 2: 각 섹션 AI 내용 생성 (v4 — 템플릿 guidance 활용)
 # ═════════════════════════════════════════════════════════════════════════════
 
 def generate_section_content(
     section: Dict,
     notice: Notice,
     solutions: List[str],
+    template_name: str = "",
     company_name: str = "(주)인터엑스",
 ) -> str:
-    """한 섹션의 내용을 Gemini로 생성 — 지식베이스 기반 상세 콘텐츠."""
     try:
         from interx_engine.application.ports.gemini_port import generate, is_available
         if not is_available():
@@ -470,35 +586,30 @@ def generate_section_content(
     company_info = _get_company_context()
     guidance = section.get("guidance", "")
 
-    # 섹션 유형별 추가 컨텍스트
     extra_context = ""
-    if sec_type == "necessity":
+    if sec_type in ("necessity", "overview"):
         extra_context = f"\n{_get_market_context()}\n{_get_competitor_context()}\n{_get_standards_context()}"
-    elif sec_type == "overview":
-        extra_context = f"\n{_get_standards_context()}"
-    elif sec_type == "commercialization":
+    elif sec_type in ("commercialization", "effects"):
         extra_context = f"\n{_get_market_context()}"
     elif sec_type == "company":
         extra_context = f"\n{_get_track_record_context()}"
-    elif sec_type == "effects":
-        extra_context = f"\n{_get_market_context()}"
 
-    # 섹션 유형별 특화 지시사항
     type_instructions = _get_type_instructions(sec_type)
 
     system = (
         f"당신은 '{notice.title}' 사업의 사업계획서 작성 전문가입니다.\n"
-        f"한국 정부지원사업(중기부/산업부/과기부 등) 사업계획서를 10년 이상 작성해 온 "
-        f"최고 수준의 전문가로서, 실제 선정되는 수준의 상세하고 구체적인 내용을 작성합니다.\n\n"
+        f"한국 정부지원사업 사업계획서를 10년 이상 작성해 온 최고 수준의 전문가로서, "
+        f"실제 선정되는 수준의 상세하고 구체적인 내용을 작성합니다.\n\n"
         f"[기업 정보]\n{company_info}\n\n"
+        f"[사업계획서 양식] {template_name}\n\n"
         f"[작성 규칙]\n"
         "1. 한국어, 공식 문서 어투 (경어체 '-임', '-함' 종결)\n"
         "2. 비용/예산/금액 정보는 절대 포함하지 마세요\n"
         "3. [작성 필요] 같은 플레이스홀더 절대 사용 금지\n"
-        "4. 뻔한 일반론('생산성 향상', '품질 개선') 대신 구체적 기술명, 방법론, 수치를 기술\n"
+        "4. 뻔한 일반론 대신 구체적 기술명, 방법론, 수치를 기술\n"
         "5. 번호 매기기(○, -, □), 불릿 활용하여 가독성 확보\n"
-        "6. 해당 섹션에 적합한 내용만 작성 (섹션 범위를 벗어나지 말 것)\n"
-        "7. 구체적인 기술명(AAS, FMEA, OntoRef, SPC, RMS 등)과 표준명(IEC 63278 등)을 적극 활용\n"
+        "6. 해당 섹션에 적합한 내용만 작성\n"
+        "7. 구체적인 기술명(AAS, FMEA, OntoRef, SPC, RMS 등)과 표준명(IEC 63278 등) 활용\n"
         "8. 1500자 이상 상세하게 작성\n\n"
         f"{type_instructions}\n"
     )
@@ -511,15 +622,24 @@ def generate_section_content(
         f"[공고 정보]\n"
         f"공고명: {notice.title}\n"
         f"주관기관: {notice.agency or '-'}\n"
-        f"사업 요약: {(notice.summary or notice.body_text[:500])[:500]}\n\n"
+        f"부처: {notice.ministry or '-'}\n"
+        f"사업 요약: {(notice.summary or (notice.body_text[:500] if notice.body_text else ''))[:500]}\n\n"
         f"[기업 솔루션 상세]\n{sol_info}\n\n"
         f"{extra_context}\n\n"
         f"[작성 요청]\n"
         f"섹션: {section['title']}\n"
         f"{subsec_str}\n"
-        f"{'작성 지침: ' + guidance if guidance else ''}\n\n"
-        f"위 정보를 모두 활용하여 이 섹션의 내용을 1500자 이상 상세하게 작성하세요. "
-        f"구체적인 기술명, 시스템명, 방법론을 반드시 포함하세요."
+    )
+
+    if guidance:
+        prompt += (
+            f"\n[양식 작성 지침 — 반드시 이 지침에 맞춰 작성하세요]\n"
+            f"{guidance}\n"
+        )
+
+    prompt += (
+        f"\n위 정보를 모두 활용하여 이 섹션의 내용을 1500자 이상 상세하게 작성하세요. "
+        f"양식 작성 지침의 요구사항을 빠짐없이 반영하세요."
     )
 
     try:
@@ -534,66 +654,80 @@ def generate_section_content(
 
 
 def _get_type_instructions(sec_type: str) -> str:
-    """섹션 유형별 특화 작성 지시사항."""
     instructions = {
         "overview": (
             "[개요 섹션 작성 패턴]\n"
             "1. (기존 공정) 현재 제조 현장의 한계점을 구체적으로 기술\n"
-            "   예: '설비, 공정, 검사, 품질, 생산계획 영역이 PM·MES·SPC·RMS 등 개별 Legacy 시스템과 "
-            "작업자 경험 중심으로 분절 운영'\n"
             "2. (개발 기술) 해결하고자 하는 기술의 구체적 구성 요소 나열\n"
-            "   예: '산업 특화 멀티-Agent를 개발. 전문 Agent(생산관리, 예지보전, 품질 분석, 공정자동화, "
-            "생산계획)와 오케스트레이션 Agent, 지식 그래프 기반 체계로 구성'\n"
             "3. 연구개발 기술의 범위 (세부 기술 목록 나열)\n"
+            "4. AS-IS / TO-BE 비교를 포함하여 기술 도입 전후 변화 명확히 기술\n"
         ),
         "necessity": (
             "[필요성/현황 섹션 작성 패턴]\n"
-            "1. 국내 기술 동향 — 현재 수준과 한계(Level 2~3)를 구체적으로 기술\n"
+            "1. 국내 기술 동향 — 현재 수준과 한계를 구체적으로 기술\n"
             "2. 국내 시장 규모 — 제공된 시장 데이터를 반드시 인용 (연도, 금액, CAGR)\n"
             "3. 국내 경쟁기관 분석 — 각 경쟁사의 제품명과 특징, 인터엑스와의 차이점\n"
-            "4. 국외 기술 동향 — 글로벌 선도 기업(Siemens, Microsoft 등)의 최신 기술\n"
+            "4. 국외 기술 동향 — 글로벌 선도 기업의 최신 기술\n"
             "5. 국외 시장 규모 — 글로벌 시장 데이터 인용\n"
-            "6. 인터엑스 기술 수준 — 보유 기술과 Level 4 달성 가능성\n"
-            "주의: 반드시 구체적 기업명, 제품명, 수치를 포함할 것\n"
+            "6. 인터엑스 기술 수준 — 보유 기술과 목표 달성 가능성\n"
+            "반드시 구체적 기업명, 제품명, 수치를 포함할 것\n"
         ),
         "goals": (
             "[목표/내용 섹션 작성 패턴]\n"
             "1. 최종 목표를 2~3문장으로 명확히 기술\n"
             "2. 세부 목표를 [세부 목표 1], [세부 목표 2]... 형식으로 나열\n"
             "3. 각 세부 목표에 3개 이상의 구체적 기술 개발 항목 포함\n"
-            "   예: '(지식 구조화 기술) 설비, 공정, 검사, 품질, 생산계획, 보전 이력 등 이종 제조 데이터를 "
-            "통합 관리할 수 있도록 산업현장 데이터 항목과 관계 구조를 정의'\n"
             "4. 각 기술 항목에 구체적 방법론 명시 (4M1E, FMEA, RPN, AAS 등)\n"
+            "5. 성과지표를 포함하여 목표 달성 측정 방법 기술\n"
         ),
         "strategy": (
             "[추진전략/체계 섹션 작성 패턴]\n"
             "1. 추진 전략 — 단계별 접근법 (1단계: 기반구축 → 2단계: 개발 → 3단계: 실증)\n"
             "2. 추진 체계 — 총괄PM, 기술개발팀, 수요기업 역할 분담\n"
             "3. 기술개발팀 편성 — 팀별 역할 (AI팀, DT팀, 시스템연계팀 등)\n"
-            "4. 품질 관리 — HITL 승인 구조, 코드 리뷰, 테스트 자동화\n"
+            "4. 일자리 창출 — 신규 채용 계획, 청년 채용 포함\n"
         ),
         "commercialization": (
-            "[사업화 전략 섹션 작성 패턴]\n"
+            "[상용화/확산 전략 섹션 작성 패턴]\n"
             "1. 목표 시장 — 제공된 시장 규모 데이터 인용\n"
-            "2. 사업화 단계 — 실증 → 상용화 → 확산\n"
-            "3. 매출 전망 — 연차별 목표 (구체적 수치)\n"
-            "4. 시장 진출 전략 — B2B SaaS, 컨소시엄, 해외 진출\n"
-            "5. 고용 창출 효과\n"
+            "2. 상용화 단계 — 실증 → 상용화 → 확산\n"
+            "3. 시장 진출 전략 — B2B SaaS, 컨소시엄, 해외 진출\n"
+            "4. 글로벌화 전략 — 해외 시장 진출 방안\n"
+            "5. 사회 공헌 — ESG 기반 사회적 가치 창출\n"
         ),
         "effects": (
-            "[기대효과 섹션 작성 패턴]\n"
+            "[기대효과/성과 섹션 작성 패턴]\n"
             "1. 정량적 기대효과 — KPI별 목표 수치 (불량률 30%↓, 설비가동률 15%↑ 등)\n"
             "2. 정성적 기대효과 — 기술 자립, 표준화 기여 등\n"
             "3. 성과 활용방안 — 특허, 논문, 기술이전, 표준화 기여\n"
-            "4. 산업 파급효과 — 관련 산업 생태계 활성화\n"
+            "4. 과학·기술적 / 경제적·사회적 / 인프라 측면 구분하여 기술\n"
         ),
         "company": (
             "[기업 역량 섹션 작성 패턴]\n"
             "1. 기업 개요 — 설립, 대표, 인력, 소재지\n"
-            "2. 기술 역량 — 보유 기술(AAS, LLM, Agent 등) 상세 설명\n"
+            "2. 기술 역량 — 보유 기술 상세 설명\n"
             "3. 수행 실적 — 유사 과제 수행 경험\n"
             "4. 지식재산권 — 관련 특허 보유 현황\n"
             "5. 인증 현황 — 벤처기업, 이노비즈, 기업부설연구소\n"
+        ),
+        "safety": (
+            "[안전/보안 섹션 작성 패턴]\n"
+            "1. 안전조치 — 안전책임자, 안전관리규정, 안전관리비, 사고대처 방안\n"
+            "2. 보안조치 — 보안관리체계, 참여자 관리, 정보통신망 관리\n"
+            "3. 연구실 안전 — 연구실 안전환경 조성에 관한 법률 준수\n"
+        ),
+        "trl": (
+            "[TRL 섹션 작성 패턴]\n"
+            "1. 핵심기술요소(CTE) 정의 — 기술개발 목표의 성공여부를 결정하는 소재/부품/시스템\n"
+            "2. CTE별 TRL 목표 — 현재 단계 → 목표 단계\n"
+            "3. 단계별 시험평가 주체, 평가항목, 생산수준, 평가환경 기재\n"
+        ),
+        "support": (
+            "[지원/유지관리 섹션 작성 패턴]\n"
+            "1. 유지보수 범위 — Panel/SW 구분\n"
+            "2. 유지보수 세부내용 — 정기점검, 수시점검, 성능점검\n"
+            "3. 사업실패 시 조치계획 — 도입기업/공급기업 책임분담\n"
+            "4. 고용 계획 — 구축 전/후 고용 현황\n"
         ),
     }
     return instructions.get(sec_type, (
@@ -612,23 +746,21 @@ def build_docx(
     notice: Notice,
     sections: List[Dict],
     section_contents: Dict[str, str],
+    template_name: str = "",
     score_card: Optional[ScoreCard] = None,
     solutions: List[str] = None,
     company_name: str = "(주)인터엑스",
 ) -> Optional[str]:
-    """섹션 구조 + 생성된 내용 → DOCX 파일 조립."""
     try:
         from docx import Document
         from docx.shared import Pt, RGBColor, Inches
         from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
     except ImportError:
         log.error("[BusinessPlan] python-docx 미설치")
         return None
 
     doc = Document()
 
-    # ── 기본 스타일 ───────────────────────────────────────────────────────
     style = doc.styles["Normal"]
     style.font.name = "맑은 고딕"
     style.font.size = Pt(10)
@@ -654,7 +786,15 @@ def build_docx(
     run.font.size = Pt(28)
     run.font.color.rgb = RGBColor(0x00, 0x4E, 0x92)
 
-    for _ in range(4):
+    if template_name:
+        doc.add_paragraph()
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(f"[{template_name}]")
+        run.font.size = Pt(11)
+        run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+
+    for _ in range(3):
         doc.add_paragraph()
 
     for line in [
@@ -684,9 +824,11 @@ def build_docx(
     info_rows = [
         ("공고명", notice.title),
         ("주관기관", notice.agency or notice.ministry or "-"),
+        ("부처", notice.ministry or "-"),
         ("마감일", notice.deadline_date or "-"),
         ("사업유형", notice.category or "-"),
         ("출처", notice.site),
+        ("사용 양식", template_name or "-"),
     ]
     table = doc.add_table(rows=len(info_rows), cols=2)
     table.style = "Light Shading Accent 1"
@@ -697,7 +839,6 @@ def build_docx(
             for run in paragraph.runs:
                 run.bold = True
 
-    # 적합도 정보
     if score_card:
         doc.add_paragraph()
         grade = score_card.priority_grade or "-"
@@ -720,14 +861,8 @@ def build_docx(
             doc.add_paragraph(f"[작성 필요: {sec['title']}]")
             continue
 
-        # 소제목이 있으면 heading level 2로
-        for sub in sec.get("subsections", []):
-            pass
-
-        # 내용 파싱 및 추가
         _add_content_to_doc(doc, content)
-
-        doc.add_paragraph()  # 섹션 간 여백
+        doc.add_paragraph()
 
     # ── 부록: 공고 원문 ───────────────────────────────────────────────────
     doc.add_page_break()
@@ -785,25 +920,22 @@ def generate_business_plan(
             progress_callback(pct, msg)
         log.info("[BusinessPlan] [%d%%] %s", pct, msg)
 
-    # 지식베이스 사전 로드
-    _progress(3, "지식베이스 로딩...")
+    _progress(3, "지식베이스 & 템플릿 레지스트리 로딩...")
     _load_knowledge_base()
+    _load_template_registry()
 
     _progress(5, "솔루션 매칭 중...")
     solutions = _detect_relevant_solutions(notice, score_card)
 
-    # Step 1: 섹션 구조 추출
-    _progress(10, "섹션 구조 분석 중...")
-    if template_text:
-        sections = extract_sections_from_template(template_text, notice.title)
-        _progress(25, f"양식 분석 완료 → {len(sections)}개 섹션")
-    else:
-        sections = extract_sections_from_notice(notice)
-        _progress(25, f"공고 분석 완료 → {len(sections)}개 섹션")
+    # Step 1: 섹션 구조 결정 (템플릿 매칭)
+    _progress(10, "공고 분석 및 템플릿 매칭 중...")
+    sections, template_name = determine_sections(notice, template_text)
+    _progress(25, f"템플릿: {template_name} → {len(sections)}개 섹션")
 
     if not sections:
         _progress(25, "기본 섹션 구조 사용")
         sections = _default_sections(notice)
+        template_name = "기본 템플릿"
 
     # Step 2: 각 섹션 내용 생성
     section_contents = {}
@@ -811,7 +943,9 @@ def generate_business_plan(
     for i, sec in enumerate(sections):
         pct = 30 + int(60 * i / max(total, 1))
         _progress(pct, f"섹션 생성 중: {sec['title']} ({i+1}/{total})")
-        content = generate_section_content(sec, notice, solutions, company_name)
+        content = generate_section_content(
+            sec, notice, solutions, template_name, company_name,
+        )
         section_contents[sec["title"]] = content
 
     # Step 3: DOCX 조립
@@ -820,6 +954,7 @@ def generate_business_plan(
         notice=notice,
         sections=sections,
         section_contents=section_contents,
+        template_name=template_name,
         score_card=score_card,
         solutions=solutions,
         company_name=company_name,
@@ -833,8 +968,13 @@ def generate_business_plan(
 #  유틸리티 함수들
 # ═════════════════════════════════════════════════════════════════════════════
 
+# 하위 호환 — 기존 코드에서 호출될 수 있는 함수명 유지
+def extract_sections_from_notice(notice: Notice) -> List[Dict]:
+    sections, _ = determine_sections(notice)
+    return sections
+
+
 def _prepare_notice_text(notice: Notice) -> str:
-    """공고 분석용 텍스트 준비."""
     parts = []
     if notice.summary:
         parts.append(notice.summary)
@@ -848,10 +988,8 @@ def _prepare_notice_text(notice: Notice) -> str:
 
 
 def _detect_relevant_solutions(notice: Notice, sc: Optional[ScoreCard]) -> List[str]:
-    """공고에 적합한 솔루션 Top 3."""
-    text = f"{notice.title} {notice.summary} {notice.body_text[:2000]}".lower()
+    text = f"{notice.title} {notice.summary or ''} {(notice.body_text or '')[:2000]}".lower()
 
-    # ScoreCard 솔루션 점수 우선
     if sc and sc.solution_scores:
         ranked = sorted(
             [(k, v) for k, v in sc.solution_scores.items() if v > 0],
@@ -860,7 +998,6 @@ def _detect_relevant_solutions(notice: Notice, sc: Optional[ScoreCard]) -> List[
         if ranked:
             return [k for k, _ in ranked[:3]]
 
-    # 키워드 매칭 fallback
     scores = {}
     for sol_key, sol_info in INTERX_CAPABILITIES.items():
         scores[sol_key] = sum(1 for kw in sol_info["keywords"] if kw.lower() in text)
@@ -868,29 +1005,13 @@ def _detect_relevant_solutions(notice: Notice, sc: Optional[ScoreCard]) -> List[
     return [k for k, v in ranked[:3] if v > 0] or ["QualityAI", "PdM"]
 
 
-def _solutions_text(solutions: List[str]) -> str:
-    """솔루션 정보를 텍스트로 정리 (간략 버전)."""
-    lines = []
-    for s in solutions:
-        cap = INTERX_CAPABILITIES.get(s, {})
-        if cap:
-            lines.append(f"- {cap['name']}: {cap['desc']}")
-            lines.append(f"  기술스택: {cap['tech']}")
-            for st_item in cap.get("strengths", [])[:2]:
-                lines.append(f"  역량: {st_item}")
-    return "\n".join(lines) if lines else "범용 제조 AI 솔루션"
-
-
 def _parse_sections_json(raw: str) -> List[Dict]:
-    """Gemini 응답에서 JSON 배열 추출."""
     import json
 
-    # ```json ... ``` 블록 추출
     m = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", raw, re.DOTALL)
     if m:
         raw = m.group(1)
     else:
-        # 순수 JSON 배열 추출
         m = re.search(r"\[.*\]", raw, re.DOTALL)
         if m:
             raw = m.group(0)
@@ -913,7 +1034,6 @@ def _parse_sections_json(raw: str) -> List[Dict]:
 
 
 def _parse_sections_regex(text: str) -> List[Dict]:
-    """정규식으로 양식 텍스트에서 번호 매겨진 섹션 제목 추출."""
     patterns = [
         r"^(\d+[\.\)]\s+.+)$",
         r"^([IⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+[\.\)]\s+.+)$",
@@ -936,10 +1056,8 @@ def _parse_sections_regex(text: str) -> List[Dict]:
 
 
 def _default_sections(notice: Notice) -> List[Dict]:
-    """공고 분석 실패 시 기본 섹션 (사업 성격 추론)."""
-    title_lower = f"{notice.title} {notice.summary}".lower()
+    title_lower = f"{notice.title} {notice.summary or ''}".lower()
 
-    # 스마트공장 계열
     if any(kw in title_lower for kw in ["스마트공장", "스마트 공장", "제조ai", "스마트팩토리"]):
         return [
             {"title": "1. 스마트공장 구축 개요", "subsections": ["1.1 구축 목표", "1.2 현재 수준 진단", "1.3 목표 수준"], "guidance": ""},
@@ -950,7 +1068,6 @@ def _default_sections(notice: Notice) -> List[Dict]:
             {"title": "6. 기대효과 및 성과지표", "subsections": ["6.1 정량적 기대효과", "6.2 정성적 기대효과", "6.3 KPI"], "guidance": ""},
         ]
 
-    # R&D 계열
     if any(kw in title_lower for kw in ["연구개발", "r&d", "기술개발", "연구과제", "에이전트"]):
         return [
             {"title": "1. 필요성 및 현황", "subsections": ["1.1 개발 대상 기술/제품 개요", "1.2 국내외 기술과 시장 현황", "1.3 관련 지식재산권/표준화/인증 현황"], "guidance": ""},
@@ -961,7 +1078,6 @@ def _default_sections(notice: Notice) -> List[Dict]:
             {"title": "6. 연구개발기관 현황", "subsections": ["6.1 연구책임자 현황", "6.2 연구개발 실적", "6.3 연구시설/장비 보유현황"], "guidance": ""},
         ]
 
-    # 바우처 계열
     if any(kw in title_lower for kw in ["바우처", "voucher", "ai솔루션"]):
         return [
             {"title": "1. 사업 개요", "subsections": ["1.1 사업 목적", "1.2 AI 도입 필요성", "1.3 현재 업무 프로세스"], "guidance": ""},
@@ -971,7 +1087,6 @@ def _default_sections(notice: Notice) -> List[Dict]:
             {"title": "5. 기대효과", "subsections": ["5.1 정량적 효과", "5.2 정성적 효과"], "guidance": ""},
         ]
 
-    # 일반
     return [
         {"title": "1. 사업 개요", "subsections": ["1.1 사업 목적", "1.2 사업 범위", "1.3 추진 필요성"], "guidance": ""},
         {"title": "2. 기술 현황 및 필요성", "subsections": ["2.1 국내외 기술 동향", "2.2 시장 현황", "2.3 경쟁사 분석"], "guidance": ""},
@@ -988,7 +1103,6 @@ def _fallback_content(
     solutions: List[str],
     company_name: str,
 ) -> str:
-    """Gemini 실패 시 지식베이스 기반 풍부한 fallback 콘텐츠."""
     kb = _load_knowledge_base()
     company = kb.get("company", {})
     sol_data = kb.get("solutions", {})
@@ -998,22 +1112,16 @@ def _fallback_content(
     sol_names = [INTERX_CAPABILITIES.get(s, {}).get("name", s) for s in solutions]
     title = section["title"].lower()
 
-    # ── 개요 / 목적 / 배경 / 필요성 ──────────────────────────────────────
     if any(kw in title for kw in ["개요", "목적", "배경", "필요성", "현황"]):
         lines = [
             f"본 사업은 '{notice.title}'에 따라 {company_name}가 보유한 핵심 기술을 활용하여 추진하는 과제임.\n",
             "■ 기존 공정의 한계",
-            "현재 제조 현장에서는 설비, 공정, 검사, 품질, 생산계획 영역이 PM(Preventive Maintenance), "
-            "MES(Manufacturing Execution System), SPC(Statistical Process Control), "
-            "RMS(Recipe Management System) 등 개별 Legacy 시스템과 작업자 경험 중심으로 분절 운영되어, "
-            "고장 예측 결과가 생산계획에 즉시 반영되지 못하고, 검사 결과와 원인 공정-Recipe 조정-생산량 조정 간 "
-            "연결이 미흡한 상태임.\n",
+            "현재 제조 현장에서는 설비, 공정, 검사, 품질, 생산계획 영역이 PM, MES, SPC, RMS 등 "
+            "개별 Legacy 시스템과 작업자 경험 중심으로 분절 운영되어, 고장 예측 결과가 생산계획에 "
+            "즉시 반영되지 못하는 한계가 있음.\n",
             "■ 개발 기술",
-            f"{company_name}는 기구축된 데이터/모델 자산을 활용하여, 설비-공정-검사-품질-생산계획 데이터를 "
-            "통합 해석하고 현장 시스템과 연계하는 산업 특화 멀티-Agent를 개발하고자 함.\n",
-            "전문 Agent 구성:",
+            f"{company_name}는 기구축된 데이터/모델 자산을 활용하여, 산업 특화 멀티-Agent를 개발하고자 함.\n",
         ]
-        # 에이전트 정보 추가
         ma = sol_data.get("multi_agent_platform", {})
         for agent in ma.get("agents", [])[:5]:
             lines.append(f"  - {agent['name']}: {agent['role']}")
@@ -1022,56 +1130,27 @@ def _fallback_content(
         for cap in company.get("core_competency", [])[:5]:
             lines.append(f"  - {cap}")
 
-        # 시장 데이터
         dt_kr = market.get("digital_twin", {}).get("korea", {})
         if dt_kr:
             lines.append(f"\n■ 시장 규모")
-            lines.append(f"  - 한국 디지털트윈 시장: {dt_kr.get('size_2024','')} (2024) → {dt_kr.get('size_2033','')} (2033), CAGR {dt_kr.get('cagr','')}")
-
-        ai_g = market.get("ai_agent", {}).get("global", {})
-        if ai_g:
-            lines.append(f"  - 글로벌 AI Agent 시장: {ai_g.get('size_2024','')} (2024) → {ai_g.get('size_2030','')} (2030), CAGR {ai_g.get('cagr','')}")
-
-        # 경쟁사
-        if comp.get("domestic"):
-            lines.append("\n■ 국내 주요 경쟁기관")
-            for c in comp.get("domestic", [])[:4]:
-                lines.append(f"  - {c['name']}: {c['product']} — {c['focus']}")
-            diff = comp.get("interx_differentiation", "")
-            if diff:
-                lines.append(f"\n■ 인터엑스 차별점\n  {diff.strip()[:400]}")
+            lines.append(f"  - 한국 DT 시장: {dt_kr.get('size_2024','')} (2024) → {dt_kr.get('size_2033','')} (2033)")
 
         return "\n".join(lines)
 
-    # ── 기업 역량 ─────────────────────────────────────────────────────────
-    if any(kw in title for kw in ["기업", "역량", "조직", "실적", "연구개발기관"]):
+    if any(kw in title for kw in ["기업", "역량", "조직", "실적", "연구개발기관", "수행기관"]):
         lines = [
             f"■ 기업 개요",
             f"{company_name}은 {company.get('established',2019)}년 설립된 {company.get('type','제조 AI 전문기업')}으로, "
-            f"대표이사 {company.get('ceo','박정윤')}, 소재지 {company.get('location','대전광역시')}, "
-            f"인력 {company.get('employees',25)}명 규모의 기업임.\n",
-            f"■ 핵심 기술 역량",
-            f"{company.get('description','').strip()}\n",
+            f"대표이사 {company.get('ceo','박정윤')}, 인력 {company.get('employees',25)}명 규모임.\n",
         ]
         for cap in company.get("core_competency", []):
             lines.append(f"  - {cap}")
-
         lines.append("\n■ 주요 수행실적")
         for p in kb.get("track_record", {}).get("projects", []):
             lines.append(f"  - [{p['name']}] {p.get('description','')}")
-
-        lines.append("\n■ 지식재산권")
-        for pat in company.get("patents", []):
-            lines.append(f"  - {pat}")
-
-        lines.append("\n■ 인증 현황")
-        for cert in company.get("certifications", []):
-            lines.append(f"  - {cert}")
-
         return "\n".join(lines)
 
-    # ── 기술 / 구축 / 개발 ────────────────────────────────────────────────
-    if any(kw in title for kw in ["기술", "구축", "개발", "내용", "목표"]):
+    if any(kw in title for kw in ["기술", "구축", "개발", "내용", "목표", "세부 추진"]):
         lines = ["■ 핵심 기술 적용 방안\n"]
         for s, n in zip(solutions, sol_names):
             cap = INTERX_CAPABILITIES.get(s, {})
@@ -1081,130 +1160,49 @@ def _fallback_content(
             for st in cap.get("strengths", []):
                 lines.append(f"  - {st}")
             lines.append("")
-
-        # 상세 솔루션 정보
-        ont = sol_data.get("ontology_knowledge", {})
-        if ont:
-            lines.append(f"□ {ont.get('name','온톨로지 기반 지식체계')}")
-            for feat in ont.get("key_features", []):
-                lines.append(f"  - {feat}")
-
-        lines.append("\n■ 시스템 아키텍처")
-        arch = sol_data.get("multi_agent_platform", {}).get("architecture", "")
-        if arch:
-            lines.append(f"  {arch.strip()[:500]}")
-
-        safety = sol_data.get("multi_agent_platform", {}).get("safety", "")
-        if safety:
-            lines.append(f"\n■ 안전성 확보 방안")
-            lines.append(f"  {safety.strip()[:300]}")
-
         return "\n".join(lines)
 
-    # ── 추진 체계 ─────────────────────────────────────────────────────────
     if "추진" in title:
         return (
             f"■ 추진 체계\n"
             f"  - 총괄 PM: {company_name} 대표이사 {company.get('ceo','박정윤')}\n"
-            f"  - 기술개발: AI/데이터 팀 (산업 AI Agent, 온톨로지, DT 담당)\n"
-            f"  - 시스템연계: 인프라팀 (PM/MES/SPC/RMS/APS 연동)\n"
-            f"  - 현장 실증: 수요기업 협력 (데이터 제공, 현장 검증)\n\n"
+            f"  - 기술개발: AI/데이터 팀\n"
+            f"  - 시스템연계: 인프라팀\n"
+            f"  - 현장 실증: 수요기업 협력\n\n"
             f"■ 추진 전략\n"
-            f"  1단계 (기반 구축): 온톨로지/지식그래프 구축, 데이터 파이프라인 설계\n"
-            f"  2단계 (핵심 개발): 멀티-Agent 플랫폼 개발, 개별 Agent 기능 구현\n"
-            f"  3단계 (통합/실증): 시스템 통합, 현장 실증, 성능 검증\n\n"
-            f"■ 품질 관리\n"
-            f"  - HITL(Human-in-the-loop) 승인 구조 적용\n"
-            f"  - Agent 실행 이력, 승인/반려 이력, 재시도 이력 누적 관리\n"
-            f"  - 코드 리뷰 및 테스트 자동화\n"
+            f"  1단계: 기반 구축 (온톨로지/지식그래프, 데이터 파이프라인)\n"
+            f"  2단계: 핵심 개발 (멀티-Agent, 개별 Agent 기능 구현)\n"
+            f"  3단계: 통합/실증 (시스템 통합, 현장 실증)\n"
         )
 
-    # ── 기대효과 / 성과 ───────────────────────────────────────────────────
-    if any(kw in title for kw in ["기대", "성과", "KPI", "효과", "활용"]):
-        lines = [
-            "■ 정량적 기대효과",
-            "  - 설비 가동률: 15% 이상 향상",
-            "  - 제품 불량률: 30% 이상 감소",
-            "  - 설비 고장 예측 정확도: 90% 이상",
-            "  - 생산계획 수립 시간: 50% 단축 (12h → 4h 이내)",
-            "  - 정비 비용: 30% 이상 절감",
-            "  - 생산성: 20% 이상 향상\n",
-            "■ 정성적 기대효과",
-            "  - 데이터 기반 의사결정 체계 구축으로 작업자 경험 의존도 탈피",
-            "  - AAS(IEC 63278-1) 표준 기반 제조 데이터 상호운용성 확보",
-            "  - 멀티-Agent 기반 자율 제어(Level 4) 구현으로 제조 AI 기술 선도",
-            "  - 온톨로지/FMEA 기반 지식 체계 구축으로 축적형 제조 지능화 실현\n",
-            "■ 성과 활용방안",
-            "  - 과제 성과를 기반으로 유사 제조 현장(반도체/자동차/화학) 확산",
-            "  - 솔루션 패키지화를 통한 B2B SaaS 모델 구축",
-            "  - 관련 특허 출원 및 기술 표준화 기여",
-        ]
+    if any(kw in title for kw in ["기대", "성과", "KPI", "효과", "활용", "확산"]):
+        return (
+            "■ 정량적 기대효과\n"
+            "  - 설비 가동률: 15% 이상 향상\n"
+            "  - 제품 불량률: 30% 이상 감소\n"
+            "  - 설비 고장 예측 정확도: 90% 이상\n"
+            "  - 생산계획 수립 시간: 50% 단축\n\n"
+            "■ 정성적 기대효과\n"
+            "  - 데이터 기반 의사결정 체계 구축\n"
+            "  - AAS(IEC 63278-1) 표준 기반 데이터 상호운용성 확보\n"
+            "  - 멀티-Agent 기반 자율 제어 구현\n"
+        )
 
-        # 시장 데이터 추가
-        dt_kr = market.get("digital_twin", {}).get("korea", {})
-        if dt_kr:
-            lines.append(f"\n■ 목표 시장 규모")
-            lines.append(f"  한국 디지털트윈 시장: {dt_kr.get('size_2024','')} → {dt_kr.get('size_2033','')} (CAGR {dt_kr.get('cagr','')})")
-
-        return "\n".join(lines)
-
-    # ── 사업화 ────────────────────────────────────────────────────────────
-    if any(kw in title for kw in ["사업화", "시장", "매출"]):
-        lines = [
-            "■ 사업화 전략",
-            f"  {company_name}는 본 과제의 성과를 기반으로 다음과 같은 사업화 전략을 추진함.\n",
-            "  1) 실증 → 상용화 → 확산 단계적 접근",
-            "    - 1단계: 수요기업 현장 실증 및 성과 검증",
-            "    - 2단계: 솔루션 패키지화 및 B2B SaaS 모델 구축",
-            "    - 3단계: 유사 산업(자동차, 화학, 소재) 확산 및 해외 진출\n",
-        ]
-
-        dt_kr = market.get("digital_twin", {}).get("korea", {})
-        ai_g = market.get("ai_agent", {}).get("global", {})
-        if dt_kr or ai_g:
-            lines.append("■ 목표 시장")
-            if dt_kr:
-                lines.append(f"  - 한국 DT 시장: {dt_kr.get('size_2024','')} (2024) → {dt_kr.get('size_2033','')} (2033)")
-            if ai_g:
-                lines.append(f"  - 글로벌 AI Agent 시장: {ai_g.get('size_2024','')} (2024) → {ai_g.get('size_2030','')} (2030)")
-
-        kai = market.get("korea_ai_industry", {})
-        if kai:
-            lines.append(f"\n■ 한국 AI 산업 현황")
-            lines.append(f"  총매출 {kai.get('total_revenue_2024','')}, B2B 비중 {kai.get('b2b_share','')}")
-
-        diff = comp.get("interx_differentiation", "")
-        if diff:
-            lines.append(f"\n■ 시장 차별화 전략\n  {diff.strip()[:400]}")
-
-        lines.append("\n■ 매출 전망")
-        lines.append("  - 1년차: 기반 구축 및 실증 (파일럿 매출)")
-        lines.append("  - 2년차: B2B 솔루션 론칭 및 초기 고객 확보")
-        lines.append("  - 3년차: 확산 및 해외 진출")
-
-        return "\n".join(lines)
-
-    # ── 그 외 ─────────────────────────────────────────────────────────────
     lines = [f"■ {section['title']}\n"]
     lines.append(f"{company_name}는 {', '.join(sol_names)} 기술을 보유한 제조 AI 전문기업으로, "
-                 f"'{notice.title}' 사업에 다음과 같이 참여하고자 함.\n")
+                 f"'{notice.title}' 사업에 참여하고자 함.\n")
     for s, n in zip(solutions, sol_names):
         cap = INTERX_CAPABILITIES.get(s, {})
         lines.append(f"  - {n}: {cap.get('desc', '')}")
-        for st in cap.get("strengths", [])[:2]:
-            lines.append(f"    {st}")
     return "\n".join(lines)
 
 
 def _add_content_to_doc(doc, content: str):
-    """텍스트 내용을 DOCX 문단으로 변환."""
     for line in content.split("\n"):
         line = line.strip()
         if not line:
             continue
-        # 마크다운 볼드 → 일반 텍스트
         line = re.sub(r"\*\*(.+?)\*\*", r"\1", line)
-        # 마크다운 헤더 → 굵은 텍스트
         header_match = re.match(r"^#{1,3}\s+(.+)", line)
         if header_match:
             from docx.shared import Pt
@@ -1213,7 +1211,6 @@ def _add_content_to_doc(doc, content: str):
             run.bold = True
             run.font.size = Pt(11)
             continue
-        # ■ □ 헤더 → 굵은 텍스트
         if re.match(r"^[■□]\s", line):
             from docx.shared import Pt
             p = doc.add_paragraph()
@@ -1221,7 +1218,6 @@ def _add_content_to_doc(doc, content: str):
             run.bold = True
             run.font.size = Pt(10.5)
             continue
-        # 불릿 아이템
         if re.match(r"^[-*]\s", line):
             doc.add_paragraph(line.lstrip("-* "), style="List Bullet")
         elif re.match(r"^\d+[\.\)]\s", line):
@@ -1232,8 +1228,11 @@ def _add_content_to_doc(doc, content: str):
             doc.add_paragraph(line)
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  파일 파싱 함수들
+# ═════════════════════════════════════════════════════════════════════════════
+
 def parse_uploaded_file(file_bytes: bytes, filename: str) -> str:
-    """업로드된 파일(PDF/HWP/HWPX/TXT)에서 텍스트 추출."""
     ext = Path(filename).suffix.lower()
 
     if ext == ".txt":
@@ -1256,7 +1255,6 @@ def parse_uploaded_file(file_bytes: bytes, filename: str) -> str:
 
 
 def _extract_pdf_text(data: bytes) -> str:
-    """PDF 텍스트 추출."""
     try:
         from pypdf import PdfReader
         import io
@@ -1275,7 +1273,6 @@ def _extract_pdf_text(data: bytes) -> str:
 
 
 def _extract_hwpx_text(data: bytes) -> str:
-    """HWPX (ZIP+XML) 텍스트 추출."""
     import zipfile
     import io
     try:
@@ -1299,7 +1296,6 @@ def _extract_hwpx_text(data: bytes) -> str:
 
 
 def _extract_hwp_text(data: bytes) -> str:
-    """HWP (바이너리 OLE) 텍스트 추출 — 노이즈 필터링 포함."""
     try:
         import olefile
         import zlib
