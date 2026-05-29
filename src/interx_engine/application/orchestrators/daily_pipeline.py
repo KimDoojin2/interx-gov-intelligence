@@ -38,19 +38,16 @@ log = logging.getLogger("interx.pipeline")
 
 
 def _urgent_dday() -> int:
-    try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        return settings.urgent_dday()
-    except Exception:
-        return 7
+    from interx_engine.application.ports.settings_port import urgent_dday
+    return urgent_dday()
 
 
 def _get_sqlite_writer():
     """SQLitePipelineWriter 싱글턴. 실패 시 None 반환."""
     try:
-        from interx_engine.infrastructure.config.settings_loader import settings
-        from interx_engine.infrastructure.persistence.sqlite_writer import SQLitePipelineWriter
-        return SQLitePipelineWriter(settings.db_path)
+        from interx_engine.application.ports.settings_port import db_path
+        from interx_engine.infrastructure.persistence.sqlite_writer import SQLitePipelineWriter  # noqa: infra-lazy
+        return SQLitePipelineWriter(db_path())
     except Exception as e:
         log.debug("[Pipeline] SQLite 초기화 실패: %s", e)
         return None
@@ -65,11 +62,11 @@ def _build_alert_gateway():
 
     try:
         if telegram_token and telegram_chat_id:
-            from interx_engine.infrastructure.alert.telegram_gateway import TelegramAlertGateway
+            from interx_engine.infrastructure.alert.telegram_gateway import TelegramAlertGateway  # noqa: infra-lazy
             log.info("[Pipeline] 알림: Telegram")
             return TelegramAlertGateway(telegram_token, telegram_chat_id)
         if slack_webhook:
-            from interx_engine.infrastructure.alert.slack_gateway import SlackAlertGateway
+            from interx_engine.infrastructure.alert.slack_gateway import SlackAlertGateway  # noqa: infra-lazy
             log.info("[Pipeline] 알림: Slack")
             return SlackAlertGateway(slack_webhook)
     except Exception as e:
@@ -215,8 +212,8 @@ class DailyPipelineOrchestrator:
 
         # ── 11-B. L3 공고 Claude API 요약 (settings.yaml summarize.enabled=true 만) ─
         try:
-            from interx_engine.infrastructure.config.settings_loader import settings as _s
-            if _s.summarize_enabled():
+            from interx_engine.application.ports.settings_port import summarize_enabled
+            if summarize_enabled():
                 from interx_engine.application.use_cases.summarize_l3 import summarize_l3_notices
                 l3_notices = [n for n in notices if n.l3_strong == "Y"]
                 if l3_notices:
@@ -340,7 +337,7 @@ class DailyPipelineOrchestrator:
 
         # ── 18. AI 일일 브리핑 생성 (Gemini 무료) ────────────────────────────
         try:
-            from interx_engine.infrastructure.ai.briefing_generator import generate_briefing
+            from interx_engine.infrastructure.ai.briefing_generator import generate_briefing  # noqa: infra-lazy
             sc_map = {s.notice_id: s for s in score_cards}
             briefing_text = generate_briefing(
                 notices=notices,

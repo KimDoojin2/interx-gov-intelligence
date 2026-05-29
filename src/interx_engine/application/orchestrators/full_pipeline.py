@@ -12,10 +12,6 @@ from interx_engine.application.use_cases.recommend_notices import RecommendNotic
 from interx_engine.application.use_cases.match_partners import MatchPartnersUseCase
 from interx_engine.application.use_cases.cluster_notices import ClusterNoticesUseCase
 from interx_engine.application.use_cases.alert_notices import AlertNoticesUseCase
-from interx_engine.infrastructure.matching.csv_partner_repository import CsvPartnerRepository
-from interx_engine.infrastructure.clustering.embedding_clusterer import EmbeddingClusterer
-from interx_engine.infrastructure.clustering.tfidf_clusterer import TfidfClusterer
-from interx_engine.infrastructure.storage.csv_writer import CsvFallbackWriter
 
 
 # ── JSON 아티팩트 저장 헬퍼 ───────────────────────────────────────────────────
@@ -51,11 +47,11 @@ def _build_alert_gateway():
     slack_webhook    = os.getenv("SLACK_WEBHOOK_URL", "")
 
     if telegram_token and telegram_chat_id:
-        from interx_engine.infrastructure.alert.telegram_gateway import TelegramAlertGateway
+        from interx_engine.infrastructure.alert.telegram_gateway import TelegramAlertGateway  # noqa: infra-lazy
         log.info("알림: Telegram 사용")
         return TelegramAlertGateway(telegram_token, telegram_chat_id)
     if slack_webhook:
-        from interx_engine.infrastructure.alert.slack_gateway import SlackAlertGateway
+        from interx_engine.infrastructure.alert.slack_gateway import SlackAlertGateway  # noqa: infra-lazy
         log.info("알림: Slack 사용")
         return SlackAlertGateway(slack_webhook)
 
@@ -121,6 +117,12 @@ class FullPipelineOrchestrator:
 
         self.base_dir     = base
         self.recommend_uc = RecommendNoticesUseCase()
+
+        # Infrastructure 의존성은 lazy import으로 주입 (아키텍처 위반 최소화)
+        from interx_engine.infrastructure.matching.csv_partner_repository import CsvPartnerRepository  # noqa: infra-lazy
+        from interx_engine.infrastructure.clustering.embedding_clusterer import EmbeddingClusterer  # noqa: infra-lazy
+        from interx_engine.infrastructure.storage.csv_writer import CsvFallbackWriter  # noqa: infra-lazy
+
         self.match_uc     = MatchPartnersUseCase(
             CsvPartnerRepository(str(base / "data/partners.csv"))
         )

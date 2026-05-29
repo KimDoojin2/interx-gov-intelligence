@@ -276,13 +276,13 @@ class KoiiaCollector(BaseCollector):
                     break
 
                 data = resp.json()
+                # KOIIA API는 {"items": [...], "result": ..., "tot": ...} 구조
                 items = (
-                    data if isinstance(data, list)
-                    else (
-                        data.get("data") or data.get("list") or data.get("results")
-                        or data.get("rows") or data.get("items") or data.get("content")
-                        or data.get("board") or data.get("notice") or []
-                    )
+                    data.get("items")  # 1순위: items 키 (KOIIA 실제 응답)
+                    or data.get("data") or data.get("list") or data.get("results")
+                    or data.get("rows") or data.get("content")
+                    or data.get("board") or data.get("notice")
+                    or (data if isinstance(data, list) else [])
                 )
                 # 여전히 없으면 dict 값 중 list인 것 탐색
                 if not items and isinstance(data, dict):

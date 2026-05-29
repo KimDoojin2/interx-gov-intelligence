@@ -37,7 +37,7 @@ class JejtpCollector(BaseCollector):
     )
 
     _JSON_API   = "https://www.jejutp.or.kr/board/business/list"
-    _DETAIL_TPL = "https://www.jejutp.or.kr/board/business/detail/{anno_id}"
+    _DETAIL_TPL = "https://www.jejutp.or.kr/board/business/{anno_id}"
 
     def _page_url(self, page: int) -> str:
         return self.LIST_URL.format(page=page - 1)
@@ -59,6 +59,7 @@ class JejtpCollector(BaseCollector):
                         **self._headers(),
                         "Content-Type": "application/json",
                         "Accept": "application/json, text/plain, */*",
+                        "X-Requested-With": "XMLHttpRequest",
                     },
                     timeout=self.timeout,
                     verify=self.ssl_verify,
@@ -68,9 +69,11 @@ class JejtpCollector(BaseCollector):
                     break
 
                 data = resp.json()
+                # JEJUTP API: {"content": [...], ...} 구조
                 items = (
-                    data if isinstance(data, list)
-                    else (data.get("content") or data.get("list") or data.get("data") or [])
+                    data.get("content")  # 1순위: content 키 (실제 응답)
+                    or data.get("list") or data.get("data")
+                    or (data if isinstance(data, list) else [])
                 )
                 if not items:
                     log.debug("[jejutp] p%d 공고 없음 → 마지막 페이지", page)

@@ -133,7 +133,7 @@ sites:
     collector_type: requests
   - code: gntp
     name: 경남테크노파크
-    enabled: true    # URL 수정: /biz/apply (신규 사이트 전환)
+    enabled: false   # SPA 기반 — JS 렌더링 없이 공고 로드 불가, Playwright 전환 필요
     collector_type: requests
   - code: ptp
     name: 포항테크노파크

@@ -254,14 +254,54 @@ class SjtpCollector(_TechnoBaseCollector):
 
 
 class CbtpCollector(_TechnoBaseCollector):
-    """충북테크노파크 — cbtp.or.kr (HTTP→HTTPS 리다이렉트, SSL DH_KEY_TOO_SMALL)"""
+    """충북테크노파크 — cbtp.or.kr (HTTP→HTTPS 리다이렉트, SSL DH_KEY_TOO_SMALL)
+    WeakSSLAdapter로 @SECLEVEL=1 설정하여 약한 DH 키 허용.
+    응답이 EUC-KR 인코딩이므로 디코딩 보정 필요.
+    """
     site_key    = "cbtp"
     agency      = "충북테크노파크"
     ministry    = "충청북도"
-    ssl_verify  = False   # 서버가 HTTP→HTTPS 강제 리다이렉트, DH_KEY_TOO_SMALL 우회
-    BASE_URL    = "http://www.cbtp.or.kr"
-    LIST_URL    = "http://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
+    ssl_verify  = False
+    BASE_URL    = "https://www.cbtp.or.kr"
+    LIST_URL    = "https://www.cbtp.or.kr/index.php?control=bbs&board_id=saup_notice&lm_uid=387&page={page}"
     LINK_PATTERN = "board_id=saup_notice"
+
+    def _build_session(self):
+        """SSL @SECLEVEL=1 어댑터로 DH_KEY_TOO_SMALL 우회."""
+        import ssl
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.ssl_ import create_urllib3_context
+
+        class _WeakSSLAdapter(HTTPAdapter):
+            def init_poolmanager(self, *args, **kwargs):
+                ctx = create_urllib3_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                ctx.set_ciphers('DEFAULT:@SECLEVEL=1')
+                kwargs['ssl_context'] = ctx
+                return super().init_poolmanager(*args, **kwargs)
+
+        session = super()._build_session()
+        session.mount('https://', _WeakSSLAdapter())
+        return session
+
+    def _get(self, url: str, **kwargs):
+        """EUC-KR 인코딩 보정 + 약한 SSL 사용."""
+        resp = self._session.get(
+            url,
+            headers=self._headers(),
+            timeout=self.timeout,
+            verify=False,
+            **kwargs,
+        )
+        resp.raise_for_status()
+        # CBTP는 EUC-KR 인코딩 사용 — 인코딩 보정
+        ct = resp.headers.get('content-type', '').lower()
+        if 'euc-kr' in ct or 'cp949' in ct:
+            resp.encoding = 'euc-kr'
+        elif resp.encoding is None or resp.encoding == 'ISO-8859-1':
+            resp.encoding = 'euc-kr'
+        return resp
 
 
 class CtpCollector(_TechnoBaseCollector):
@@ -326,13 +366,48 @@ class UtpCollector(_TechnoBaseCollector):
 
 
 class GntpCollector(_TechnoBaseCollector):
-    """경남테크노파크 — gntp.or.kr (신규 사이트로 전환)"""
+    """경남테크노파크 — gntp.or.kr (SPA 기반 — JS 렌더링 후 공고 로드)
+    HTML fallback: applyInfo 또는 테이블/리스트 기반 파싱
+    """
     site_key = "gntp"
     agency   = "경남테크노파크"
     ministry = "경상남도"
     BASE_URL = "https://www.gntp.or.kr"
     LIST_URL = "https://www.gntp.or.kr/biz/apply?page={page}"
-    LINK_PATTERN = "applyInfo"
+    LINK_PATTERN = ""  # SPA → LINK_PATTERN 비활성, 범용 파서로 처리
+
+    def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
+        """GNTP SPA: applyInfo 링크 또는 범용 링크 탐색"""
+        notices: List[Notice] = []
+        seen: set = set()
+
+        # 1) applyInfo 링크 우선
+        for a in soup.find_all("a", href=True):
+            href = (a.get("href") or "").strip()
+            if "applyInfo" in href or "bizView" in href or "apply/" in href:
+                full = href if href.startswith("http") else urljoin(self.BASE_URL, href)
+                if full in seen:
+                    continue
+                title = a.get_text(strip=True)
+                if not title or len(title) < 3:
+                    continue
+                if _PAGINATION_TITLE_RE.match(title.strip()):
+                    continue
+                seen.add(full)
+                row = a.find_parent("tr") or a.find_parent("li") or a.find_parent("div") or a.parent
+                text = row.get_text(" ", strip=True) if row else title
+                dates = _extract_dates(text)
+                notices.append(self._make_notice(
+                    execution_id, title, full,
+                    dates[-1] if dates else "",
+                    dates[0] if len(dates) >= 2 else "",
+                ))
+
+        if notices:
+            return notices
+
+        # 2) 범용 파서 fallback
+        return super()._parse_page(soup, execution_id)
 
 
 class PtpCollector(_TechnoBaseCollector):
