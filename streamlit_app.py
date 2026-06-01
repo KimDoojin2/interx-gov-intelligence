@@ -4,10 +4,14 @@ Modern B2B SaaS Design (Palantir / Linear / Vercel inspired)
 """
 from __future__ import annotations
 
-import io, json, os, re, sys, time, hashlib
+import io, json, logging, os, re, sys, time, hashlib, warnings
 from collections import Counter, defaultdict
 from datetime import datetime, date, timedelta
 from pathlib import Path
+
+# FontBBox 경고 억제 (pdfplumber/pdfminer PDF 파싱 시 폰트 메타데이터 누락)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", message=".*FontBBox.*")
 
 import streamlit as st
 import pandas as pd
@@ -465,20 +469,45 @@ if page == "📊 대시보드":
                 items_html += f'<div class="ub-item">{_badge(grade)} <span style="flex:1">{n.title[:60]}</span> <span style="color:#DC2626;font-weight:800;font-size:.85rem">D-{dd}</span> <span style="color:{t["text3"]};font-size:.72rem">{n.site} · {n.agency or "-"}</span></div>'
             st.markdown(f'<div class="urgent-banner"><div class="ub-title">🚨 긴급 마감 D-3 이내 ({len(d3_notices)}건)</div>{items_html}</div>', unsafe_allow_html=True)
 
-        # ── KPI Cards ──
+        # ── KPI Cards (클릭 가능) ──
         st.markdown(_section("핵심 지표"), unsafe_allow_html=True)
+        if "dash_grade_filter" not in st.session_state:
+            st.session_state.dash_grade_filter = "A"  # 기본값: A등급
         k1, k2, k3, k4, k5, k6 = st.columns(6)
-        k1.markdown(_kpi(len(notices), "전체 공고"), unsafe_allow_html=True)
-        k2.markdown(_kpi(gc["A"], "A등급", GA), unsafe_allow_html=True)
-        k3.markdown(_kpi(gc["B"], "B등급", GB), unsafe_allow_html=True)
+        with k1:
+            st.markdown(_kpi(len(notices), "전체 공고"), unsafe_allow_html=True)
+            if st.button("전체", key="kpi_all", use_container_width=True):
+                st.session_state.dash_grade_filter = "ALL"
+                st.rerun()
+        with k2:
+            st.markdown(_kpi(gc["A"], "A등급", GA), unsafe_allow_html=True)
+            if st.button("A등급", key="kpi_a", use_container_width=True):
+                st.session_state.dash_grade_filter = "A"
+                st.rerun()
+        with k3:
+            st.markdown(_kpi(gc["B"], "B등급", GB), unsafe_allow_html=True)
+            if st.button("B등급", key="kpi_b", use_container_width=True):
+                st.session_state.dash_grade_filter = "B"
+                st.rerun()
         l3_count = sum(1 for n in notices if getattr(n, "l3_strong", "N") == "Y")
-        k4.markdown(_kpi(l3_count, "L3 강공고", "#9D174D"), unsafe_allow_html=True)
+        with k4:
+            st.markdown(_kpi(l3_count, "L3 강공고", "#9D174D"), unsafe_allow_html=True)
+            if st.button("L3", key="kpi_l3", use_container_width=True):
+                st.session_state.dash_grade_filter = "L3"
+                st.rerun()
         d7 = sum(1 for n in notices if 0 <= _dday(n.deadline_date or "") <= 7)
-        k5.markdown(_kpi(d7, "D-7 마감", GD), unsafe_allow_html=True)
-        # Feature #2: Win probability KPI
+        with k5:
+            st.markdown(_kpi(d7, "D-7 마감", GD), unsafe_allow_html=True)
+            if st.button("D-7", key="kpi_d7", use_container_width=True):
+                st.session_state.dash_grade_filter = "D7"
+                st.rerun()
         avg_wp = wp_sum / max(1, wp_cnt)
         wp_color = GA if avg_wp >= 60 else GB if avg_wp >= 40 else GC
-        k6.markdown(_kpi(f"{avg_wp:.0f}%", "평균 수주확률", wp_color), unsafe_allow_html=True)
+        with k6:
+            st.markdown(_kpi(f"{avg_wp:.0f}%", "평균 수주확률", wp_color), unsafe_allow_html=True)
+            if st.button("C등급", key="kpi_c", use_container_width=True):
+                st.session_state.dash_grade_filter = "C"
+                st.rerun()
 
         # ── Grade Distribution + Search ──
         col_chart, col_search = st.columns([1, 2])
@@ -510,14 +539,36 @@ if page == "📊 대시보드":
                 if not found:
                     st.caption("검색 결과가 없습니다.")
 
-        # ── A-grade Top Notices ──
-        a_notices = [(n, smap.get(n.notice_id)) for n in notices
-                     if smap.get(n.notice_id) and smap[n.notice_id].priority_grade == "A"]
-        a_notices.sort(key=lambda x: -(x[1].priority_score if x[1] else 0))
+        # ── Grade-filtered Notices (핵심지표 클릭 연동) ──
+        _gf = st.session_state.get("dash_grade_filter", "A")
+        if _gf == "ALL":
+            _filtered_notices = [(n, smap.get(n.notice_id)) for n in notices if smap.get(n.notice_id)]
+            _section_title = f"전체 공고 ({len(_filtered_notices)}건)"
+        elif _gf == "L3":
+            _filtered_notices = [(n, smap.get(n.notice_id)) for n in notices
+                                 if getattr(n, "l3_strong", "N") == "Y" and smap.get(n.notice_id)]
+            _section_title = f"L3 강공고 ({len(_filtered_notices)}건)"
+        elif _gf == "D7":
+            _filtered_notices = [(n, smap.get(n.notice_id)) for n in notices
+                                 if 0 <= _dday(n.deadline_date or "") <= 7 and smap.get(n.notice_id)]
+            _section_title = f"D-7 마감 임박 ({len(_filtered_notices)}건)"
+        else:
+            _filtered_notices = [(n, smap.get(n.notice_id)) for n in notices
+                                 if smap.get(n.notice_id) and smap[n.notice_id].priority_grade == _gf]
+            _grade_label = {"A": "A등급 핵심", "B": "B등급 관련", "C": "C등급 참고", "D": "D등급"}.get(_gf, _gf)
+            _section_title = f"{_grade_label} 공고 ({len(_filtered_notices)}건)"
+        _filtered_notices.sort(key=lambda x: -(x[1].priority_score if x[1] else 0))
 
-        if a_notices:
-            st.markdown(_section(f"A등급 핵심 공고 ({len(a_notices)}건)"), unsafe_allow_html=True)
-            for n, sc in a_notices[:8]:
+        if _filtered_notices:
+            _active_pills = " ".join(
+                f'<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600;margin-right:6px;cursor:pointer;'
+                f'background:{"rgba(255,128,0,.15)" if g == _gf else "transparent"};color:{GRADE.get(g, t["text3"])};'
+                f'border:1px solid {GRADE.get(g, t["border"])}">{g}</span>'
+                for g in ["A", "B", "C", "D", "L3", "D7", "ALL"]
+            )
+            st.markdown(f'<div style="margin-bottom:8px">{_active_pills}</div>', unsafe_allow_html=True)
+            st.markdown(_section(_section_title), unsafe_allow_html=True)
+            for n, sc in _filtered_notices[:12]:
                 dd = _dday(n.deadline_date or "")
                 wp = _win_prob(n, sc)
                 dd_str = f"D-{dd}" if dd >= 0 else "마감"
@@ -576,8 +627,8 @@ if page == "📊 대시보드":
                             st.markdown("**📌 핵심 요약**")
                             st.markdown(f"> {_key_summ}")
                         if _body_d and len(_body_d) > 50:
-                            st.caption("📄 전체 본문")
-                            st.text(_clean_summary(_body_d[:3000]))
+                            with st.expander("📄 전체 본문 보기", expanded=False):
+                                st.text(_clean_summary(_body_d[:3000]))
 
                     # AI 분석 (캐시 지원)
                     _dk = _ai_cache_key(n.notice_id)
@@ -673,8 +724,17 @@ if page == "🚀 수집 실행":
         enable_sheets = st.checkbox("Google Sheets 업로드", value=True)
         submitted = st.form_submit_button("🚀 수집 시작", disabled=st.session_state.pipeline_running)
 
+    # 취소 버튼 (수집 실행 중일 때만 표시)
+    if st.session_state.pipeline_running:
+        if st.button("⛔ 수집 취소", type="secondary", use_container_width=True):
+            st.session_state.pipeline_running = False
+            st.session_state.pipeline_cancelled = True
+            st.warning("수집이 취소되었습니다.")
+            st.rerun()
+
     if submitted and not st.session_state.pipeline_running:
         st.session_state.pipeline_running = True
+        st.session_state.pipeline_cancelled = False
         progress = st.progress(0, text="준비 중...")
         status = st.status("파이프라인 실행 중...", expanded=True)
         with status:
