@@ -724,8 +724,19 @@ if page == "🚀 수집 실행":
         enable_sheets = st.checkbox("Google Sheets 업로드", value=True)
         submitted = st.form_submit_button("🚀 수집 시작", disabled=st.session_state.pipeline_running)
 
-    # 취소 버튼 (수집 실행 중일 때만 표시)
+    # 수집 실행 중 상태 배너 + 취소 버튼
     if st.session_state.pipeline_running:
+        st.markdown(f"""<div style="background:linear-gradient(90deg,rgba(255,128,0,.12),rgba(255,128,0,.04));
+            border:1px solid rgba(255,128,0,.3);border-radius:12px;padding:16px 20px;margin:12px 0;
+            display:flex;align-items:center;gap:12px">
+            <div style="width:12px;height:12px;border-radius:50%;background:#FF8000;
+                animation:pulse 1.5s infinite"></div>
+            <div style="flex:1">
+                <div style="font-weight:700;color:{t['text']};font-size:.95rem">🚀 수집 진행 중...</div>
+                <div style="color:{t['text2']};font-size:.78rem;margin-top:2px">공고를 수집하고 있습니다. 완료까지 1~5분 소요됩니다.</div>
+            </div>
+        </div>
+        <style>@keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.3}}}}</style>""", unsafe_allow_html=True)
         if st.button("⛔ 수집 취소", type="secondary", use_container_width=True):
             st.session_state.pipeline_running = False
             st.session_state.pipeline_cancelled = True
