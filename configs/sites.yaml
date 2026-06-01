@@ -13,7 +13,7 @@ sites:
     collector_type: requests
   - code: kiat
     name: KIAT (한국산업기술진흥원)
-    enabled: true
+    enabled: false   # Playwright 필수 — Streamlit Cloud에서 미설치 시 0건
     collector_type: playwright
   - code: smba
     name: 중소벤처기업부
@@ -84,12 +84,12 @@ sites:
     collector_type: requests
   - code: smart_factory
     name: 스마트제조혁신추진단 (smart-factory.kr)
-    enabled: true
-    collector_type: playwright  # React/Ant Design SPA — Playwright 필수
+    enabled: false   # URL 변경 (404) + Playwright 필수 — 비활성화
+    collector_type: playwright
   - code: iitp
     name: 정보통신기획평가원 (iitp.kr)
-    enabled: true
-    collector_type: playwright   # Vue.js SPA — AI·반도체·6G 과제 공고
+    enabled: false   # Playwright 필수 + RemoteDisconnected — Streamlit Cloud 비활성
+    collector_type: playwright
   # ── 테크노파크 12개 (v3.1 신규) ──
   - code: seoultp
     name: 서울테크노파크

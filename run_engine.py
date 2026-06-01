@@ -129,7 +129,7 @@ class MultiCollectorAdapter:
         self.max_workers = max_workers
         self.last_errors: list = []
 
-    def _collect_with_retry(self, col, execution_id: str, max_retries: int = 2) -> list:
+    def _collect_with_retry(self, col, execution_id: str, max_retries: int = 1) -> list:
         import time
         site = getattr(col, "site_key", repr(col))
         last_exc = None
@@ -151,8 +151,8 @@ class MultiCollectorAdapter:
         all_notices: list = []
         self.last_errors  = []
         n = min(len(self.collectors), self.max_workers)
-        _PER_SITE_TIMEOUT = getattr(settings, "collector_timeout", 60) * 6
-        _GLOBAL_TIMEOUT   = max(300, len(self.collectors) * 20)  # 사이트당 최소 20초 보장
+        _PER_SITE_TIMEOUT = getattr(settings, "collector_timeout", 60) * 3   # 사이트당 최대 45초
+        _GLOBAL_TIMEOUT   = max(120, len(self.collectors) * 10)  # 사이트당 10초 기준 (120초 최소)
 
         with ThreadPoolExecutor(max_workers=n) as ex:
             futures = {ex.submit(self._collect_with_retry, c, execution_id): c

@@ -499,7 +499,7 @@ class BaseCollector(NoticeCollectorPort, ABC):
                     try:
                         from interx_engine.infrastructure.ocr.document_parser import extract_from_attachments
                         ocr_text, _ = extract_from_attachments(
-                            notice.attachment_items, max_files=2, max_pages=5
+                            notice.attachment_items, max_files=1, max_pages=3
                         )
                         if ocr_text and len(ocr_text) > len(notice.body_text or ""):
                             notice.body_text = ocr_text

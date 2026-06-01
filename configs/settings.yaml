@@ -21,12 +21,12 @@ proposal:
   output_dir: "data/proposals"   # 제안서 저장 디렉토리 (project_root 기준)
 
 collector:
-  retry_total: 3              # 실패 시 재시도 횟수 (2→3 강화)
-  retry_backoff: 1.0          # 재시도 간격 배율 (0.5→1.0초, 지수 증가)
+  retry_total: 1              # 실패 시 재시도 횟수 (3→1 — 빠른 스킵)
+  retry_backoff: 0.5          # 재시도 간격 배율 (1.0→0.5초)
   retry_status_codes: [429, 500, 502, 503, 504]
-  timeout: 30                 # 사이트당 connect+read 타임아웃 (20→30초, 느린 사이트 대응)
+  timeout: 15                 # 사이트당 connect+read 타임아웃 (30→15초 — 빠른 실패)
   fetch_detail: true          # 상세 페이지 방문 여부
-  detail_workers: 3           # 상세 페이지 병렬 워커 수 (사이트당)
+  detail_workers: 5           # 상세 페이지 병렬 워커 수 (3→5 — 병렬 강화)
 
 summarize:
   enabled: false        # Claude API L3 요약 — 명시적으로 true 설정 시에만 과금 발생

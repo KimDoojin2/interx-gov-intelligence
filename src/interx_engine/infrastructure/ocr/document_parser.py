@@ -376,8 +376,8 @@ def extract_text(file_bytes: bytes, filename: str, max_pages: int = 20) -> Extra
 def extract_text_from_url(
     url: str,
     filename: str = "",
-    timeout: int = 15,
-    max_size_mb: int = 10,
+    timeout: int = 8,
+    max_size_mb: int = 5,
 ) -> ExtractionResult:
     """
     URL에서 파일을 다운로드한 후 텍스트를 추출한다.
