@@ -575,8 +575,9 @@ if page == "📊 대시보드":
                 apply_st = _apply_badge(getattr(n, "apply_status", ""))
                 wp_color = GA if wp >= 60 else GB if wp >= 40 else GC
                 wp_pill = f'<span class="pill" style="background:rgba({",".join(str(int(wp_color.lstrip("#")[i:i+2], 16)) for i in (0,2,4))},.1);color:{wp_color};font-weight:700">수주 {wp:.0f}%</span>'
+                _g = sc.priority_grade if sc else "D"
                 meta = f"{n.site} · {n.agency or '-'} · 예산 {n.budget or '-'} · {dd_str}"
-                st.markdown(_notice_row("A", n.title[:60], meta, f"{apply_st} {wp_pill}"), unsafe_allow_html=True)
+                st.markdown(_notice_row(_g, n.title[:60], meta, f"{apply_st} {wp_pill}"), unsafe_allow_html=True)
                 with st.expander("상세 보기", expanded=False):
                     dc1, dc2 = st.columns(2)
                     with dc1:
@@ -643,7 +644,7 @@ if page == "📊 대시보드":
                                     title=n.title, body_text=_body_d, summary=_summary_d,
                                     structured=_struct_d,
                                     matched_keywords=", ".join(sc.positive_keywords[:8]) if sc and sc.positive_keywords else "",
-                                    grade="A", score=sc.fitness_score if sc else 0,
+                                    grade=_g, score=sc.fitness_score if sc else 0,
                                     budget=n.budget or "", solution_scores=sc.solution_scores if sc else None,
                                 )
                                 st.session_state[_dk] = _ai_r
