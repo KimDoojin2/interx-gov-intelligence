@@ -75,6 +75,11 @@ class SQLitePipelineWriter:
               fitness_score     REAL,
               priority_score    REAL,
               priority_grade    TEXT,
+              body_text         TEXT,
+              summary           TEXT,
+              structured_json   TEXT,
+              agency            TEXT,
+              ministry          TEXT,
               PRIMARY KEY (execution_id, notice_id)
             )""")
             # 새 컬럼 마이그레이션
@@ -87,6 +92,11 @@ class SQLitePipelineWriter:
                 ("fitness_score",   "REAL"),
                 ("priority_score",  "REAL"),
                 ("priority_grade",  "TEXT"),
+                ("body_text",       "TEXT"),
+                ("summary",         "TEXT"),
+                ("structured_json", "TEXT"),
+                ("agency",          "TEXT"),
+                ("ministry",        "TEXT"),
             ]:
                 if col not in _nex:
                     try:
@@ -188,14 +198,19 @@ class SQLitePipelineWriter:
 
             for n in notices:
                 sc = score_cards.get(n.notice_id)
+                # structured → JSON 직렬화
+                _struct = getattr(n, "structured", None) or {}
+                _struct_json = json.dumps(_struct, ensure_ascii=False) if _struct else ""
                 c.execute(
                     """
                     INSERT OR REPLACE INTO notices
                       (execution_id, notice_id, site, title, detail_url,
                        posted_date, deadline_date, budget,
                        l3_strong, partner_candidate,
-                       fitness_score, priority_score, priority_grade)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       fitness_score, priority_score, priority_grade,
+                       body_text, summary, structured_json,
+                       agency, ministry)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         execution_id,
@@ -211,6 +226,11 @@ class SQLitePipelineWriter:
                         getattr(sc, "fitness_score",  0.0) if sc else 0.0,
                         getattr(sc, "priority_score", 0.0) if sc else 0.0,
                         getattr(sc, "priority_grade", "D") if sc else "D",
+                        (getattr(n, "body_text", "") or "")[:8000],
+                        (getattr(n, "summary", "") or "")[:2000],
+                        _struct_json,
+                        getattr(n, "agency", "") or "",
+                        getattr(n, "ministry", "") or "",
                     ),
                 )
 

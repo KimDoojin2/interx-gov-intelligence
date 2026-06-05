@@ -37,12 +37,22 @@ _DATE_RE = re.compile(r"\d{4}[-./]\d{1,2}[-./]\d{1,2}")
 
 # ── 예산 추출 패턴 (우선순위 순) ─────────────────────────────────────────────
 _BUDGET_PATTERNS = [
-    re.compile(r"지원\s*(?:금액|규모)\s*[:：]\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
-    re.compile(r"총\s*(?:지원|사업|연구)\s*(?:금액|규모|비)\s*[:：]\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
+    # 명시적 레이블 (지원금액: / 지원규모: / 사업비: 등)
+    re.compile(r"지원\s*(?:금액|규모)\s*[:：]?\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
+    re.compile(r"총\s*(?:지원|사업|연구|정부)\s*(?:금액|규모|비|출연금?)\s*[:：]?\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
+    re.compile(r"(?:사업비|예산|보조금|국비|출연금)\s*[:：]?\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
     re.compile(r"과제당\s*[:：]?\s*([0-9,]+)\s*(억|백만|만)\s*원"),
     re.compile(r"최대\s*([0-9,]+)\s*(억|백만|만)\s*원"),
-    re.compile(r"([0-9,]+)\s*(억|백만|만)\s*원\s*(?:이내|내외|규모|지원)"),
-    re.compile(r"지원금\s*[:：]\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
+    re.compile(r"([0-9,]+)\s*(억|백만|만)\s*원\s*(?:이내|내외|규모|지원|한도)"),
+    re.compile(r"지원금\s*[:：]?\s*([0-9,]+)\s*(억|백만|만)?\s*원"),
+    # 약식 (1억, 5천만원, 3백만원)
+    re.compile(r"([0-9,]+)\s*(천만|백만)\s*원"),
+    # 범위 (1~3억원, 5,000~10,000만원)
+    re.compile(r"[0-9,]+\s*[~∼]\s*([0-9,]+)\s*(억|백만|만)\s*원"),
+    # 괄호 안 (총 OO억원)
+    re.compile(r"\(\s*(?:총\s*)?([0-9,]+)\s*(억|백만|만)\s*원\s*\)"),
+    # 기업당/건당
+    re.compile(r"(?:기업당|업체당|건당|과제당)\s*(?:최대\s*)?([0-9,]+)\s*(억|백만|만)\s*원"),
 ]
 
 # ── 구조화 섹션 키워드 ────────────────────────────────────────────────────────
@@ -135,9 +145,21 @@ def _extract_budget_from_text(text: str) -> str:
     for pat in _BUDGET_PATTERNS:
         m = pat.search(text)
         if m:
-            amount = m.group(1).replace(",", "")
-            unit = m.group(2) if m.lastindex >= 2 and m.group(2) else "원"
-            return f"{amount}{unit}"
+            # 마지막 두 그룹이 (금액, 단위) — 패턴마다 그룹 수가 다를 수 있음
+            groups = [g for g in m.groups() if g is not None]
+            if not groups:
+                continue
+            # 숫자 그룹 찾기 (첫 번째 순수 숫자)
+            amount = ""
+            unit = "원"
+            for g in groups:
+                g_clean = g.replace(",", "").strip()
+                if re.fullmatch(r"\d+", g_clean):
+                    amount = g_clean
+                elif g_clean in ("억", "백만", "만", "천만"):
+                    unit = g_clean
+            if amount and int(amount) > 0:
+                return f"{amount}{unit}"
     return ""
 
 
