@@ -67,7 +67,10 @@ def _t():
     )
 
 # ── Page Config ──
-st.set_page_config(page_title="InterX Intelligence", page_icon="🔶", layout="wide", initial_sidebar_state="expanded")
+# ── Favicon: InterX 로고 ──
+_LOGO_PATH = Path(__file__).parent / "static" / "icon_64.png"
+_PAGE_ICON = str(_LOGO_PATH) if _LOGO_PATH.exists() else "🔶"
+st.set_page_config(page_title="InterX Intelligence", page_icon=_PAGE_ICON, layout="wide", initial_sidebar_state="expanded")
 
 # ── Intro animation ──
 if "intro_shown" not in st.session_state:
