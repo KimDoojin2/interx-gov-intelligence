@@ -1825,7 +1825,7 @@ if page == "📈 분석":
                     gc = [GA, GB, GC, GD]
                     fig = go.Figure()
                     fig.add_trace(go.Bar(x=gl, y=[grade_budget.get(g, 0) for g in gl],
-                                         name="총 예산", marker_color=[c + "66" for c in gc]))
+                                         name="총 예산", marker_color=[c.lstrip('#') and f"rgba({int(c[1:3],16)},{int(c[3:5],16)},{int(c[5:7],16)},0.4)" for c in gc]))
                     fig.add_trace(go.Bar(x=gl, y=[grade_pipe.get(g, 0) for g in gl],
                                          name="파이프라인 밸류", marker_color=gc))
                     fig.update_layout(title=dict(text="등급별 예산 vs 파이프라인 (억원)", font=dict(size=14, color=t['text'])),
@@ -1910,10 +1910,11 @@ if page == "📈 분석":
                                              line=dict(color=sol_colors[i % len(sol_colors)], width=2.5),
                                              marker=dict(size=7)))
                 fig.update_layout(title=dict(text="솔루션별 월간 매칭 공고수 (점수≥40)", font=dict(size=14, color=t['text'])),
-                                  height=450, margin=dict(t=70, b=36, l=50, r=16),
+                                  height=450,
                                   xaxis=dict(title="월", gridcolor=t['border']),
                                   yaxis=_yaxis("공고수"),
-                                  legend=dict(orientation="h", y=1.18, x=0, xanchor="left"), **_layout())
+                                  legend=dict(orientation="h", y=1.18, x=0, xanchor="left"),
+                                  **_layout(margin=dict(t=70, b=36, l=50, r=16)))
                 st.plotly_chart(fig, width="stretch")
 
                 # 솔루션별 성장률
