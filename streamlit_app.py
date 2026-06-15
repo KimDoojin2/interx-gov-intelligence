@@ -342,6 +342,10 @@ _RELATED_POST_RE = re.compile(
     r"NO\.\s+\d{4}\.\d{2}\.\d{2}~\d{4}\.\d{2}\.\d{2}\s+#.+",
     re.DOTALL,
 )
+_TAIL_NOISE_RE = re.compile(
+    r"(이\s*함께\s*본\s*공고|붙임\d*\.\s*기업마당|#\s*해시태그\s*목록|목록\s*$)",
+    re.I,
+)
 
 def _clean_summary(text: str) -> str:
     """핵심 요약에서 네비게이션/해시태그/관련 공고 등 잡음 제거."""
@@ -349,18 +353,41 @@ def _clean_summary(text: str) -> str:
         return ""
     text = _JUNK_PATTERNS.sub("", text)
     text = _RELATED_POST_RE.sub("", text)
-    # 해시태그 블록 제거
+    for p in [_TAIL_NOISE_RE]:
+        m = p.search(text)
+        if m:
+            text = text[:m.start()]
     text = re.sub(r'#\w+(\s+#\w+){2,}', '', text)
-    # 연속 공백 정리
     text = re.sub(r'\s{2,}', ' ', text).strip()
-    # "HOME 정책정보 지원사업 지원사업" 같은 breadcrumb 제거
     text = re.sub(r'^(HOME\s+)?(정책정보\s+)?(지원사업\s+)*', '', text).strip()
     return text
 
 
+_BODY_SECTION_PATTERNS = [
+    ("문의처", re.compile(r"문의처\s*[:\-]?\s*(.+?)(?=\n\n|사업신청|신청방법|접수|$)", re.S)),
+    ("신청방법", re.compile(r"(?:사업)?신청\s*방법\s*[:\-]?\s*(.+?)(?=\n\n|사업신청\s*사이트|문의처|접수|$)", re.S)),
+    ("신청사이트", re.compile(r"사업신청\s*사이트\s*[:\-]?\s*(.+?)(?=\n\n|문의처|$)", re.S)),
+    ("지원규모", re.compile(r"(?:기업당|과제당|총\s*사업비)\s*[:\-]?\s*(.+?)(?=\n|$)")),
+    ("신청기간", re.compile(r"(?:접수\s*기간|신청\s*기간|모집\s*기간)\s*[:\-]?\s*(.+?)(?=\n|$)")),
+]
+
+def _parse_body_sections(body: str) -> dict:
+    """본문 텍스트에서 핵심 항목만 추출."""
+    result = {}
+    if not body:
+        return result
+    cleaned = _clean_summary(body)
+    for label, pat in _BODY_SECTION_PATTERNS:
+        m = pat.search(cleaned)
+        if m:
+            val = re.sub(r'\s+', ' ', m.group(1)).strip()
+            if len(val) > 5 and len(val) < 500:
+                result[label] = val
+    return result
+
+
 def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
     """공고 핵심 요약 추출: 구조화 섹션 > 핵심 문장 > 정제된 summary."""
-    # 1) 구조화 섹션이 있으면 조합
     parts = []
     for key in ["사업목적", "지원내용", "지원대상"]:
         v = (structured or {}).get(key, "")
@@ -369,7 +396,6 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
     if parts:
         return " | ".join(parts)
 
-    # 2) body에서 핵심 키워드 문장 추출
     src = _clean_summary(body or summary or "")
     if not src:
         return ""
@@ -382,7 +408,6 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
     if important:
         return " ".join(important[:3])[:500]
 
-    # 3) 첫 유의미 문장
     for s in sents:
         if len(s) >= 25:
             return s[:300]
@@ -631,8 +656,13 @@ if page == "📊 대시보드":
                             st.markdown("**📌 핵심 요약**")
                             st.markdown(f"> {_key_summ}")
                         if _body_d and len(_body_d) > 50:
-                            with st.expander("📄 전체 본문 보기", expanded=False):
-                                st.text(_clean_summary(_body_d[:3000]))
+                            _extra = _parse_body_sections(_body_d)
+                            if _extra:
+                                with st.expander("📄 본문 요약 정보", expanded=False):
+                                    _icon_map = {"문의처": "📞", "신청방법": "📝", "신청사이트": "🌐", "지원규모": "💵", "신청기간": "📅"}
+                                    for _ek, _ev in _extra.items():
+                                        st.markdown(f"**{_icon_map.get(_ek, '📌')} {_ek}**")
+                                        st.markdown(f"> {_ev}")
 
                     # AI 분석 (캐시 지원)
                     _dk = _ai_cache_key(n.notice_id)
@@ -955,10 +985,13 @@ if page == "📋 공고 목록":
                             st.markdown("**📌 핵심 요약**")
                             st.markdown(f"> {_sn_key_summ}")
                         if body and len(body) > 50:
-                            st.markdown("---")
-                            st.caption("📄 전체 본문")
-                            st.text(_clean_summary(body[:5000]))
-                            if len(body) > 5000: st.caption(f"전체 {len(body):,}자 중 5,000자 표시")
+                            _extra2 = _parse_body_sections(body)
+                            if _extra2:
+                                st.markdown("---")
+                                _icon_map2 = {"문의처": "📞", "신청방법": "📝", "신청사이트": "🌐", "지원규모": "💵", "신청기간": "📅"}
+                                for _ek2, _ev2 in _extra2.items():
+                                    st.markdown(f"**{_icon_map2.get(_ek2, '📌')} {_ek2}**")
+                                    st.markdown(f"> {_ev2}")
 
                 # ── Feature #3: AI Analysis with Caching ──
                 _cache_key = _ai_cache_key(sn.notice_id)
