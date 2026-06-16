@@ -604,7 +604,8 @@ if page == "📊 대시보드":
                 wp_color = GA if wp >= 60 else GB if wp >= 40 else GC
                 wp_pill = f'<span class="pill" style="background:rgba({",".join(str(int(wp_color.lstrip("#")[i:i+2], 16)) for i in (0,2,4))},.1);color:{wp_color};font-weight:700">수주 {wp:.0f}%</span>'
                 _g = sc.priority_grade if sc else "D"
-                meta = f"{n.site} · {n.agency or '-'} · 예산 {n.budget or '-'} · {dd_str}"
+                _bgt_part = f" · 예산 {n.budget}" if n.budget else ""
+                meta = f"{n.site} · {n.agency or '-'}{_bgt_part} · {dd_str}"
                 st.markdown(_notice_row(_g, n.title[:60], meta, f"{apply_st} {wp_pill}"), unsafe_allow_html=True)
                 with st.expander("상세 보기", expanded=False):
                     dc1, dc2 = st.columns(2)
@@ -612,7 +613,8 @@ if page == "📊 대시보드":
                         st.markdown(f"**주관기관**: {n.agency or n.ministry or '-'}")
                         st.markdown(f"**부처**: {getattr(n, 'ministry', '-') or '-'}")
                         st.markdown(f"**마감일**: {n.deadline_date or '-'} ({dd_str})")
-                        st.markdown(f"**예산**: {n.budget or '-'}")
+                        if n.budget:
+                            st.markdown(f"**예산**: {n.budget}")
                         st.markdown(f"**공고일**: {getattr(n, 'notice_date', '-') or '-'}")
                         st.markdown(f"**신청기간**: {getattr(n, 'apply_period', '-') or '-'}")
                         st.markdown(f"**접수상태**: {getattr(n, 'apply_status', '-') or '-'}")
@@ -885,7 +887,7 @@ if page == "📋 공고 목록":
                 "수주확률": f"{wp:.0f}%",
                 "접수상태": getattr(n, "apply_status", "") or "-",
                 "L3": "Y" if getattr(n, "l3_strong", "N") == "Y" else "",
-                "예산": _bgt or "-",
+                "예산": _bgt or "",
                 "진행": _action,
             })
         if rows:
@@ -921,20 +923,22 @@ if page == "📋 공고 목록":
                         <span style="font-size:1.05rem;font-weight:700;color:{t['text']}">{sn.title}</span>
                         {apply_st}
                     </div>
-                    <div style="font-size:.78rem;color:{t['text3']}">{sn.site} · {sn.agency or sn.ministry or '-'} · {sn.deadline_date or '-'} · 예산 {sn.budget or '-'}</div>
+                    <div style="font-size:.78rem;color:{t['text3']}">{sn.site} · {sn.agency or sn.ministry or '-'} · {sn.deadline_date or '-'}{"" if not sn.budget else f" · 예산 {sn.budget}"}</div>
                 </div>""", unsafe_allow_html=True)
 
                 dc1, dc2 = st.columns(2)
                 with dc1:
                     st.markdown("##### 기본 정보")
-                    for label, val in [("주관기관", sn.agency or sn.ministry or "-"),
-                                       ("부처", getattr(sn, "ministry", "-") or "-"),
-                                       ("마감일", f"{sn.deadline_date or '-'} (D-{dd})" if dd >= 0 else f"{sn.deadline_date or '-'} (마감)"),
-                                       ("예산", sn.budget or "-"),
-                                       ("공고일", getattr(sn, "notice_date", "-") or "-"),
-                                       ("신청기간", getattr(sn, "apply_period", "-") or "-"),
-                                       ("접수상태", getattr(sn, "apply_status", "-") or "-")]:
-                        st.markdown(f"- **{label}** : {val}")
+                    _info_items = [("주관기관", sn.agency or sn.ministry or "-"),
+                                    ("부처", getattr(sn, "ministry", "") or ""),
+                                    ("마감일", f"{sn.deadline_date or '-'} (D-{dd})" if dd >= 0 else f"{sn.deadline_date or '-'} (마감)"),
+                                    ("예산", sn.budget or ""),
+                                    ("공고일", getattr(sn, "notice_date", "") or ""),
+                                    ("신청기간", getattr(sn, "apply_period", "") or ""),
+                                    ("접수상태", getattr(sn, "apply_status", "") or "")]
+                    for label, val in _info_items:
+                        if val:
+                            st.markdown(f"- **{label}** : {val}")
                     link = getattr(sn, "detail_url", "") or ""
                     if link and link.startswith("http"): st.markdown(f"- **링크** : [{link[:50]}...]({link})")
 
@@ -1152,7 +1156,7 @@ if page == "🔍 공고 비교":
                 ("마감일", lambda n, sc: n.deadline_date or "-"),
                 ("D-day", lambda n, sc: str(_dday(n.deadline_date or "")) if _dday(n.deadline_date or "") >= 0 else "마감"),
                 ("접수상태", lambda n, sc: getattr(n, "apply_status", "") or "-"),
-                ("예산", lambda n, sc: n.budget or "-"),
+                ("예산", lambda n, sc: n.budget or ""),
                 ("적합도", lambda n, sc: f"{sc.fitness_score:.1f}" if sc else "-"),
                 ("우선순위", lambda n, sc: f"{sc.priority_score:.1f}" if sc else "-"),
                 ("수주확률", lambda n, sc: f"{_win_prob(n, sc):.0f}%"),
