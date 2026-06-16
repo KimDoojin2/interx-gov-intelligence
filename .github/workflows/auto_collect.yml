@@ -2,11 +2,11 @@
 name: Auto Collect Pipeline
 
 on:
-  schedule:
-    # 07:00 KST = 22:00 UTC (previous day)
-    - cron: '0 22 * * 1-5'
-    # 14:00 KST = 05:00 UTC
-    - cron: '0 5 * * 1-5'
+  # schedule:
+  #   # 07:00 KST = 22:00 UTC (previous day)
+  #   - cron: '0 22 * * 1-5'
+  #   # 14:00 KST = 05:00 UTC
+  #   - cron: '0 5 * * 1-5'
   workflow_dispatch:
     inputs:
       mode:
