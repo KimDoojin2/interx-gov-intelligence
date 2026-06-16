@@ -36,7 +36,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          playwright install chromium --with-deps
+          pip install playwright || true
+          python -m playwright install chromium --with-deps || true
 
       - name: Run pipeline
         env:
