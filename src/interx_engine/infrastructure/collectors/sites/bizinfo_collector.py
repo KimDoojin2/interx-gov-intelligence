@@ -59,10 +59,11 @@ class BizinfoCollector(PlaywrightBaseCollector):
     LIST_URL = _LIST
 
     def collect(self, execution_id: str) -> List[Notice]:
-        import time as _t, random as _r
+        import logging, time as _t, random as _r
+        log = logging.getLogger("interx.collectors")
         # 홈페이지 쿠키 선취득 → ConnectionReset 방지
         try:
-            _t.sleep(_r.uniform(2.0, 4.0))
+            _t.sleep(_r.uniform(1.0, 2.0))
             self._session.get(
                 _BASE,
                 headers=self._headers(),
@@ -70,10 +71,52 @@ class BizinfoCollector(PlaywrightBaseCollector):
                 verify=self.ssl_verify,
                 allow_redirects=True,
             )
-            _t.sleep(_r.uniform(1.0, 2.0))
+            _t.sleep(_r.uniform(0.5, 1.0))
         except Exception:
             pass
-        return super().collect(execution_id)
+
+        # Playwright 우선 시도
+        try:
+            notices = self._collect_playwright(execution_id)
+            if notices:
+                return notices
+        except Exception as e:
+            log.warning("[bizinfo] playwright 실패 (%s) → requests fallback", e)
+
+        # requests + html.parser fallback (lxml은 bizinfo href 공백 처리 못함)
+        return self._collect_requests_fallback(execution_id)
+
+    def _collect_requests_fallback(self, execution_id: str) -> List[Notice]:
+        import logging, time as _t, random as _r
+        log = logging.getLogger("interx.collectors")
+        notices:  List[Notice] = []
+        seen_ids: set          = set()
+
+        for page in range(1, self.max_pages + 1):
+            url = self._page_url(page)
+            resp = self._get(url)
+            if not resp:
+                break
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            items = self._parse_page(soup, execution_id)
+            if not items:
+                break
+
+            new = [n for n in items if n.notice_id not in seen_ids]
+            if not new:
+                break
+            for n in new:
+                seen_ids.add(n.notice_id)
+            notices.extend(new)
+            _t.sleep(_r.uniform(1.0, 2.0))
+
+        if notices:
+            log.info("[BIZINFO] requests fallback %d건 수집", len(notices))
+            notices = self._enrich_notices(notices)
+        else:
+            log.warning("[bizinfo] requests fallback도 0건")
+        return notices
 
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
         # 1순위: 표준 table 파싱 (컬럼 개수 유연하게)
