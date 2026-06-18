@@ -94,8 +94,22 @@ class BizinfoCollector(PlaywrightBaseCollector):
 
         for page in range(1, self.max_pages + 1):
             url = self._page_url(page)
-            resp = self._get(url)
-            if not resp:
+            resp = None
+            for attempt in range(3):
+                try:
+                    resp = self._session.get(
+                        url, headers=self._headers(),
+                        timeout=60, verify=self.ssl_verify,
+                        allow_redirects=True,
+                    )
+                    if resp and resp.status_code == 200:
+                        break
+                except Exception as e:
+                    log.warning("[bizinfo] p%d attempt %d: %s", page, attempt+1, e)
+                    _t.sleep(2 ** attempt)
+                    resp = None
+
+            if not resp or resp.status_code != 200:
                 break
 
             soup = BeautifulSoup(resp.text, "html.parser")
@@ -115,7 +129,7 @@ class BizinfoCollector(PlaywrightBaseCollector):
             log.info("[BIZINFO] requests fallback %d건 수집", len(notices))
             notices = self._enrich_notices(notices)
         else:
-            log.warning("[bizinfo] requests fallback도 0건")
+            log.warning("[bizinfo] requests fallback도 0건 (GitHub Actions IP 차단 가능)")
         return notices
 
     def _parse_page(self, soup: BeautifulSoup, execution_id: str) -> List[Notice]:
