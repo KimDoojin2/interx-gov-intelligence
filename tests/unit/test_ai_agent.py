@@ -195,22 +195,3 @@ class TestBriefingGenerator:
         assert len(stats["recurring"]) == 1
 
 
-# ── proposal_enhancer (fallback) ──────────────────────────────────────────────
-
-class TestProposalEnhancer:
-    def test_fallback_strategy(self):
-        from interx_engine.infrastructure.ai.proposal_enhancer import _fallback_strategy
-        result = _fallback_strategy(
-            matched_keywords="스마트공장, 디지털트윈",
-            solution_scores={"ManufacturingDT": 90, "QualityAI": 70},
-        )
-        assert "executive_summary" in result
-        assert "approach" in result
-        assert "differentiators" in result
-        assert "제조DT" in result["approach"]
-
-    def test_fallback_empty(self):
-        from interx_engine.infrastructure.ai.proposal_enhancer import _fallback_strategy
-        result = _fallback_strategy()
-        assert "executive_summary" in result
-        assert "AI 솔루션" in result["executive_summary"]

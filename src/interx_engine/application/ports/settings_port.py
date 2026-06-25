@@ -22,9 +22,6 @@ def urgent_dday() -> int:
     return get_setting("urgent_dday", 7)
 
 
-def proposal_output_dir() -> str:
-    return get_setting("proposal_output_dir", "data/proposals")
-
 
 def summarize_enabled() -> bool:
     return get_setting("summarize_enabled", False)

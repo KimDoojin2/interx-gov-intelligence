@@ -33,16 +33,13 @@ def _calc_dday(deadline: str) -> str:
 def notice_to_master_row(notice: Notice, score: Optional[ScoreCard] = None) -> dict:
     budget_norm  = normalize_budget(notice.budget) if notice.budget else ""
     dup_flag     = getattr(notice, "duplicate_flag",  "N")
-    comp_flag    = getattr(notice, "competitor_flag", "")
     is_new       = getattr(notice, "is_new",          False)
     is_changed   = getattr(notice, "is_changed",      False)
 
-    # 자동 메모: 변경감지·중복의심·경쟁사 뱃지 조합
     memo_parts = []
     if is_new:          memo_parts.append("🆕신규")
     if is_changed:      memo_parts.append("🔄변경감지")
     if dup_flag == "Y": memo_parts.append("⚠️중복의심")
-    if comp_flag:       memo_parts.append(f"🏢경쟁사({comp_flag})")
     # notice.memo에 이미 붙어 있는 경우 중복 방지
     base_memo = getattr(notice, "memo", "") or ""
     auto_memo = " ".join(memo_parts)
@@ -70,7 +67,7 @@ def notice_to_master_row(notice: Notice, score: Optional[ScoreCard] = None) -> d
         "BD마일스톤":    getattr(notice, "bd_milestone", ""),
         "신규여부":      "Y" if is_new else "N",
         "변경여부":      "Y" if is_changed else "N",
-        "경쟁사감지":    comp_flag or "",
+        "경쟁사감지":    "",
         "중복의심":      dup_flag,
         "메모":         memo,
         "상세URL":      notice.detail_url,

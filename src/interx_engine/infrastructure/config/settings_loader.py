@@ -87,10 +87,6 @@ class Settings:
     def urgent_dday(self) -> int:
         return int(self._cfg.get("alert", {}).get("urgent_dday", 7))
 
-    def proposal_output_dir(self) -> Path:
-        rel = self._cfg.get("proposal", {}).get("output_dir", "data/proposals")
-        return self.project_root / rel
-
     def retry_total(self) -> int:
         return int(self._cfg.get("collector", {}).get("retry_total", 3))
 

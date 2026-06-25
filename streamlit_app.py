@@ -420,8 +420,8 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
 
 NAV_ITEMS = [
     "📊 대시보드", "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
-    "📝 제안서", "📄 사업계획서", "🏢 경쟁사", "🎯 수주 예측", "📅 마감 캘린더",
-    "📈 분석", "👤 담당자", "🤖 AI 뉴스", "💬 AI 챗봇",
+    "🎯 수주 예측", "📅 마감 캘린더",
+    "📈 분석", "👤 담당자", "🔬 파싱 검증", "🤖 AI 뉴스", "💬 AI 챗봇",
 ]
 
 with st.sidebar:
@@ -812,14 +812,12 @@ if page == "🚀 수집 실행":
                     sc = sm.get(n.notice_id)
                     if sc: gc[sc.priority_grade] = gc.get(sc.priority_grade, 0) + 1
                 st.write(f"✓ **{len(nn)}**건 · A={gc['A']} B={gc['B']} C={gc['C']} D={gc['D']}")
-                pp = result.get("proposal_files", [])
-                if pp: st.write(f"✓ **{len(pp)}**건 제안서 생성")
                 progress.progress(100, text="완료")
                 st.session_state.pipeline_result = result
                 st.session_state.pipeline_running = False
                 history_entry = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "execution_id": execution_id, "total": len(nn), "grades": dict(gc),
-                    "sites": dict(Counter(n.site for n in nn)), "proposals": len(pp),
+                    "sites": dict(Counter(n.site for n in nn)),
                     "mode": ml, "l3_count": sum(1 for n in nn if getattr(n, "l3_strong", "N") == "Y")}
                 st.session_state.collection_history.append(history_entry)
                 status.update(label=f"✓ 완료 — {len(nn)}건 수집", state="complete")
@@ -1077,40 +1075,6 @@ if page == "📋 공고 목록":
                             else:
                                 st.warning("🔄 이전 실행 대비 변경이 감지되었습니다.")
 
-                # ── 사업계획서 바로 생성 ──
-                if grade in ("A", "B"):
-                    st.markdown(f'<div style="border-top:1px solid {t["border"]};margin:12px 0"></div>', unsafe_allow_html=True)
-                    _bp_key = f"bp_gen_{sn.notice_id}"
-                    if st.button(f"📄 사업계획서 AI 생성 →", key=_bp_key, type="primary", width="stretch"):
-                        try:
-                            from interx_engine.application.use_cases.generate_business_plan import generate_business_plan
-                            _bp_bar = st.progress(0)
-                            _bp_status = st.empty()
-                            def _bp_cb(pct, msg):
-                                _bp_bar.progress(min(pct, 100))
-                                _bp_status.text(msg)
-                            with st.spinner("AI가 사업계획서를 생성 중..."):
-                                _bp_path = generate_business_plan(
-                                    notice=sn, score_card=ssc,
-                                    company_name="(주)인터엑스",
-                                    progress_callback=_bp_cb,
-                                )
-                            _bp_bar.progress(100)
-                            if _bp_path:
-                                _bp_status.success("사업계획서 생성 완료!")
-                                with open(_bp_path, "rb") as _bf:
-                                    st.download_button(
-                                        "📥 사업계획서 다운로드 (.docx)",
-                                        _bf.read(),
-                                        file_name=Path(_bp_path).name,
-                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                        width="stretch",
-                                    )
-                            else:
-                                _bp_status.error("생성 실패 — GEMINI_API_KEY 환경변수를 확인하세요.")
-                        except Exception as _bp_err:
-                            st.error(f"사업계획서 생성 실패: {_bp_err}")
-
                 # ── 원문 바로가기 ──
                 _sn_link = getattr(sn, "detail_url", "") or ""
                 if _sn_link and _sn_link.startswith("http"):
@@ -1213,256 +1177,6 @@ if page == "🔍 공고 비교":
             st.info("비교를 위해 최소 2건의 공고를 선택해주세요.")
 
 
-# =============================================================================
-#  PAGE: Proposals
-# =============================================================================
-
-if page == "📝 제안서":
-    result = _result()
-    if not result:
-        st.markdown(_empty("📝", "제안서 데이터 없음", "수집 실행 시 A/B등급 공고에 대해 제안서가 자동 생성됩니다."), unsafe_allow_html=True)
-    else:
-        proposals = result.get("proposal_files", [])
-        if not proposals:
-            st.markdown(_empty("📝", "생성된 제안서가 없습니다", "A/B등급 공고가 있을 때 자동으로 제안서가 생성됩니다."), unsafe_allow_html=True)
-        else:
-            st.markdown(_section(f"자동 생성 제안서 ({len(proposals)}건)"), unsafe_allow_html=True)
-            for _pi, p in enumerate(proposals):
-                fp = Path(p)
-                if fp.exists():
-                    cn, cd = st.columns([5, 1])
-                    cn.markdown(_notice_row("A", fp.stem, f"{fp.suffix} · {fp.stat().st_size:,} bytes"), unsafe_allow_html=True)
-                    with open(fp, "rb") as f:
-                        cd.download_button("다운로드", f.read(), fp.name,
-                                           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                           key=f"dl_{_pi}_{fp.name}")
-
-
-# =============================================================================
-#  PAGE: Business Plan Generator
-# =============================================================================
-
-if page == "📄 사업계획서":
-    st.markdown(_section("사업계획서 AI 생성기"), unsafe_allow_html=True)
-    st.markdown(f'<p style="color:{t["text2"]};margin-bottom:24px">'
-                f'공고 맞춤형 사업계획서 초안을 AI가 자동 생성합니다. '
-                f'양식 파일 업로드 또는 공고 본문 분석 중 선택하세요.</p>',
-                unsafe_allow_html=True)
-
-    result = _result()
-    notices = result.get("notices", []) if result else []
-    score_cards = result.get("score_cards", []) if result else []
-    smap_bp = {s.notice_id: s for s in score_cards}
-
-    bp_tab1, bp_tab2 = st.tabs(["📋 공고 선택 → 자동 생성", "📁 양식 업로드 → 내용 채우기"])
-
-    with bp_tab1:
-        st.markdown(f'<p style="color:{t["text2"]}">수집된 공고 중 하나를 선택하면, '
-                    f'공고 본문을 AI가 분석하여 맞춤형 사업계획서 구조를 만들고 내용을 생성합니다.</p>',
-                    unsafe_allow_html=True)
-
-        if not notices:
-            st.info("수집된 공고가 없습니다. 먼저 '수집 실행'을 해주세요.")
-        else:
-            # 공고 선택 (A/B 등급 우선 정렬)
-            def _bp_sort_key(n):
-                sc = smap_bp.get(n.notice_id)
-                grade_order = {"A": 0, "B": 1, "C": 2, "D": 3}
-                g = grade_order.get(sc.priority_grade, 3) if sc else 3
-                return (g, n.title)
-
-            sorted_notices = sorted(notices, key=_bp_sort_key)
-            options = []
-            for n in sorted_notices:
-                sc = smap_bp.get(n.notice_id)
-                grade = sc.priority_grade if sc else "?"
-                options.append(f"[{grade}] {n.title[:60]} ({n.site})")
-
-            selected_idx = st.selectbox("공고 선택", range(len(options)),
-                                        format_func=lambda i: options[i])
-            selected_notice = sorted_notices[selected_idx]
-            selected_sc = smap_bp.get(selected_notice.notice_id)
-
-            # 공고 미리보기
-            with st.expander("선택한 공고 정보", expanded=False):
-                c1, c2, c3 = st.columns(3)
-                c1.metric("등급", selected_sc.priority_grade if selected_sc else "-")
-                c2.metric("마감일", selected_notice.deadline_date or "-")
-                c3.metric("기관", selected_notice.agency or "-")
-                if selected_notice.summary:
-                    st.write(selected_notice.summary[:300])
-
-            bp_company = st.text_input("기업명", value="(주)인터엑스", key="bp_company1")
-
-            if st.button("사업계획서 생성", key="bp_gen1", type="primary", width="stretch"):
-                try:
-                    from interx_engine.application.use_cases.generate_business_plan import (
-                        generate_business_plan,
-                    )
-
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    def _bp_progress(pct, msg):
-                        progress_bar.progress(min(pct, 100))
-                        status_text.text(f"{msg}")
-
-                    with st.spinner("AI가 사업계획서를 생성하고 있습니다..."):
-                        path = generate_business_plan(
-                            notice=selected_notice,
-                            score_card=selected_sc,
-                            template_text="",
-                            company_name=bp_company,
-                            progress_callback=_bp_progress,
-                        )
-
-                    progress_bar.progress(100)
-
-                    if path:
-                        status_text.success(f"생성 완료!")
-                        with open(path, "rb") as f:
-                            st.download_button(
-                                label="📥 사업계획서 다운로드 (.docx)",
-                                data=f.read(),
-                                file_name=Path(path).name,
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                width="stretch",
-                            )
-                    else:
-                        status_text.error("생성 실패 — Gemini API 키를 확인하세요.")
-
-                except Exception as e:
-                    st.error(f"생성 실패: {e}")
-
-    with bp_tab2:
-        st.markdown(f'<p style="color:{t["text2"]}">해당 사업의 양식 파일(HWP/HWPX/PDF/TXT)을 업로드하면, '
-                    f'AI가 양식 구조를 파악하고 각 섹션의 내용을 자동 채웁니다.</p>',
-                    unsafe_allow_html=True)
-
-        uploaded = st.file_uploader(
-            "양식 파일 업로드",
-            type=["hwp", "hwpx", "pdf", "txt"],
-            key="bp_upload",
-        )
-
-        bp_title = st.text_input("사업/공고명", key="bp_title2",
-                                  placeholder="예: 2025년 제조AI특화 스마트공장 구축지원사업")
-        bp_agency = st.text_input("주관기관", key="bp_agency2", placeholder="예: 중소벤처기업부")
-        bp_company2 = st.text_input("기업명", value="(주)인터엑스", key="bp_company2")
-        bp_summary = st.text_area("사업 요약 (선택)", key="bp_summary2",
-                                   placeholder="사업 내용을 간단히 설명하면 더 정확한 내용이 생성됩니다.",
-                                   height=100)
-
-        if st.button("양식 기반 사업계획서 생성", key="bp_gen2", type="primary",
-                     width="stretch"):
-            if not uploaded and not bp_title:
-                st.warning("양식 파일 또는 사업명을 입력하세요.")
-            else:
-                try:
-                    from interx_engine.application.use_cases.generate_business_plan import (
-                        generate_business_plan,
-                        parse_uploaded_file,
-                    )
-
-                    template_text = ""
-                    if uploaded:
-                        with st.spinner("양식 파일 분석 중..."):
-                            template_text = parse_uploaded_file(
-                                uploaded.read(), uploaded.name
-                            )
-                        if template_text:
-                            st.success(f"양식 파싱 완료: {len(template_text):,}자 추출")
-                        else:
-                            st.warning("양식 텍스트 추출 실패 — 공고 분석 모드로 전환")
-
-                    # 가상 Notice 생성
-                    from interx_engine.core.entities.notice import Notice
-                    virtual_notice = Notice(
-                        execution_id="MANUAL",
-                        site="manual",
-                        notice_id="MANUAL-BP",
-                        title=bp_title or "사업계획서",
-                        agency=bp_agency,
-                        summary=bp_summary,
-                        body_text=bp_summary or "",
-                    )
-
-                    progress_bar2 = st.progress(0)
-                    status_text2 = st.empty()
-
-                    def _bp_progress2(pct, msg):
-                        progress_bar2.progress(min(pct, 100))
-                        status_text2.text(f"{msg}")
-
-                    with st.spinner("AI가 사업계획서를 생성하고 있습니다..."):
-                        path = generate_business_plan(
-                            notice=virtual_notice,
-                            score_card=None,
-                            template_text=template_text,
-                            company_name=bp_company2,
-                            progress_callback=_bp_progress2,
-                        )
-
-                    progress_bar2.progress(100)
-
-                    if path:
-                        status_text2.success("생성 완료!")
-                        with open(path, "rb") as f:
-                            st.download_button(
-                                label="📥 사업계획서 다운로드 (.docx)",
-                                data=f.read(),
-                                file_name=Path(path).name,
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                width="stretch",
-                            )
-                    else:
-                        status_text2.error("생성 실패 — Gemini API 키를 확인하세요.")
-
-                except Exception as e:
-                    st.error(f"생성 실패: {e}")
-
-
-# =============================================================================
-#  PAGE: Competitor Analysis
-# =============================================================================
-
-if page == "🏢 경쟁사":
-    result = _result()
-    if not result:
-        st.markdown(_empty("🏢", "경쟁사 분석 데이터 없음", "수집 실행 후 경쟁사 관련 공고를 자동으로 분석합니다."), unsafe_allow_html=True)
-    else:
-        notices = result.get("notices", []); score_cards = result.get("score_cards", [])
-        if notices:
-            try:
-                import plotly.graph_objects as go
-                from interx_engine.application.use_cases.competitor_report import generate_competitor_report
-                with st.spinner("경쟁사 분석 중..."):
-                    cr = generate_competitor_report(notices, score_cards)
-                s = cr.get("summary", {}); cn = cr.get("competitor_notices", [])
-
-                c1, c2, c3, c4 = st.columns(4)
-                c1.markdown(_kpi(s.get("total_notices", 0), "전체 공고"), unsafe_allow_html=True)
-                c2.markdown(_kpi(s.get("competitor_related", 0), "경쟁사 관련"), unsafe_allow_html=True)
-                c3.markdown(_kpi(f'{s.get("competitor_ratio", 0)}%', "경쟁 비율"), unsafe_allow_html=True)
-                c4.markdown(_kpi(s.get("tier1_count", 0), "Tier1 탐지", GD), unsafe_allow_html=True)
-
-                tc = s.get("top_competitors", [])
-                if tc:
-                    st.markdown(_section("경쟁사 탐지 TOP 10"), unsafe_allow_html=True)
-                    fig = go.Figure(go.Bar(x=[c[1] for c in tc[:10]], y=[c[0] for c in tc[:10]],
-                                          orientation='h', marker_color=P))
-                    fig.update_layout(height=380, yaxis=dict(autorange="reversed"),
-                                      xaxis=dict(gridcolor=t['border'], title="탐지 횟수"), **_layout())
-                    st.plotly_chart(fig, width="stretch")
-                if cn:
-                    st.markdown(_section(f"경쟁사 관련 공고 ({len(cn)}건)"), unsafe_allow_html=True)
-                    st.dataframe(pd.DataFrame([{
-                        "등급": c["grade"], "공고명": c["title"][:55], "사이트": c["site"],
-                        "마감일": c["deadline"] or "-", "경쟁사": " / ".join(c["competitors"]),
-                        "Tier": " / ".join(c["tiers"])
-                    } for c in cn]), width="stretch", height=380)
-            except Exception as e:
-                st.error(f"경쟁사 분석 실패: {e}")
 
 
 # =============================================================================
@@ -1767,7 +1481,7 @@ if page == "📈 분석":
             hrows = [{"#": i, "수집일시": h["timestamp"], "모드": h.get("mode", "-"), "전체": h["total"],
                       "A": h["grades"].get("A", 0), "B": h["grades"].get("B", 0),
                       "C": h["grades"].get("C", 0), "D": h["grades"].get("D", 0),
-                      "L3": h.get("l3_count", 0), "제안서": h.get("proposals", 0),
+                      "L3": h.get("l3_count", 0),
                       "사이트": len(h.get("sites", {}))} for i, h in enumerate(reversed(history), 1)]
             st.dataframe(pd.DataFrame(hrows), width="stretch", height=280)
 
@@ -2267,6 +1981,95 @@ if page == "👤 담당자":
         mrows = [{"담당자": m, "전체": d["total"], "A": d["A"], "B": d["B"], "C": d["C"], "D": d["D"],
                   "A비율": f'{d["A"] / max(1, d["total"]) * 100:.0f}%'} for m, d in sorted(md.items(), key=lambda x: -x[1]["total"])]
         st.dataframe(pd.DataFrame(mrows), width="stretch", height=350)
+
+
+# =============================================================================
+#  PAGE: Parsing Validation
+# =============================================================================
+
+if page == "🔬 파싱 검증":
+    result = _result()
+    if not result:
+        st.markdown(_empty("🔬", "파싱 검증 데이터 없음", "수집을 먼저 실행하세요. 수집 결과의 파싱 품질을 자동으로 검증합니다."), unsafe_allow_html=True)
+    else:
+        from interx_engine.application.use_cases.validate_parsing import validate_parsing
+
+        notices = result.get("notices", [])
+        score_cards = result.get("score_cards", [])
+
+        with st.spinner("파싱 품질 검증 중..."):
+            vr = validate_parsing(notices, score_cards)
+
+        sm = vr.summary
+
+        st.markdown(_section("파싱 품질 요약"), unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        _comp_color = GD if sm["overall_completeness"] >= 80 else (YW if sm["overall_completeness"] >= 60 else RD)
+        c1.markdown(_kpi(f'{sm["overall_completeness"]}%', "전체 완성도", _comp_color), unsafe_allow_html=True)
+        c2.markdown(_kpi(sm["total_notices"], "수집 공고"), unsafe_allow_html=True)
+        c3.markdown(_kpi(sm["parsing_issues"], "파싱 이슈", RD if sm["parsing_issues"] > 0 else GD), unsafe_allow_html=True)
+        c4.markdown(_kpi(sm["grade_flags"], "등급 의심", RD if sm["grade_flags"] > 0 else GD), unsafe_allow_html=True)
+
+        # ── 사이트별 완성도 ──
+        if vr.site_reports:
+            st.markdown(_section("사이트별 파싱 완성도"), unsafe_allow_html=True)
+            import plotly.graph_objects as go
+
+            sites = [sr.site for sr in sorted(vr.site_reports, key=lambda s: s.completeness_pct, reverse=True)]
+            pcts = [sr.completeness_pct for sr in sorted(vr.site_reports, key=lambda s: s.completeness_pct, reverse=True)]
+            colors = [GD if p >= 80 else (YW if p >= 60 else RD) for p in pcts]
+
+            fig = go.Figure(go.Bar(x=sites, y=pcts, marker_color=colors, text=[f"{p}%" for p in pcts], textposition="auto"))
+            fig.update_layout(
+                height=350, yaxis=dict(range=[0, 100], title="완성도 %", gridcolor=t["border"]),
+                xaxis=dict(title="수집 사이트"), **_layout(),
+            )
+            st.plotly_chart(fig, width="stretch")
+
+            # ── 사이트별 필드 상세 ──
+            with st.expander("필드별 상세 현황", expanded=False):
+                field_rows = []
+                for sr in vr.site_reports:
+                    row = {"사이트": sr.site, "공고수": sr.total}
+                    for fname, fs in sr.field_stats.items():
+                        row[fname] = f"{fs.pct}% ({fs.filled}/{fs.total})"
+                    field_rows.append(row)
+                st.dataframe(pd.DataFrame(field_rows), width="stretch", height=300)
+
+        # ── 등급 정확도 의심 ──
+        if vr.grade_accuracy_flags:
+            st.markdown(_section(f"등급 정확도 의심 ({len(vr.grade_accuracy_flags)}건)"), unsafe_allow_html=True)
+            st.markdown(f'<p style="color:{t["text2"]}">A등급인데 본문이 부실하거나, D등급인데 점수가 높은 등 등급 산정이 의심되는 공고입니다.</p>', unsafe_allow_html=True)
+            grade_rows = []
+            for gi in vr.grade_accuracy_flags:
+                grade_rows.append({
+                    "등급": gi.grade, "사이트": gi.site,
+                    "공고명": gi.title[:50], "문제점": " / ".join(gi.issues),
+                })
+            st.dataframe(pd.DataFrame(grade_rows), width="stretch", height=300)
+
+        # ── 파싱 누락 이슈 ──
+        if vr.issues:
+            st.markdown(_section(f"파싱 누락 이슈 ({len(vr.issues)}건)"), unsafe_allow_html=True)
+
+            _sev_filter = st.radio("심각도 필터", ["전체", "에러만 (A/B 등급)", "경고만 (C/D 등급)"], horizontal=True)
+
+            filtered = vr.issues
+            if _sev_filter == "에러만 (A/B 등급)":
+                filtered = [i for i in vr.issues if i.severity == "error"]
+            elif _sev_filter == "경고만 (C/D 등급)":
+                filtered = [i for i in vr.issues if i.severity == "warning"]
+
+            issue_rows = []
+            for ii in filtered[:100]:
+                issue_rows.append({
+                    "심각도": "🔴" if ii.severity == "error" else "🟡",
+                    "등급": ii.grade, "사이트": ii.site,
+                    "공고명": ii.title[:45], "이슈": " / ".join(ii.issues),
+                })
+            st.dataframe(pd.DataFrame(issue_rows), width="stretch", height=400)
+        elif not vr.grade_accuracy_flags:
+            st.success("파싱 이슈 없음! 모든 공고가 정상적으로 파싱되었습니다.")
 
 
 # =============================================================================

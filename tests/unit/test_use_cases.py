@@ -7,8 +7,7 @@ Use Case 단위 테스트 — 핵심 유스케이스 8개 커버
   4. detect_changes       (신규/변경 감지)
   5. assign_manager       (담당자 자동 배정)
   6. assign_milestone     (BD 마일스톤 자동 배정)
-  7. track_competitors    (경쟁사 감지)
-  8. site_quality_grader  (사이트 품질 등급)
+  7. site_quality_grader  (사이트 품질 등급)
 """
 from __future__ import annotations
 
@@ -432,62 +431,8 @@ class TestAssignMilestone:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 7. TrackCompetitors
 # ═════════════════════════════════════════════════════════════════════════════
-
-class TestTrackCompetitors:
-    """track_competitors.py — 경쟁사 감지"""
-
-    def test_detect_tier1(self):
-        with patch(
-            "interx_engine.application.use_cases.track_competitors._load_competitors",
-            return_value={
-                "tier1": ["삼성SDS", "LG CNS"],
-                "tier2": ["유비씨"],
-            },
-        ):
-            from interx_engine.application.use_cases.track_competitors import track_competitors
-            notices = [_notice("공고", agency="삼성SDS")]
-            result = track_competitors(notices)
-            assert "직접경쟁" in result[0].competitor_flag
-            assert "삼성sds" in result[0].competitor_flag.lower()
-
-    def test_detect_tier2(self):
-        with patch(
-            "interx_engine.application.use_cases.track_competitors._load_competitors",
-            return_value={
-                "tier1": ["삼성SDS"],
-                "tier2": ["유비씨"],
-            },
-        ):
-            from interx_engine.application.use_cases.track_competitors import track_competitors
-            notices = [_notice("공고", agency="유비씨")]
-            result = track_competitors(notices)
-            assert "간접경쟁" in result[0].competitor_flag
-
-    def test_no_match(self):
-        with patch(
-            "interx_engine.application.use_cases.track_competitors._load_competitors",
-            return_value={"tier1": ["삼성SDS"], "tier2": []},
-        ):
-            from interx_engine.application.use_cases.track_competitors import track_competitors
-            notices = [_notice("공고", agency="인터엑스")]
-            result = track_competitors(notices)
-            assert result[0].competitor_flag == ""
-
-    def test_memo_updated(self):
-        with patch(
-            "interx_engine.application.use_cases.track_competitors._load_competitors",
-            return_value={"tier1": ["삼성SDS"], "tier2": []},
-        ):
-            from interx_engine.application.use_cases.track_competitors import track_competitors
-            notices = [_notice("공고", agency="삼성SDS")]
-            result = track_competitors(notices)
-            assert "경쟁" in (result[0].memo or "")
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 8. SiteQualityGrader
+# 7. SiteQualityGrader
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestSiteQualityGrader:

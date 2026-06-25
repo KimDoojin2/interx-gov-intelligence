@@ -17,9 +17,6 @@ matching:
 alert:
   urgent_dday: 7        # D-day ≤ N이면 긴급마감 시트에 포함
 
-proposal:
-  output_dir: "data/proposals"   # 제안서 저장 디렉토리 (project_root 기준)
-
 collector:
   retry_total: 1              # 실패 시 재시도 횟수 (3→1 — 빠른 스킵)
   retry_backoff: 0.5          # 재시도 간격 배율 (1.0→0.5초)

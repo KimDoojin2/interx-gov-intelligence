@@ -174,7 +174,7 @@ def normalize(df: pd.DataFrame) -> pd.DataFrame:
         "파트너후보": "partner_candidate", "주무부처": "ministry",
         "예산": "budget", "담당자": "manager", "검토상태": "status",
         "사업유형": "business_type", "상세URL": "detail_url",
-        # 신규 컬럼은 한글 그대로 유지 (신규여부, 변경여부, 경쟁사감지, 중복의심)
+        # 신규 컬럼은 한글 그대로 유지 (신규여부, 변경여부, 중복의심)
     }
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
     # d_day 계산

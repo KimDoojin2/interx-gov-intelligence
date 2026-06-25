@@ -1,7 +1,7 @@
 """
 DailyPipelineOrchestrator — 9-sheet 아키텍처 + 전체 기능 통합
   수집 → notice_id중복제거 → 마감지난공고제거 → 스코어링
-  → TF-IDF중복제거 → 변경감지 → 담당자배정 → 경쟁사트래킹
+  → TF-IDF중복제거 → 변경감지 → 담당자배정
   → 품질등급 → 행빌드 → 시트업로드 → SQLite저장 → 알림발송
 """
 from __future__ import annotations
@@ -19,13 +19,11 @@ from interx_engine.application.use_cases.deduplicate_notices import deduplicate_
 from interx_engine.application.use_cases.detect_changes import detect_changes
 from interx_engine.application.use_cases.assign_manager import assign_managers
 from interx_engine.application.use_cases.assign_milestone import assign_milestones
-from interx_engine.application.use_cases.track_competitors import track_competitors
 from interx_engine.application.use_cases.detect_recurring import detect_recurring
 from interx_engine.application.use_cases.site_quality_grader import grade_site_quality
 from interx_engine.application.use_cases.log_status_change import (
     detect_status_changes, load_snapshot, save_snapshot,
 )
-from interx_engine.application.use_cases.generate_proposal_v2 import generate_proposals_v2
 from interx_engine.application.mappers.notice_mapper import (
     notice_to_master_row, notice_to_urgent_row, _calc_dday,
 )
@@ -173,8 +171,6 @@ class DailyPipelineOrchestrator:
             log.warning("[Pipeline] 상태변경 로그 실패 (무시): %s", e)
             status_rows = []
 
-        # ── 8. 경쟁사 트래킹 ─────────────────────────────────────────────────
-        notices = track_competitors(notices)
 
         # ── 8-B. 정기공고 감지 (recurring_flag / recurring_group 설정) ──────
         try:
@@ -245,12 +241,6 @@ class DailyPipelineOrchestrator:
         except Exception as e:
             log.debug("[Pipeline] 학습 데이터 내보내기 스킵: %s", e)
 
-        # ── 11-E. 제안서 초안 자동 생성 (A/B 등급) ───────────────────────────
-        try:
-            proposal_files = generate_proposals_v2(notices, score_cards)
-        except Exception as e:
-            log.warning("[Pipeline] 제안서 생성 실패 (무시): %s", e)
-            proposal_files = []
 
         # ── 12. KPI / 통계 / 에러 빌드 ──────────────────────────────────────
         elapsed    = round(time.monotonic() - t0, 1)
@@ -274,8 +264,7 @@ class DailyPipelineOrchestrator:
             f"신규={new_count} | 변경={changed_count} | "
             f"마감제거={expired_count} | 중복제거={dup_count} | "
             f"정기공고={recurring_count} | "
-            f"경쟁사={sum(1 for n in notices if n.competitor_flag)} | "
-            f"제안서={len(proposal_files)} | 에러={len(error_rows)} | "
+            f"에러={len(error_rows)} | "
             f"마일스톤=[{ms_summary}]"
         )
 
@@ -299,7 +288,6 @@ class DailyPipelineOrchestrator:
             "dup_count":             dup_count,
             "expired_count":         expired_count,
             "error_count":           len(error_rows),
-            "proposal_files":        proposal_files,
             "quality_grades":        quality_grades,
             "analysis_report":       analysis_report,
             "win_report":            win_report,

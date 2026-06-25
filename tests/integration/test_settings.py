@@ -44,7 +44,3 @@ class TestSettingsLoad:
         assert len(codes) > 0
         assert 500 in codes
 
-    def test_proposal_output_dir_is_path(self):
-        d = self.s.proposal_output_dir()
-        assert isinstance(d, Path)
-        assert "proposal" in str(d).lower()

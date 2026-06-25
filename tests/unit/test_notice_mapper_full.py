@@ -140,8 +140,3 @@ class TestNoticeToMasterRow:
         row = notice_to_master_row(n)
         assert row["마감일"] == "상시모집"
 
-    def test_competitor_flag_in_memo(self):
-        n = _notice()
-        n.competitor_flag = "tier1"
-        row = notice_to_master_row(n)
-        assert "tier1" in row["메모"] or row["경쟁사감지"] == "tier1"

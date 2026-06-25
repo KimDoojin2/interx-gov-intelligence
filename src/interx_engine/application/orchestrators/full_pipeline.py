@@ -206,10 +206,7 @@ class FullPipelineOrchestrator:
         except Exception as e:
             log.warning("수주 예측 JSON 저장 실패: %s", e)
 
-        # ── 8. 제안서 결과 재사용 (DailyPipeline Step 11-E에서 이미 실행됨) ──
-        proposals = result.get("proposal_files", [])
-
-        # ── 9. 클러스터 JSON 저장 (대시보드용) ───────────────────────────────
+        # ── 8. 클러스터 JSON 저장 (대시보드용) ───────────────────────────────
         try:
             _save_json_artifact(self.base_dir, "clusters_latest.json", {
                 "created_at": datetime.now().isoformat(),
@@ -230,6 +227,5 @@ class FullPipelineOrchestrator:
             "clusters":          clusters,
             "alert_result":      alert_result,
             "win_report":        win_report,
-            "proposals":         proposals,
             "elapsed_seconds":   elapsed,
         }

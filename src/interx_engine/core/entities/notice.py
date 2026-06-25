@@ -37,7 +37,6 @@ class Notice:
     status: str = ""                        # 검토상태
     open_ended: bool = False                # 상시모집/예산소진시 등 비정형 마감
     duplicate_flag: str = "N"             # TF-IDF 중복 감지 플래그
-    competitor_flag: str = ""             # 경쟁사 감지 (tier1/tier2)
     is_new: bool = False                  # 신규 공고 (이전 실행 대비)
     is_changed: bool = False              # 변경 감지 (마감일·예산 등)
     memo: str = ""                        # 자동 메모 (중복의심·변경감지·경쟁사)
