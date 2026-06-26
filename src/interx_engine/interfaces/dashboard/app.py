@@ -131,7 +131,6 @@ def make_demo() -> pd.DataFrame:
     sites = ["bizinfo", "bipa", "uipa", "iris", "kiat", "smba", "nipa"]
     solutions = ["ManufacturingDT", "RecipeAI", "QualityAI", "InspectionAI", "SafetyAI", "GenAI", "InfraDS", "PdM"]
     grades = ["A", "A", "B", "B", "B", "C", "C", "D"]
-    managers = ["김담당", "이영업", "박BD", "최전략", "정기획"]
     statuses = ["검토중", "제안완료", "수주", "탈락", "보류"]
     rows = []
     for i in range(80):
@@ -153,7 +152,6 @@ def make_demo() -> pd.DataFrame:
             "partner_candidate": random.choice(["Y", "N", "N"]),
             "ministry": random.choice(["산업통상자원부", "중소벤처기업부", "과학기술정보통신부", "고용노동부"]),
             "budget": f"{random.randint(1, 50)}억원",
-            "manager": random.choice(managers),
             "status": random.choice(statuses),
             "business_type": random.choice(["R&D", "실증(PoC)", "바우처", "인력양성", "수요조사"]),
             "신규여부":   random.choice(["Y", "N", "N", "N"]),
@@ -172,7 +170,7 @@ def normalize(df: pd.DataFrame) -> pd.DataFrame:
         "적합도점수": "fitness_score", "우선순위점수": "priority_score",
         "추천솔루션": "recommended_solution", "L3강공고": "l3_strong",
         "파트너후보": "partner_candidate", "주무부처": "ministry",
-        "예산": "budget", "담당자": "manager", "검토상태": "status",
+        "예산": "budget", "검토상태": "status",
         "사업유형": "business_type", "상세URL": "detail_url",
         # 신규 컬럼은 한글 그대로 유지 (신규여부, 변경여부, 중복의심)
     }
@@ -334,8 +332,8 @@ for col, label, val, color in [
 st.markdown("---")
 
 # ─── 탭 ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15 = st.tabs([
-    "📋 공고 목록", "📈 시각화", "👤 담당자별 현황", "🔥 A 등급 상세",
+tab1, tab2, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15 = st.tabs([
+    "📋 공고 목록", "📈 시각화", "🔥 A 등급 상세",
     "⚠️ 긴급 마감", "📊 수집 트렌드", "💰 예산 분석", "🏅 사이트 품질",
     "📎 사업공고 첨부", "🧠 포트폴리오 분석",
     "📝 CRM 메모", "📅 마감 캘린더", "🎯 BD 파이프라인", "📤 보고서 다운로드",
@@ -481,51 +479,6 @@ with tab2:
             fig6.add_vline(x=7, line_dash="dash", line_color="red", annotation_text="7일 긴급")
             fig6.add_vline(x=30, line_dash="dash", line_color="orange", annotation_text="30일")
             st.plotly_chart(fig6, use_container_width=True)
-
-
-# ══ TAB3: 담당자별 현황 ═══════════════════════════════════════════════════════
-with tab3:
-    st.markdown("### 👤 담당자별 수주 현황")
-
-    if "manager" not in df.columns:
-        st.info("담당자 정보가 없습니다. 스프레드시트에서 담당자 컬럼을 입력해주세요.")
-    else:
-        mgr_df = df[df["manager"].notna() & (df["manager"] != "")].copy()
-        if mgr_df.empty:
-            st.info("담당자가 배정된 공고가 없습니다.")
-        else:
-            # 담당자별 요약
-            grp = mgr_df.groupby("manager").agg(
-                담당공고수=("title", "count"),
-                평균적합도=("fitness_score", "mean"),
-                L3강공고=("l3_strong", lambda x: (x == "Y").sum()),
-                A등급수=("priority_grade", lambda x: (x == "A").sum()),
-            ).reset_index().rename(columns={"manager": "담당자"})
-            grp["평균적합도"] = grp["평균적합도"].round(1)
-
-            st.dataframe(grp, use_container_width=True)
-
-            # 담당자별 수주 현황 (status 있을 때)
-            if "status" in mgr_df.columns:
-                status_grp = mgr_df.groupby(["manager", "status"]).size().reset_index(name="건수")
-                fig_mgr = px.bar(
-                    status_grp, x="manager", y="건수", color="status",
-                    title="담당자 × 수주 현황",
-                    barmode="stack",
-                    labels={"manager": "담당자", "status": "상태"},
-                )
-                st.plotly_chart(fig_mgr, use_container_width=True)
-
-            # 담당자별 적합도 박스플롯
-            if "fitness_score" in mgr_df.columns:
-                fig_box = px.box(
-                    mgr_df, x="manager", y="fitness_score",
-                    title="담당자별 적합도 분포 (Box Plot)",
-                    points="all",
-                    color="manager",
-                    labels={"manager": "담당자", "fitness_score": "적합도 점수"},
-                )
-                st.plotly_chart(fig_box, use_container_width=True)
 
 
 # ══ TAB4: P1 상세 ════════════════════════════════════════════════════════════

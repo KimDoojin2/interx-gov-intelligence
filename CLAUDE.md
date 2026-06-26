@@ -11,7 +11,7 @@ core/           → 순수 도메인 (외부 의존성 없음)
   rules/        → PriorityScoringPolicy, L3StrongPolicy, RecommendationRules
 
 application/    → 유스케이스 & 오케스트레이터
-  use_cases/    → 20개 (score, deduplicate, detect_recurring, win_prediction, validate_parsing ...)
+  use_cases/    → 19개 (score, deduplicate, detect_recurring, win_prediction, validate_parsing ...)
   ports/        → 인터페이스 (collector, sheet, alert, partner)
   mappers/      → Notice→Sheets행 변환
   orchestrators/→ DailyPipeline, FullPipeline
@@ -42,7 +42,6 @@ venv/Scripts/python -m pytest tests/unit/ -v --tb=short  # 단위 테스트
 | `scoring.yaml` | 점수 가중치·등급 컷·키워드 | grade_a=48, grade_b=30, grade_c=18 |
 | `sites.yaml` | 수집 사이트 목록 (enabled 플래그) | 16개 enabled |
 | `recurring.yaml` | 정기공고 패턴 (name + aliases) | 125줄 |
-| `manager_rules.yaml` | 담당자 배정 규칙 | 키워드+부처 매칭 |
 | `sheets.yaml` | Sheets 9시트 컬럼 매핑 | 01~96 시트 |
 | `settings.yaml` | 타임아웃·페이지수·워커수 | max_pages=5 |
 
@@ -142,7 +141,6 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 - win_probability ML 기반 수주 예측
 - Playwright (JS/SPA 처리)
 - body_text 8000자 수집
-- 담당자 자동 배정
 - 파트너 매칭
 - TF-IDF 클러스터링
 - 9패널 자동 분석 대시보드
@@ -171,7 +169,7 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 
 ### Phase 2 — 경쟁력 차별화
 4. **정기공고 트래커** — 패턴별 올해 탐지 + 작년 수주 이력 연결
-5. **제안서 후보 목록** — A등급+win≥60%+마감30일 자동 필터 + 담당자별 현황
+5. **제안서 후보 목록** — A등급+win≥60%+마감30일 자동 필터
 6. **win_probability 파이프라인** — 예상 수주액 = Σ(예산 × win%) → 매니저 보고용
 
 ### Phase 3 — 확장

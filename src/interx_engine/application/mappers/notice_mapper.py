@@ -62,7 +62,7 @@ def notice_to_master_row(notice: Notice, score: Optional[ScoreCard] = None) -> d
         "적합키워드":    " | ".join(score.positive_keywords[:5]) if score else "",
         "L3강공고":      notice.l3_strong,
         "파트너후보":    notice.partner_candidate,
-        "담당자":       notice.manager or "",
+        "담당자":       "",
         "검토상태":      notice.status  or "",
         "BD마일스톤":    getattr(notice, "bd_milestone", ""),
         "신규여부":      "Y" if is_new else "N",
@@ -91,6 +91,6 @@ def notice_to_urgent_row(notice: Notice, score: Optional[ScoreCard] = None) -> d
         "추천솔루션":   notice.recommended_solution or "-",
         "추천액션":     notice.recommended_action   or "검토",
         "예산":        notice.budget,
-        "담당자":       notice.manager or "",
+        "담당자":       "",
         "상세URL":     notice.detail_url,
     }

@@ -49,7 +49,7 @@ def build_notice_payload(notice, score_card=None) -> Dict[str, Any]:
         "partner_candidate": getattr(n, "partner_candidate", "N"),
         "recurring_flag": getattr(n, "recurring_flag", "N"),
         "recurring_group": getattr(n, "recurring_group", ""),
-        "manager": getattr(n, "manager", ""),
+        "manager": "",
         "bd_milestone": getattr(n, "bd_milestone", ""),
         "detail_url": getattr(n, "detail_url", "") or getattr(n, "notice_link", ""),
         "body_text": (getattr(n, "body_text", "") or "")[:8000],

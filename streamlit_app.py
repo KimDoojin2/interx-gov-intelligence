@@ -421,7 +421,7 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
 NAV_ITEMS = [
     "📊 대시보드", "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
     "🎯 수주 예측", "📅 마감 캘린더",
-    "📈 분석", "👤 담당자", "🔬 파싱 검증", "🤖 AI 뉴스", "💬 AI 챗봇",
+    "📈 분석", "🔬 파싱 검증", "🤖 AI 뉴스", "💬 AI 챗봇",
 ]
 
 with st.sidebar:
@@ -1941,46 +1941,6 @@ if page == "📈 분석":
                     st.plotly_chart(fig, width="stretch")
             else:
                 st.markdown(_empty("🔄", "정기공고 감지 없음", "recurring_flag가 설정된 공고가 없습니다. 수집 시 정기공고 감지가 활성화되어 있는지 확인하세요."), unsafe_allow_html=True)
-
-
-# =============================================================================
-#  PAGE: Manager Overview
-# =============================================================================
-
-if page == "👤 담당자":
-    result = _result()
-    if not result:
-        st.markdown(_empty("👤", "담당자 현황 없음", "수집 실행 후 담당자별 공고 배분을 확인할 수 있습니다."), unsafe_allow_html=True)
-    else:
-        import plotly.graph_objects as go
-        notices = result.get("notices", []); smap = _smap(result)
-        md = defaultdict(lambda: {"total": 0, "A": 0, "B": 0, "C": 0, "D": 0})
-        for n in notices:
-            mgr = n.manager or "미배정"; sc = smap.get(n.notice_id); g = sc.priority_grade if sc else "D"
-            md[mgr]["total"] += 1; md[mgr][g] += 1
-
-        tm = len([m for m in md if m != "미배정"]); ua = md.get("미배정", {}).get("total", 0)
-        k1, k2, k3 = st.columns(3)
-        k1.markdown(_kpi(tm, "배정 담당자"), unsafe_allow_html=True)
-        k2.markdown(_kpi(len(notices) - ua, "배정 완료"), unsafe_allow_html=True)
-        k3.markdown(_kpi(ua, "미배정", GD), unsafe_allow_html=True)
-
-        if md:
-            mgrs = sorted(md, key=lambda m: -md[m]["total"])
-            fig = go.Figure()
-            for g, c in [("A", GA), ("B", GB), ("C", GC), ("D", GD)]:
-                fig.add_trace(go.Bar(name=g, x=mgrs, y=[md[m][g] for m in mgrs], marker_color=c))
-            fig.update_layout(title=dict(text="담당자별 등급 분포", font=dict(size=14, color=t['text'])),
-                              barmode='stack', height=380,
-                              legend=dict(orientation="h", y=1.12),
-                              xaxis=dict(gridcolor=t['border']), yaxis=_yaxis("건수"),
-                              **_layout())
-            st.plotly_chart(fig, width="stretch")
-
-        st.markdown(_section("담당자 상세"), unsafe_allow_html=True)
-        mrows = [{"담당자": m, "전체": d["total"], "A": d["A"], "B": d["B"], "C": d["C"], "D": d["D"],
-                  "A비율": f'{d["A"] / max(1, d["total"]) * 100:.0f}%'} for m, d in sorted(md.items(), key=lambda x: -x[1]["total"])]
-        st.dataframe(pd.DataFrame(mrows), width="stretch", height=350)
 
 
 # =============================================================================

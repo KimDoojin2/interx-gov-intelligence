@@ -102,7 +102,7 @@ async def api_update_notice(notice_id: str, request: Request):
     field = body.get("field", "")
     value = body.get("value", "")
     reason = body.get("reason", "")
-    if field not in ("status", "manager", "bd_milestone", "memo"):
+    if field not in ("status", "bd_milestone", "memo"):
         return JSONResponse({"error": "invalid field"}, 400)
     update_notice_status(notice_id, field, value, reason)
     return {"ok": True}

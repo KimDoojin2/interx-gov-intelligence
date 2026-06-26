@@ -1,7 +1,7 @@
 """
 DailyPipelineOrchestrator — 9-sheet 아키텍처 + 전체 기능 통합
   수집 → notice_id중복제거 → 마감지난공고제거 → 스코어링
-  → TF-IDF중복제거 → 변경감지 → 담당자배정
+  → TF-IDF중복제거 → 변경감지
   → 품질등급 → 행빌드 → 시트업로드 → SQLite저장 → 알림발송
 """
 from __future__ import annotations
@@ -17,7 +17,6 @@ from interx_engine.application.use_cases.portfolio_analysis import PortfolioAnal
 from interx_engine.application.use_cases.win_prediction import WinPredictionUseCase
 from interx_engine.application.use_cases.deduplicate_notices import deduplicate_by_tfidf
 from interx_engine.application.use_cases.detect_changes import detect_changes
-from interx_engine.application.use_cases.assign_manager import assign_managers
 from interx_engine.application.use_cases.assign_milestone import assign_milestones
 from interx_engine.application.use_cases.detect_recurring import detect_recurring
 from interx_engine.application.use_cases.site_quality_grader import grade_site_quality
@@ -152,10 +151,7 @@ class DailyPipelineOrchestrator:
         # ── 6. 공고 변경 감지 ─────────────────────────────────────────────────
         notices, new_count, changed_count = detect_changes(notices)
 
-        # ── 7. 담당자 자동 배정 ───────────────────────────────────────────────
-        notices = assign_managers(notices)
-
-        # ── 7-B. BD 마일스톤 자동 배정 ───────────────────────────────────────
+        # ── 7. BD 마일스톤 자동 배정 ─────────────────────────────────────────
         notices = assign_milestones(notices, score_cards)
 
         # ── 7-C. 상태변경 로그 기록 ──────────────────────────────────────────

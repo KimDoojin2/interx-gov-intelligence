@@ -37,7 +37,6 @@ def _notice(
     body_text: str = "",
     l3_strong: str = "N",
     partner_candidate: str = "N",
-    manager: str = "",
     bd_milestone: str = "",
     **kwargs,
 ) -> Notice:
@@ -55,7 +54,6 @@ def _notice(
         body_text=body_text,
         l3_strong=l3_strong,
         partner_candidate=partner_candidate,
-        manager=manager,
         bd_milestone=bd_milestone,
     )
     for k, v in kwargs.items():
@@ -300,70 +298,7 @@ class TestDetectChanges:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 5. AssignManager
-# ═════════════════════════════════════════════════════════════════════════════
-
-class TestAssignManager:
-    """assign_manager.py — 담당자 자동 배정"""
-
-    def test_assign_with_rules(self, tmp_path):
-        """YAML 규칙 파일로 담당자 배정 테스트."""
-        from interx_engine.application.use_cases.assign_manager import assign_managers, _load_rules
-
-        rules_yaml = tmp_path / "manager_rules.yaml"
-        rules_yaml.write_text(
-            "rules:\n"
-            "  - manager: '홍길동'\n"
-            "    conditions:\n"
-            "      keywords: ['스마트공장', 'AI']\n"
-            "  - manager: '김철수'\n"
-            "    conditions:\n"
-            "      ministry: ['과학기술정보통신부']\n",
-            encoding="utf-8",
-        )
-
-        with patch(
-            "interx_engine.application.use_cases.assign_manager._load_rules",
-            return_value=[
-                {"manager": "홍길동", "conditions": {"keywords": ["스마트공장", "AI"]}},
-                {"manager": "김철수", "conditions": {"ministry": ["과학기술정보통신부"]}},
-            ],
-        ):
-            notices = [
-                _notice("스마트공장 구축 지원사업", ministry="중소벤처기업부"),
-                _notice("양자컴퓨팅 연구과제", ministry="과학기술정보통신부"),
-                _notice("바이오 신약 개발", ministry="보건복지부"),
-            ]
-            result = assign_managers(notices)
-            assert result[0].manager == "홍길동"
-            assert result[1].manager == "김철수"
-            assert result[2].manager == ""  # 매칭 규칙 없음
-
-    def test_preserve_manual_assignment(self):
-        """이미 배정된 담당자는 유지."""
-        with patch(
-            "interx_engine.application.use_cases.assign_manager._load_rules",
-            return_value=[{"manager": "자동", "conditions": {"keywords": ["스마트공장"]}}],
-        ):
-            from interx_engine.application.use_cases.assign_manager import assign_managers
-            notices = [_notice("스마트공장 구축", manager="수동배정자")]
-            result = assign_managers(notices)
-            assert result[0].manager == "수동배정자"
-
-    def test_no_rules(self):
-        """규칙 파일 없으면 스킵."""
-        with patch(
-            "interx_engine.application.use_cases.assign_manager._load_rules",
-            return_value=[],
-        ):
-            from interx_engine.application.use_cases.assign_manager import assign_managers
-            notices = [_notice("공고")]
-            result = assign_managers(notices)
-            assert result[0].manager == ""
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 6. AssignMilestone
+# 5. AssignMilestone
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestAssignMilestone:
