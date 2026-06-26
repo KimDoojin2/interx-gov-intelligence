@@ -1,0 +1,19 @@
+{"id":"2633","program":"한국형Manufacturing-X","ministry":"산업부","role":"참여","partner":"직접","company":"","industry":"","revenue":"","budget":300.0,"ix_revenue":30.0,"task":"","result":"선정"}
+{"id":"2643","program":"AI로봇실증사업","ministry":"산업부","role":"참여","partner":"직접","company":"","industry":"기타","revenue":"1500억","budget":10.0,"ix_revenue":2.5,"task":"","result":"선정"}
+{"id":"2640","program":"제조암묵지기반AI","ministry":"산업부","role":"참여","partner":"에이테크솔루션","company":"에이테크솔루션","industry":"자동차부품","revenue":"3000억","budget":28.0,"ix_revenue":4.5,"task":"","result":"선정"}
+{"id":"2641","program":"지역특화제조데이터","ministry":"TP","role":"공급","partner":"직접","company":"한국OSG 호산공장","industry":"기계","revenue":"846억","budget":4.0,"ix_revenue":2.0,"task":"25년 AI 솔루션 실증 연계 교차실증","result":"선정"}
+{"id":"2642","program":"제조데이터 표준화 참조모델","ministry":"중기부","role":"주관","partner":"직접","company":"","industry":"","revenue":"","budget":8.8,"ix_revenue":8.8,"task":"IX-생기원-KPC 컨소시엄","result":"선정"}
+{"id":"2621","program":"AI응용제품 신속상용화","ministry":"중기부","role":"대표공급","partner":"지역육성","company":"대상(전북TP)","industry":"식품","revenue":"4조5000억","budget":48.0,"ix_revenue":26.0,"task":"비정형작업보조(알룰로스 수율상승을 위한 SOP기반 최적적용(APC) 자동화 Agent)","result":"선정"}
+{"id":"2625","program":"제조AI특화","ministry":"중기부","role":"공급","partner":"직접","company":"서연C&F","industry":"자동차부품","revenue":"3126억","budget":4.0,"ix_revenue":1.5,"task":"","result":"선정"}
+{"id":"2625","program":"제조AI특화","ministry":"중기부","role":"공급","partner":"직접","company":"성우랜드","industry":"플라스틱사출","revenue":"120억","budget":4.0,"ix_revenue":1.5,"task":"","result":"선정"}
+{"id":"2625","program":"제조AI특화","ministry":"중기부","role":"용역","partner":"카이시스템","company":"보고에이피","industry":"자동차부품","revenue":"722억","budget":5.5,"ix_revenue":4.5,"task":"","result":"선정"}
+{"id":"2623","program":"산업AI솔루션 실증확산지원","ministry":"산업부","role":"참여","partner":"직접","company":"생기원/기계업종","industry":"기계","revenue":"2000억","budget":42.0,"ix_revenue":7.0,"task":"수요기업(서암기계공업, 대우공업, 한솔아이원스 외)","result":"선정"}
+{"id":"2620","program":"산업문제해결형AI Agent","ministry":"산업부","role":"주관","partner":"직접","company":"대덕전자","industry":"반도체PCB","revenue":"1조","budget":81.0,"ix_revenue":25.0,"task":"","result":"선정"}
+{"id":"2619","program":"AI Agent 융합확산 지원","ministry":"NIPA","role":"참여","partner":"NCAI","company":"메카텍/NCAI","industry":"조선","revenue":"1조","budget":15.5,"ix_revenue":7.0,"task":"NCAI 범한메카텍 컨소시엄 AI Agent 과업참여","result":"선정"}
+{"id":"2615","program":"조선해양산업핵심기술개발(R&D)","ministry":"산업부","role":"참여","partner":"직접","company":"KOMERI","industry":"조선","revenue":"","budget":0,"ix_revenue":6.0,"task":"조선업을 위한 AI기반 공정 스케줄링 및 블록 배치 최적화 기술개발 및 실증","result":"선정"}
+{"id":"2606","program":"블록체인살생물 2세부","ministry":"기후부","role":"참여","partner":"직접","company":"","industry":"","revenue":"","budget":54.0,"ix_revenue":18.4,"task":"AI 기반 사업장 입출고 제어 등 규제 대응 지원 기술개발","result":"선정"}
+{"id":"2602","program":"자율형공장","ministry":"중기부","role":"용역","partner":"아이티스코","company":"에스엔에스아이엔씨 1공장","industry":"자동차부품","revenue":"1719억","budget":12.0,"ix_revenue":1.5,"task":"DT부분 용역","result":"선정"}
+{"id":"2602","program":"자율형공장","ministry":"중기부","role":"용역","partner":"아이티스코","company":"에스엔에스아이엔씨 2공장","industry":"자동차부품","revenue":"1719억","budget":12.0,"ix_revenue":1.5,"task":"DT부분 용역","result":"선정"}
+{"id":"2602","program":"자율형공장","ministry":"중기부","role":"공급","partner":"직접","company":"토비스","industry":"전장디스플레이","revenue":"5376억","budget":12.0,"ix_revenue":12.0,"task":"디스플레이 품질관리 자율제조 DT","result":"선정"}
+{"id":"2603","program":"정부일반형","ministry":"중기부","role":"대표공급","partner":"직접","company":"화승코퍼레이션","industry":"자동차용고무","revenue":"1조6983억","budget":3.6,"ix_revenue":3.6,"task":"혼련 최적 조건 공정 최적화","result":"선정"}
+{"id":"2603","program":"정부일반형","ministry":"중기부","role":"대표공급","partner":"이노베이스","company":"대우공업","industry":"자동차부품","revenue":"1590억","budget":3.97,"ix_revenue":3.97,"task":"","result":"선정"}
