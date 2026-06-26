@@ -236,22 +236,6 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{color:{
 /* ── Chat ── */
 .stChatMessage{{border-radius:12px}}
 
-/* ── Kanban Board ── */
-.kb-col-header{{
-    font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;
-    padding:10px 14px;border-radius:10px 10px 0 0;text-align:center;
-    margin-bottom:0;
-}}
-.kb-card{{
-    background:{t['card']};border:1px solid {t['border']};border-radius:10px;
-    padding:12px 14px;margin:6px 0;transition:all .2s;cursor:default;
-}}
-.kb-card:hover{{border-color:rgba(255,128,0,.25);box-shadow:0 4px 16px {t['shadow']};transform:translateY(-1px)}}
-.kb-card .kb-title{{font-size:.8rem;font-weight:600;color:{t['text']};line-height:1.4;margin-bottom:6px}}
-.kb-card .kb-meta{{font-size:.68rem;color:{t['text3']};display:flex;flex-wrap:wrap;gap:4px 8px}}
-.kb-card .kb-tags{{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}}
-.kb-count{{font-size:.68rem;font-weight:700;opacity:.6}}
-
 /* ── Notice Detail Page ── */
 .detail-header{{
     background:{t['card']};border:1px solid {t['border']};border-radius:16px;
@@ -461,7 +445,7 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
 # =============================================================================
 
 NAV_ITEMS = [
-    "📊 대시보드", "🏗️ BD 파이프라인", "📄 공고 상세",
+    "📊 대시보드", "📄 공고 상세",
     "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
     "🎯 수주 예측", "📅 마감 캘린더",
     "📈 분석", "🔬 파싱 검증", "🤖 AI 뉴스", "💬 AI 챗봇",
@@ -502,144 +486,10 @@ st.markdown(f"""<div class="nav-bar">
 
 
 # =============================================================================
-#  PAGE: BD Pipeline (Kanban)
-# =============================================================================
-
-if page == "🏗️ BD 파이프라인":
-    result = _result()
-    if not result:
-        st.markdown(_empty("🏗️", "데이터를 수집해주세요",
-                           "좌측 메뉴에서 '수집 실행'을 선택하여 정부지원사업 공고를 수집하세요."),
-                    unsafe_allow_html=True)
-    else:
-        notices = result.get("notices", []); smap = _smap(result)
-
-        # Pipeline state in session
-        if "pipeline" not in st.session_state:
-            st.session_state.pipeline = {}
-
-        _STAGES = [
-            ("신규발견", "#6366F1", "rgba(99,102,241,.08)"),
-            ("검토중", "#F59E0B", "rgba(245,158,11,.08)"),
-            ("제안준비", "#3B82F6", "rgba(59,130,246,.08)"),
-            ("제출완료", "#8B5CF6", "rgba(139,92,246,.08)"),
-            ("수주", "#059669", "rgba(5,150,105,.08)"),
-            ("탈락", "#DC2626", "rgba(220,38,38,.05)"),
-        ]
-
-        def _get_stage(nid):
-            return st.session_state.pipeline.get(nid, "신규발견")
-
-        # 등급/사이트 필터
-        fc1, fc2, fc3 = st.columns([1, 1, 3])
-        with fc1:
-            _kb_grade = st.selectbox("등급 필터", ["전체", "A", "B", "C", "D"], key="kb_grade")
-        with fc2:
-            _kb_sort = st.selectbox("정렬", ["점수 높은 순", "마감 임박 순", "최신 공고 순"], key="kb_sort")
-
-        # Build card data
-        _cards = []
-        for n in notices:
-            sc = smap.get(n.notice_id)
-            if not sc:
-                continue
-            g = sc.priority_grade
-            if _kb_grade != "전체" and g != _kb_grade:
-                continue
-            dd = _dday(n.deadline_date or "")
-            wp = _win_prob(n, sc)
-            stage = _get_stage(n.notice_id)
-            _cards.append({"n": n, "sc": sc, "g": g, "dd": dd, "wp": wp, "stage": stage})
-
-        if _kb_sort == "마감 임박 순":
-            _cards.sort(key=lambda x: (x["dd"] if x["dd"] >= 0 else 9999))
-        elif _kb_sort == "최신 공고 순":
-            _cards.sort(key=lambda x: x["n"].notice_date or "", reverse=True)
-        else:
-            _cards.sort(key=lambda x: -(x["sc"].priority_score if x["sc"] else 0))
-
-        # Summary KPIs
-        _stage_counts = {}
-        for c in _cards:
-            _stage_counts[c["stage"]] = _stage_counts.get(c["stage"], 0) + 1
-        _total_pipe = len([c for c in _cards if c["stage"] not in ("탈락",)])
-        _total_wp = sum(c["wp"] for c in _cards if c["stage"] not in ("탈락", "수주"))
-        _total_wp_cnt = len([c for c in _cards if c["stage"] not in ("탈락", "수주")])
-
-        mk1, mk2, mk3, mk4 = st.columns(4)
-        mk1.markdown(_kpi(len(_cards), "전체 공고"), unsafe_allow_html=True)
-        mk2.markdown(_kpi(_total_pipe, "파이프라인 내", P), unsafe_allow_html=True)
-        mk3.markdown(_kpi(_stage_counts.get("수주", 0), "수주 확정", GA), unsafe_allow_html=True)
-        mk4.markdown(_kpi(f"{_total_wp / max(1, _total_wp_cnt):.0f}%", "평균 수주확률"), unsafe_allow_html=True)
-
-        st.markdown(_section("파이프라인 칸반 보드"), unsafe_allow_html=True)
-
-        # Kanban columns
-        cols = st.columns(len(_STAGES))
-        for idx, (stage_name, stage_color, stage_bg) in enumerate(_STAGES):
-            with cols[idx]:
-                _cnt = _stage_counts.get(stage_name, 0)
-                st.markdown(
-                    f'<div class="kb-col-header" style="background:{stage_bg};color:{stage_color}">'
-                    f'{stage_name} <span class="kb-count">({_cnt})</span></div>',
-                    unsafe_allow_html=True
-                )
-                _stage_cards = [c for c in _cards if c["stage"] == stage_name]
-                if not _stage_cards:
-                    st.caption("—")
-                for c in _stage_cards[:15]:
-                    n, sc, g, dd, wp = c["n"], c["sc"], c["g"], c["dd"], c["wp"]
-                    gc = GRADE.get(g, t['text3'])
-                    dd_str = f"D-{dd}" if dd >= 0 else "마감"
-                    dd_color = GD if 0 <= dd <= 3 else GC if 0 <= dd <= 7 else t['text3']
-                    wp_color = GA if wp >= 60 else GB if wp >= 40 else GC
-                    st.markdown(
-                        f'<div class="kb-card">'
-                        f'<div class="kb-title">{n.title[:45]}</div>'
-                        f'<div class="kb-meta">'
-                        f'<span class="n-badge" style="background:{gc};font-size:.6rem;min-width:22px;height:18px;border-radius:5px">{g}</span>'
-                        f'<span style="color:{dd_color}">{dd_str}</span>'
-                        f'<span style="color:{wp_color}">수주 {wp:.0f}%</span>'
-                        f'</div>'
-                        f'<div class="kb-meta" style="margin-top:2px">'
-                        f'<span>{n.site}</span>'
-                        f'<span>{n.agency or "-"}</span>'
-                        f'</div>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                    _new_stage = st.selectbox(
-                        "상태변경", [s[0] for s in _STAGES],
-                        index=[s[0] for s in _STAGES].index(stage_name),
-                        key=f"kb_{n.notice_id}",
-                        label_visibility="collapsed"
-                    )
-                    if _new_stage != stage_name:
-                        st.session_state.pipeline[n.notice_id] = _new_stage
-                        st.rerun()
-
-        # Pipeline funnel summary
-        st.markdown(_section("파이프라인 퍼널"), unsafe_allow_html=True)
-        _funnel_data = [(s[0], _stage_counts.get(s[0], 0), s[1]) for s in _STAGES]
-        _max_funnel = max((x[1] for x in _funnel_data), default=1)
-        for _fn, _fv, _fc in _funnel_data:
-            _pct = _fv / max(1, _max_funnel) * 100
-            st.markdown(
-                f'<div style="display:flex;align-items:center;gap:12px;margin:4px 0">'
-                f'<span style="width:80px;font-size:.78rem;font-weight:600;color:{_fc}">{_fn}</span>'
-                f'<div style="flex:1;height:24px;background:{t["bg3"]};border-radius:6px;overflow:hidden">'
-                f'<div style="width:{_pct}%;height:100%;background:{_fc};border-radius:6px;'
-                f'transition:width .5s ease"></div></div>'
-                f'<span style="width:40px;text-align:right;font-size:.82rem;font-weight:700;color:{t["text"]}">{_fv}</span></div>',
-                unsafe_allow_html=True
-            )
-
-
-# =============================================================================
 #  PAGE: Notice Detail
 # =============================================================================
 
-elif page == "📄 공고 상세":
+if page == "📄 공고 상세":
     result = _result()
     if not result:
         st.markdown(_empty("📄", "데이터를 수집해주세요",
