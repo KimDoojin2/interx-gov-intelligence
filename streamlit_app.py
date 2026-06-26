@@ -236,6 +236,48 @@ section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3{{color:{
 /* ── Chat ── */
 .stChatMessage{{border-radius:12px}}
 
+/* ── Kanban Board ── */
+.kb-col-header{{
+    font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+    padding:10px 14px;border-radius:10px 10px 0 0;text-align:center;
+    margin-bottom:0;
+}}
+.kb-card{{
+    background:{t['card']};border:1px solid {t['border']};border-radius:10px;
+    padding:12px 14px;margin:6px 0;transition:all .2s;cursor:default;
+}}
+.kb-card:hover{{border-color:rgba(255,128,0,.25);box-shadow:0 4px 16px {t['shadow']};transform:translateY(-1px)}}
+.kb-card .kb-title{{font-size:.8rem;font-weight:600;color:{t['text']};line-height:1.4;margin-bottom:6px}}
+.kb-card .kb-meta{{font-size:.68rem;color:{t['text3']};display:flex;flex-wrap:wrap;gap:4px 8px}}
+.kb-card .kb-tags{{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}}
+.kb-count{{font-size:.68rem;font-weight:700;opacity:.6}}
+
+/* ── Notice Detail Page ── */
+.detail-header{{
+    background:{t['card']};border:1px solid {t['border']};border-radius:16px;
+    padding:28px 32px;margin-bottom:20px;
+}}
+.detail-header .dh-grade{{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:48px;height:48px;border-radius:14px;font-size:1.5rem;font-weight:900;
+    color:#fff;margin-right:16px;vertical-align:middle;
+}}
+.detail-header .dh-title{{font-size:1.2rem;font-weight:800;color:{t['text']};line-height:1.4}}
+.detail-header .dh-org{{font-size:.82rem;color:{t['text2']};margin-top:6px}}
+.detail-score-card{{
+    background:{t['card']};border:1px solid {t['border']};border-radius:14px;
+    padding:20px;text-align:center;
+}}
+.detail-score-card .ds-val{{font-size:1.8rem;font-weight:900;line-height:1}}
+.detail-score-card .ds-label{{font-size:.65rem;color:{t['text3']};margin-top:8px;font-weight:600;text-transform:uppercase;letter-spacing:1px}}
+.detail-section{{
+    background:{t['card']};border:1px solid {t['border']};border-radius:14px;
+    padding:20px 24px;margin-bottom:12px;
+}}
+.detail-section .ds-title{{font-size:.85rem;font-weight:700;color:{t['text']};margin-bottom:12px;display:flex;align-items:center;gap:8px}}
+.sol-bar{{height:8px;border-radius:4px;background:{t['bg3']};overflow:hidden;margin:4px 0}}
+.sol-bar-fill{{height:100%;border-radius:4px;background:linear-gradient(90deg,{P},{P_L})}}
+
 /* ── Compare Table (Feature #6) ── */
 .cmp-table{{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;border:1px solid {t['border']}}}
 .cmp-table th{{background:{t['bg3']};color:{t['text2']};font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:12px 16px;text-align:left}}
@@ -419,7 +461,8 @@ def _extract_key_summary(summary: str, body: str, structured: dict) -> str:
 # =============================================================================
 
 NAV_ITEMS = [
-    "📊 대시보드", "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
+    "📊 대시보드", "🏗️ BD 파이프라인", "📄 공고 상세",
+    "🚀 수집 실행", "📋 공고 목록", "🔍 공고 비교",
     "🎯 수주 예측", "📅 마감 캘린더",
     "📈 분석", "🔬 파싱 검증", "🤖 AI 뉴스", "💬 AI 챗봇",
 ]
@@ -459,10 +502,382 @@ st.markdown(f"""<div class="nav-bar">
 
 
 # =============================================================================
+#  PAGE: BD Pipeline (Kanban)
+# =============================================================================
+
+if page == "🏗️ BD 파이프라인":
+    result = _result()
+    if not result:
+        st.markdown(_empty("🏗️", "데이터를 수집해주세요",
+                           "좌측 메뉴에서 '수집 실행'을 선택하여 정부지원사업 공고를 수집하세요."),
+                    unsafe_allow_html=True)
+    else:
+        notices = result.get("notices", []); smap = _smap(result)
+
+        # Pipeline state in session
+        if "pipeline" not in st.session_state:
+            st.session_state.pipeline = {}
+
+        _STAGES = [
+            ("신규발견", "#6366F1", "rgba(99,102,241,.08)"),
+            ("검토중", "#F59E0B", "rgba(245,158,11,.08)"),
+            ("제안준비", "#3B82F6", "rgba(59,130,246,.08)"),
+            ("제출완료", "#8B5CF6", "rgba(139,92,246,.08)"),
+            ("수주", "#059669", "rgba(5,150,105,.08)"),
+            ("탈락", "#DC2626", "rgba(220,38,38,.05)"),
+        ]
+
+        def _get_stage(nid):
+            return st.session_state.pipeline.get(nid, "신규발견")
+
+        # 등급/사이트 필터
+        fc1, fc2, fc3 = st.columns([1, 1, 3])
+        with fc1:
+            _kb_grade = st.selectbox("등급 필터", ["전체", "A", "B", "C", "D"], key="kb_grade")
+        with fc2:
+            _kb_sort = st.selectbox("정렬", ["점수 높은 순", "마감 임박 순", "최신 공고 순"], key="kb_sort")
+
+        # Build card data
+        _cards = []
+        for n in notices:
+            sc = smap.get(n.notice_id)
+            if not sc:
+                continue
+            g = sc.priority_grade
+            if _kb_grade != "전체" and g != _kb_grade:
+                continue
+            dd = _dday(n.deadline_date or "")
+            wp = _win_prob(n, sc)
+            stage = _get_stage(n.notice_id)
+            _cards.append({"n": n, "sc": sc, "g": g, "dd": dd, "wp": wp, "stage": stage})
+
+        if _kb_sort == "마감 임박 순":
+            _cards.sort(key=lambda x: (x["dd"] if x["dd"] >= 0 else 9999))
+        elif _kb_sort == "최신 공고 순":
+            _cards.sort(key=lambda x: x["n"].notice_date or "", reverse=True)
+        else:
+            _cards.sort(key=lambda x: -(x["sc"].priority_score if x["sc"] else 0))
+
+        # Summary KPIs
+        _stage_counts = {}
+        for c in _cards:
+            _stage_counts[c["stage"]] = _stage_counts.get(c["stage"], 0) + 1
+        _total_pipe = len([c for c in _cards if c["stage"] not in ("탈락",)])
+        _total_wp = sum(c["wp"] for c in _cards if c["stage"] not in ("탈락", "수주"))
+        _total_wp_cnt = len([c for c in _cards if c["stage"] not in ("탈락", "수주")])
+
+        mk1, mk2, mk3, mk4 = st.columns(4)
+        mk1.markdown(_kpi(len(_cards), "전체 공고"), unsafe_allow_html=True)
+        mk2.markdown(_kpi(_total_pipe, "파이프라인 내", P), unsafe_allow_html=True)
+        mk3.markdown(_kpi(_stage_counts.get("수주", 0), "수주 확정", GA), unsafe_allow_html=True)
+        mk4.markdown(_kpi(f"{_total_wp / max(1, _total_wp_cnt):.0f}%", "평균 수주확률"), unsafe_allow_html=True)
+
+        st.markdown(_section("파이프라인 칸반 보드"), unsafe_allow_html=True)
+
+        # Kanban columns
+        cols = st.columns(len(_STAGES))
+        for idx, (stage_name, stage_color, stage_bg) in enumerate(_STAGES):
+            with cols[idx]:
+                _cnt = _stage_counts.get(stage_name, 0)
+                st.markdown(
+                    f'<div class="kb-col-header" style="background:{stage_bg};color:{stage_color}">'
+                    f'{stage_name} <span class="kb-count">({_cnt})</span></div>',
+                    unsafe_allow_html=True
+                )
+                _stage_cards = [c for c in _cards if c["stage"] == stage_name]
+                if not _stage_cards:
+                    st.caption("—")
+                for c in _stage_cards[:15]:
+                    n, sc, g, dd, wp = c["n"], c["sc"], c["g"], c["dd"], c["wp"]
+                    gc = GRADE.get(g, t['text3'])
+                    dd_str = f"D-{dd}" if dd >= 0 else "마감"
+                    dd_color = GD if 0 <= dd <= 3 else GC if 0 <= dd <= 7 else t['text3']
+                    wp_color = GA if wp >= 60 else GB if wp >= 40 else GC
+                    st.markdown(
+                        f'<div class="kb-card">'
+                        f'<div class="kb-title">{n.title[:45]}</div>'
+                        f'<div class="kb-meta">'
+                        f'<span class="n-badge" style="background:{gc};font-size:.6rem;min-width:22px;height:18px;border-radius:5px">{g}</span>'
+                        f'<span style="color:{dd_color}">{dd_str}</span>'
+                        f'<span style="color:{wp_color}">수주 {wp:.0f}%</span>'
+                        f'</div>'
+                        f'<div class="kb-meta" style="margin-top:2px">'
+                        f'<span>{n.site}</span>'
+                        f'<span>{n.agency or "-"}</span>'
+                        f'</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    _new_stage = st.selectbox(
+                        "상태변경", [s[0] for s in _STAGES],
+                        index=[s[0] for s in _STAGES].index(stage_name),
+                        key=f"kb_{n.notice_id}",
+                        label_visibility="collapsed"
+                    )
+                    if _new_stage != stage_name:
+                        st.session_state.pipeline[n.notice_id] = _new_stage
+                        st.rerun()
+
+        # Pipeline funnel summary
+        st.markdown(_section("파이프라인 퍼널"), unsafe_allow_html=True)
+        _funnel_data = [(s[0], _stage_counts.get(s[0], 0), s[1]) for s in _STAGES]
+        _max_funnel = max((x[1] for x in _funnel_data), default=1)
+        for _fn, _fv, _fc in _funnel_data:
+            _pct = _fv / max(1, _max_funnel) * 100
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:12px;margin:4px 0">'
+                f'<span style="width:80px;font-size:.78rem;font-weight:600;color:{_fc}">{_fn}</span>'
+                f'<div style="flex:1;height:24px;background:{t["bg3"]};border-radius:6px;overflow:hidden">'
+                f'<div style="width:{_pct}%;height:100%;background:{_fc};border-radius:6px;'
+                f'transition:width .5s ease"></div></div>'
+                f'<span style="width:40px;text-align:right;font-size:.82rem;font-weight:700;color:{t["text"]}">{_fv}</span></div>',
+                unsafe_allow_html=True
+            )
+
+
+# =============================================================================
+#  PAGE: Notice Detail
+# =============================================================================
+
+elif page == "📄 공고 상세":
+    result = _result()
+    if not result:
+        st.markdown(_empty("📄", "데이터를 수집해주세요",
+                           "좌측 메뉴에서 '수집 실행'을 선택하여 공고를 수집하세요."),
+                    unsafe_allow_html=True)
+    else:
+        notices = result.get("notices", []); smap = _smap(result)
+
+        # Notice selector
+        _notice_options = []
+        for n in notices:
+            sc = smap.get(n.notice_id)
+            g = sc.priority_grade if sc else "D"
+            _notice_options.append(f"[{g}] {n.title[:60]}")
+
+        if not _notice_options:
+            st.warning("수집된 공고가 없습니다.")
+        else:
+            # Quick jump from other pages
+            _preselect = 0
+            if "detail_notice_id" in st.session_state:
+                _target_id = st.session_state.detail_notice_id
+                for i, n in enumerate(notices):
+                    if n.notice_id == _target_id:
+                        _preselect = i
+                        break
+
+            _sel_idx = st.selectbox("공고 선택", range(len(_notice_options)),
+                                    format_func=lambda i: _notice_options[i],
+                                    index=_preselect, key="detail_select")
+            n = notices[_sel_idx]
+            sc = smap.get(n.notice_id)
+            g = sc.priority_grade if sc else "D"
+            gc = GRADE.get(g, t['text3'])
+            dd = _dday(n.deadline_date or "")
+            wp = _win_prob(n, sc)
+
+            # ── Header ──
+            dd_str = f"D-{dd}" if dd >= 0 else "마감"
+            dd_color = GD if 0 <= dd <= 3 else GC if 0 <= dd <= 7 else t['text3']
+            _link = getattr(n, "detail_url", "") or ""
+            _link_html = f' · <a href="{_link}" target="_blank" style="color:{A2};text-decoration:none">원문 바로가기 ↗</a>' if _link.startswith("http") else ""
+            st.markdown(
+                f'<div class="detail-header">'
+                f'<span class="dh-grade" style="background:{gc}">{g}</span>'
+                f'<span class="dh-title">{n.title}</span>'
+                f'<div class="dh-org">{n.site} · {n.agency or n.ministry or "-"}'
+                f' · <span style="color:{dd_color};font-weight:700">{dd_str}</span>'
+                f'{_link_html}</div></div>',
+                unsafe_allow_html=True
+            )
+
+            # ── Score Cards Row ──
+            sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+            _wp_color = GA if wp >= 60 else GB if wp >= 40 else GC if wp >= 20 else GD
+            sc1.markdown(f'<div class="detail-score-card"><div class="ds-val" style="color:{_wp_color}">{wp:.0f}%</div><div class="ds-label">수주 확률</div></div>', unsafe_allow_html=True)
+            _fit = sc.fitness_score if sc else 0
+            _fit_c = GA if _fit >= 60 else GB if _fit >= 40 else GC if _fit >= 20 else GD
+            sc2.markdown(f'<div class="detail-score-card"><div class="ds-val" style="color:{_fit_c}">{_fit:.1f}</div><div class="ds-label">적합도</div></div>', unsafe_allow_html=True)
+            _pri = sc.priority_score if sc else 0
+            sc3.markdown(f'<div class="detail-score-card"><div class="ds-val" style="color:{P}">{_pri:.1f}</div><div class="ds-label">우선순위 점수</div></div>', unsafe_allow_html=True)
+            _ind = sc.industry_score if sc else 0
+            sc4.markdown(f'<div class="detail-score-card"><div class="ds-val">{_ind:.1f}</div><div class="ds-label">산업 점수</div></div>', unsafe_allow_html=True)
+            _bgt = n.budget or "-"
+            sc5.markdown(f'<div class="detail-score-card"><div class="ds-val" style="font-size:1rem">{_bgt}</div><div class="ds-label">예산</div></div>', unsafe_allow_html=True)
+
+            # ── Two Column Detail ──
+            col_info, col_analysis = st.columns([1, 1])
+
+            with col_info:
+                # 기본 정보
+                st.markdown(f'<div class="detail-section"><div class="ds-title">📋 기본 정보</div>', unsafe_allow_html=True)
+                _info_rows = [
+                    ("주관기관", n.agency or n.ministry or "-"),
+                    ("부처", getattr(n, "ministry", "-") or "-"),
+                    ("공고일", getattr(n, "notice_date", "-") or "-"),
+                    ("마감일", f'{n.deadline_date or "-"} ({dd_str})'),
+                    ("예산", n.budget or "-"),
+                    ("신청기간", getattr(n, "apply_period", "-") or "-"),
+                    ("접수상태", getattr(n, "apply_status", "-") or "-"),
+                ]
+                for _lbl, _val in _info_rows:
+                    st.markdown(f"**{_lbl}** &nbsp; {_val}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # L3/BD 정보
+                _l3 = getattr(n, "l3_strong", "N")
+                _rec = getattr(n, "recurring_flag", "")
+                _rec_g = getattr(n, "recurring_group", "")
+                _partner = getattr(n, "partner_candidate", "N")
+                _milestone = getattr(n, "bd_milestone", "-")
+                st.markdown(f'<div class="detail-section"><div class="ds-title">🎯 BD 인텔리전스</div>', unsafe_allow_html=True)
+                _bd_rows = [
+                    ("L3 강공고", _pill("Y — 강공고", "l3") if _l3 == "Y" else "N"),
+                    ("정기공고", f'{_rec} ({_rec_g})' if _rec else "N"),
+                    ("파트너 후보", "Y" if _partner == "Y" else "N"),
+                    ("BD 마일스톤", _milestone or "-"),
+                ]
+                for _lbl, _val in _bd_rows:
+                    st.markdown(f"**{_lbl}** &nbsp; {_val}", unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with col_analysis:
+                # 솔루션 매칭
+                if sc and sc.solution_scores:
+                    st.markdown(f'<div class="detail-section"><div class="ds-title">🔧 솔루션 매칭</div>', unsafe_allow_html=True)
+                    SOL_NAMES = {"ManufacturingDT": "제조DT", "RecipeAI": "레시피AI", "QualityAI": "품질AI",
+                                 "InspectionAI": "비전검사", "SafetyAI": "안전AI", "GenAI": "GenAI",
+                                 "InfraDS": "데이터인프라", "PdM": "예지보전"}
+                    _sols = sorted(sc.solution_scores.items(), key=lambda x: -x[1])
+                    _max_sol = max((v for _, v in _sols), default=1) or 1
+                    for _sk, _sv in _sols:
+                        _pct = min(100, _sv / _max_sol * 100)
+                        _sn = SOL_NAMES.get(_sk, _sk)
+                        _sc_color = GA if _sv > 15 else GB if _sv > 8 else GC if _sv > 0 else t['text3']
+                        st.markdown(
+                            f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0">'
+                            f'<span style="width:80px;font-size:.75rem;font-weight:600;color:{t["text"]}">{_sn}</span>'
+                            f'<div class="sol-bar" style="flex:1"><div class="sol-bar-fill" style="width:{_pct}%"></div></div>'
+                            f'<span style="width:30px;text-align:right;font-size:.78rem;font-weight:700;color:{_sc_color}">{_sv:.0f}</span></div>',
+                            unsafe_allow_html=True
+                        )
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                # 매칭 키워드
+                if sc and sc.positive_keywords:
+                    st.markdown(f'<div class="detail-section"><div class="ds-title">🔑 매칭 키워드</div>', unsafe_allow_html=True)
+                    _tags = " ".join(
+                        f'<span style="display:inline-block;padding:3px 10px;border-radius:16px;font-size:.72rem;'
+                        f'font-weight:600;background:rgba(255,128,0,.08);color:{P};margin:2px">{k}</span>'
+                        for k in sc.positive_keywords[:15]
+                    )
+                    st.markdown(_tags, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                # 콤보 키워드
+                if sc and getattr(sc, "combo_keywords", None):
+                    st.markdown(f'<div class="detail-section"><div class="ds-title">⚡ 콤보 키워드</div>', unsafe_allow_html=True)
+                    _combo_tags = " ".join(
+                        f'<span style="display:inline-block;padding:3px 10px;border-radius:16px;font-size:.72rem;'
+                        f'font-weight:600;background:rgba(59,130,246,.08);color:{A2};margin:2px">{k}</span>'
+                        for k in sc.combo_keywords[:10]
+                    )
+                    st.markdown(_combo_tags, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── 공고 본문 ──
+            _body = getattr(n, "body_text", "") or ""
+            _struct = getattr(n, "structured", None) or {}
+            _summary = getattr(n, "summary", "") or ""
+
+            if _struct or _body:
+                st.markdown(_section("📄 공고 내용"), unsafe_allow_html=True)
+
+                # 구조화 섹션
+                for _sk, _sl, _ic in [
+                    ("사업목적", "사업목적", "🎯"), ("지원내용", "지원내용", "💰"),
+                    ("지원대상", "지원대상", "👥"), ("지원금액", "지원금액", "💵"),
+                    ("신청방법", "신청방법", "📝"), ("선정평가", "선정평가", "📊"),
+                ]:
+                    _sv = _clean_summary(_struct.get(_sk, ""))
+                    if _sv and len(_sv) > 10:
+                        st.markdown(f'<div class="detail-section"><div class="ds-title">{_ic} {_sl}</div>{_sv[:500]}</div>', unsafe_allow_html=True)
+
+                # 핵심 요약 (구조화 없을 때)
+                if not _struct:
+                    _key = _extract_key_summary(_summary, _body, _struct)
+                    if _key and len(_key) > 20:
+                        st.markdown(f'<div class="detail-section"><div class="ds-title">📌 핵심 요약</div>{_key}</div>', unsafe_allow_html=True)
+
+                # 본문 전체
+                if _body and len(_body) > 50:
+                    with st.expander("📄 본문 전체 보기", expanded=False):
+                        st.text_area("본문", _body[:8000], height=400, disabled=True, label_visibility="collapsed")
+
+                # 본문 추출 항목
+                if _body:
+                    _extra = _parse_body_sections(_body)
+                    if _extra:
+                        st.markdown(f'<div class="detail-section"><div class="ds-title">📞 부가 정보</div>', unsafe_allow_html=True)
+                        _icon_map = {"문의처": "📞", "신청방법": "📝", "신청사이트": "🌐", "지원규모": "💵", "신청기간": "📅"}
+                        for _ek, _ev in _extra.items():
+                            st.markdown(f"**{_icon_map.get(_ek, '📌')} {_ek}** &nbsp; {_ev}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+            # ── AI 분석 ──
+            _dk = _ai_cache_key(n.notice_id)
+            _dc = st.session_state.get(_dk)
+            if _dc:
+                st.markdown(
+                    f'<div class="detail-section" style="border-color:rgba(58,123,238,.2)">'
+                    f'<div class="ds-title" style="color:{A2}">💡 AI 분석 결과</div>'
+                    f'<b>적합도 분석:</b> {_dc.get("fit_reason","")}<br>'
+                    f'<b>제안 전략:</b> {_dc.get("proposal_strategy","")}<br>'
+                    f'<b>솔루션 매핑:</b> {_dc.get("solution_mapping","")}<br>'
+                    f'<b>핵심 요구:</b> {_dc.get("key_requirements","")}<br>'
+                    f'<span style="color:{GC}"><b>리스크:</b> {_dc.get("risk_factors","")}</span></div>',
+                    unsafe_allow_html=True
+                )
+            if st.button("💡 AI 심층 분석" + (" (재분석)" if _dc else ""), key=f"detail_ai_{n.notice_id}"):
+                with st.spinner("AI 분석 중..."):
+                    try:
+                        from interx_engine.infrastructure.ai.notice_analyzer import analyze_notice
+                        _ai_r = analyze_notice(
+                            title=n.title, body_text=_body, summary=_summary,
+                            structured=_struct,
+                            matched_keywords=", ".join(sc.positive_keywords[:8]) if sc and sc.positive_keywords else "",
+                            grade=g, score=sc.fitness_score if sc else 0,
+                            budget=n.budget or "", solution_scores=sc.solution_scores if sc else None,
+                        )
+                        st.session_state[_dk] = _ai_r
+                        st.rerun()
+                    except Exception as _ae:
+                        st.error(f"AI 분석 실패: {_ae}")
+
+            # 파이프라인 상태 변경
+            st.markdown(_section("🏗️ 파이프라인 상태"), unsafe_allow_html=True)
+            _PIPE_STAGES = ["신규발견", "검토중", "제안준비", "제출완료", "수주", "탈락"]
+            if "pipeline" not in st.session_state:
+                st.session_state.pipeline = {}
+            _cur_stage = st.session_state.pipeline.get(n.notice_id, "신규발견")
+            _new_stage = st.selectbox("상태", _PIPE_STAGES, index=_PIPE_STAGES.index(_cur_stage), key="detail_pipe_stage")
+            if _new_stage != _cur_stage:
+                st.session_state.pipeline[n.notice_id] = _new_stage
+                st.success(f"상태 변경: {_cur_stage} → {_new_stage}")
+
+            # 원문 미리보기
+            if _link.startswith("http"):
+                with st.expander("🌐 원문 사이트 미리보기", expanded=False):
+                    st.caption("⚠️ 일부 사이트는 보안 정책으로 미리보기가 차단됩니다.")
+                    st.iframe(_link, height=500)
+
+
+# =============================================================================
 #  PAGE: Dashboard
 # =============================================================================
 
-if page == "📊 대시보드":
+elif page == "📊 대시보드":
     result = _result()
     if not result:
         st.markdown(_empty("📊", "데이터를 수집해주세요",
@@ -734,7 +1149,7 @@ if page == "📊 대시보드":
 #  PAGE: Pipeline Runner
 # =============================================================================
 
-if page == "🚀 수집 실행":
+elif page == "🚀 수집 실행":
     st.markdown(_section("파이프라인 실행"), unsafe_allow_html=True)
 
     if "pipeline_running" not in st.session_state:
@@ -833,7 +1248,7 @@ if page == "🚀 수집 실행":
 #  PAGE: Notice List + Detail
 # =============================================================================
 
-if page == "📋 공고 목록":
+elif page == "📋 공고 목록":
     result = _result()
     if not result:
         st.markdown(_empty("📋", "공고 데이터 없음", "수집 실행 후 이 탭에서 공고를 조회할 수 있습니다."), unsafe_allow_html=True)
@@ -1090,7 +1505,7 @@ if page == "📋 공고 목록":
 #  PAGE: Notice Comparison (Feature #6)
 # =============================================================================
 
-if page == "🔍 공고 비교":
+elif page == "🔍 공고 비교":
     result = _result()
     if not result:
         st.markdown(_empty("🔍", "공고 비교", "수집 실행 후 공고를 비교할 수 있습니다."), unsafe_allow_html=True)
@@ -1183,7 +1598,7 @@ if page == "🔍 공고 비교":
 #  PAGE: Win Prediction
 # =============================================================================
 
-if page == "🎯 수주 예측":
+elif page == "🎯 수주 예측":
     result = _result()
     if not result:
         st.markdown(_empty("🎯", "수주 예측 데이터 없음", "수집 실행 후 공고별 수주 확률을 예측합니다."), unsafe_allow_html=True)
@@ -1305,7 +1720,7 @@ if page == "🎯 수주 예측":
 #  PAGE: Deadline Calendar
 # =============================================================================
 
-if page == "📅 마감 캘린더":
+elif page == "📅 마감 캘린더":
     result = _result()
     if not result:
         st.markdown(_empty("📅", "마감 캘린더 데이터 없음", "수집 실행 후 마감일 관리를 할 수 있습니다."), unsafe_allow_html=True)
@@ -1353,7 +1768,7 @@ if page == "📅 마감 캘린더":
 #  PAGE: Analytics (Solution + Keywords + History)
 # =============================================================================
 
-if page == "📈 분석":
+elif page == "📈 분석":
     result = _result()
     _an_tab = st.radio("분석 항목", ["🔧 솔루션", "📈 키워드", "🕐 히스토리",
                                     "💰 파이프라인", "📊 솔루션트렌드", "🏛️ 부처별", "📅 마감히트맵", "🔄 정기공고"],
@@ -1947,7 +2362,7 @@ if page == "📈 분석":
 #  PAGE: Parsing Validation
 # =============================================================================
 
-if page == "🔬 파싱 검증":
+elif page == "🔬 파싱 검증":
     result = _result()
     if not result:
         st.markdown(_empty("🔬", "파싱 검증 데이터 없음", "수집을 먼저 실행하세요. 수집 결과의 파싱 품질을 자동으로 검증합니다."), unsafe_allow_html=True)
@@ -2036,7 +2451,7 @@ if page == "🔬 파싱 검증":
 #  PAGE: AI News & Trends
 # =============================================================================
 
-if page == "🤖 AI 뉴스":
+elif page == "🤖 AI 뉴스":
     import xml.etree.ElementTree as ET
     import requests as _req
     from html import unescape as _unescape
@@ -2193,7 +2608,7 @@ if page == "🤖 AI 뉴스":
 #  PAGE: AI Chatbot (RAG)
 # =============================================================================
 
-if page == "💬 AI 챗봇":
+elif page == "💬 AI 챗봇":
     st.markdown(_section("AI 공고 분석 챗봇"), unsafe_allow_html=True)
     st.markdown(f'<p style="font-size:.8rem;color:{t["text3"]}">수집된 공고 데이터 기반 자연어 질의응답 · Gemini 무료 API</p>', unsafe_allow_html=True)
 
