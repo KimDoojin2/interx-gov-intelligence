@@ -2004,11 +2004,11 @@ if page == "🔬 파싱 검증":
 
         st.markdown(_section("파싱 품질 요약"), unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
-        _comp_color = GD if sm["overall_completeness"] >= 80 else (YW if sm["overall_completeness"] >= 60 else RD)
+        _comp_color = GA if sm["overall_completeness"] >= 80 else (GC if sm["overall_completeness"] >= 60 else GD)
         c1.markdown(_kpi(f'{sm["overall_completeness"]}%', "전체 완성도", _comp_color), unsafe_allow_html=True)
         c2.markdown(_kpi(sm["total_notices"], "수집 공고"), unsafe_allow_html=True)
-        c3.markdown(_kpi(sm["parsing_issues"], "파싱 이슈", RD if sm["parsing_issues"] > 0 else GD), unsafe_allow_html=True)
-        c4.markdown(_kpi(sm["grade_flags"], "등급 의심", RD if sm["grade_flags"] > 0 else GD), unsafe_allow_html=True)
+        c3.markdown(_kpi(sm["parsing_issues"], "파싱 이슈", GD if sm["parsing_issues"] > 0 else GA), unsafe_allow_html=True)
+        c4.markdown(_kpi(sm["grade_flags"], "등급 의심", GD if sm["grade_flags"] > 0 else GA), unsafe_allow_html=True)
 
         # ── 사이트별 완성도 ──
         if vr.site_reports:
@@ -2017,7 +2017,7 @@ if page == "🔬 파싱 검증":
 
             sites = [sr.site for sr in sorted(vr.site_reports, key=lambda s: s.completeness_pct, reverse=True)]
             pcts = [sr.completeness_pct for sr in sorted(vr.site_reports, key=lambda s: s.completeness_pct, reverse=True)]
-            colors = [GD if p >= 80 else (YW if p >= 60 else RD) for p in pcts]
+            colors = [GA if p >= 80 else (GC if p >= 60 else GD) for p in pcts]
 
             fig = go.Figure(go.Bar(x=sites, y=pcts, marker_color=colors, text=[f"{p}%" for p in pcts], textposition="auto"))
             fig.update_layout(
