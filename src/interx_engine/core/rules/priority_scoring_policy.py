@@ -939,6 +939,11 @@ class PriorityScoringPolicy:
                 "C" if priority >= _CFG["GRADE_C"] else "D"
             )
 
+        # ── 본문 없는 A등급 → B등급 하향 (제목만으로 A등급은 신뢰도 부족) ────
+        if grade == "A" and (not notice.body_text or len(notice.body_text.strip()) < 50):
+            grade = "B"
+            log.debug("본문 부실 A→B 하향: %s", notice.title[:40])
+
         # ── L3 강공고 판정 ───────────────────────────────────────────────────
         title_has_l3 = any(kw in title_text for kw in _L3_TITLE_KEYWORDS)
         is_l3 = (fitness >= L3_THRESHOLD) and title_has_l3

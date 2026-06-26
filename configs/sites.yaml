@@ -101,7 +101,7 @@ sites:
     collector_type: requests
   - code: gdtp
     name: 경기대진테크노파크
-    enabled: true
+    enabled: false   # 공고가 아닌 사이트 메뉴를 수집함 — 파싱 로직 재작성 필요
     collector_type: requests
   - code: itp
     name: 인천테크노파크
@@ -137,7 +137,7 @@ sites:
     collector_type: requests
   - code: ptp
     name: 포항테크노파크
-    enabled: true    # javascript:void(0) → JS렌더링, detail enrichment 비활성
+    enabled: false   # 네비게이션 메뉴를 공고로 수집함 — Playwright 전환 필요
     collector_type: requests
 
   - code: mock
