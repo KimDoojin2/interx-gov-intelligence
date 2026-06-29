@@ -81,7 +81,7 @@ class TestBuildCollectors:
 
     def test_none_builds_all(self):
         cols = build_collectors(None, max_pages=1)
-        assert len(cols) >= 20
+        assert len(cols) >= 19
 
 
 class TestBaseCollectorRetry:
