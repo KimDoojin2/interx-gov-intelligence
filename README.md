@@ -746,10 +746,9 @@ interx_gov_intelligence/
 │   ├── scoring.yaml                       # 점수 가중치, 등급 컷, 키워드 전체
 │   ├── sites.yaml                         # 수집 사이트 목록 (enabled 플래그)
 │   ├── recurring.yaml                     # 정기공고 패턴 (name + aliases)
-│   ├── manager_rules.yaml                 # 담당자 자동 배정 규칙
 │   ├── sheets.yaml                        # Google Sheets 시트명·컬럼 매핑
 │   ├── settings.yaml                      # 타임아웃·페이지수 등 전역 설정
-│   └── competitors.yaml                   # 경쟁사 추적 키워드
+│   └── logging.yaml                       # 로깅 설정
 │
 └── src/interx_engine/
     ├── core/                              # ← 외부 의존성 없는 순수 도메인
@@ -772,29 +771,34 @@ interx_gov_intelligence/
     │   │   ├── notice_collector_port.py
     │   │   ├── sheet_gateway_port.py
     │   │   ├── alert_gateway_port.py
-    │   │   └── partner_repository_port.py
-    │   ├── use_cases/                     # 단일 책임 유스케이스
+    │   │   ├── partner_repository_port.py
+    │   │   ├── budget_utils_port.py
+    │   │   ├── gemini_port.py
+    │   │   └── settings_port.py
+    │   ├── use_cases/                     # 23개 유스케이스
     │   │   ├── score_notices.py           # 스코어링 실행
     │   │   ├── deduplicate_notices.py     # TF-IDF 유사도 중복 제거
     │   │   ├── detect_recurring.py        # 정기공고 패턴 매칭
     │   │   ├── detect_changes.py          # 공고 변경 감지 (제목/예산/마감일)
-    │   │   ├── assign_manager.py          # 담당자 자동 배정
     │   │   ├── assign_milestone.py        # BD 마일스톤 배정 (M01/M05/P01)
-    │   │   ├── track_competitors.py       # 경쟁사 공고 감지
     │   │   ├── match_partners.py          # 파트너사 공고 매칭
     │   │   ├── recommend_notices.py       # BD 추천 액션 생성
     │   │   ├── cluster_notices.py         # 공고 클러스터링
     │   │   ├── alert_notices.py           # 알림 발송 (Slack/Telegram)
+    │   │   ├── send_smart_alerts.py       # 스마트 알림 (조건부 발송)
+    │   │   ├── find_similar_notices.py    # 유사 공고 탐색
     │   │   ├── site_quality_grader.py     # 사이트 수집 품질 A~D 등급
+    │   │   ├── validate_parsing.py        # 파싱 품질 자동 검증
     │   │   ├── deep_parsing.py            # 첨부파일(PDF/HWP) 정밀 파싱
+    │   │   ├── parse_documents.py         # 문서 파싱 (OCR 포함)
     │   │   ├── portfolio_analysis.py      # pandas 기반 포트폴리오 분석
     │   │   ├── win_prediction.py          # ★ 수주 가능성 예측 (룰/ML)
-    │   │   ├── generate_proposal.py       # 제안서 초안 Word .docx 자동 생성
     │   │   ├── export_training_data.py    # ML 학습데이터 JSONL 저장
     │   │   ├── summarize_l3.py            # L3 공고 Claude API 요약
     │   │   ├── auto_analysis.py           # 비지도학습 자동 분석 (9패널 PNG)
     │   │   ├── download_attachments.py    # 첨부파일 다운로드
-    │   │   └── log_pipeline_run.py        # 파이프라인 실행 로그
+    │   │   ├── log_pipeline_run.py        # 파이프라인 실행 로그
+    │   │   └── log_status_change.py       # 상태 변경 로그
     │   ├── mappers/
     │   │   ├── notice_mapper.py           # Notice+ScoreCard → Sheets 행 딕셔너리
     │   │   ├── kpi_mapper.py              # 실행 통계 행 빌더
@@ -807,7 +811,7 @@ interx_gov_intelligence/
     │   ├── collectors/
     │   │   ├── collector_factory.py       # 사이트코드 → 콜렉터 인스턴스 팩토리
     │   │   ├── html_utils.py              # HTML 파싱 공통 유틸
-    │   │   └── sites/
+    │   │   └── sites/                     # 23개 사이트 수집기
     │   │       ├── base_collector.py      # BaseCollector / PlaywrightBaseCollector 추상
     │   │       ├── bizinfo_collector.py   # 기업마당 (Playwright)
     │   │       ├── kiat_collector.py      # 한국산업기술진흥원 (Playwright)
@@ -820,15 +824,31 @@ interx_gov_intelligence/
     │   │       ├── ttp_collector.py       # 대전테크노파크
     │   │       ├── dicia_collector.py     # 의료기기산업협회 (Playwright)
     │   │       ├── gjtp_collector.py      # 광주테크노파크
-    │   │       ├── new_collectors.py      # KISED·KETEP·KOIIA·JEJUTP (멀티)
+    │   │       ├── gbtp_collector.py      # 경북테크노파크
+    │   │       ├── iris_collector.py      # IRIS (국가연구개발사업)
+    │   │       ├── jbtp_collector.py      # 전북테크노파크
+    │   │       ├── jejutp_collector.py    # 제주테크노파크
+    │   │       ├── jntp_collector.py      # 전남테크노파크
+    │   │       ├── ntis_collector.py      # NTIS
+    │   │       ├── smba_collector.py      # 중소벤처기업부
+    │   │       ├── new_collectors.py      # KISED·KETEP·KOIIA·IITP (멀티)
+    │   │       ├── multi_site_collectors.py # 추가 멀티사이트
     │   │       ├── technopark_collectors.py # 테크노파크 12개 통합 (v5.2)
     │   │       └── mock_notice_collector.py # 테스트용 Mock
+    │   ├── ai/                            # AI/LLM 연동
+    │   │   ├── gemini_client.py           # Gemini API 클라이언트
+    │   │   ├── chatbot.py                 # AI 챗봇
+    │   │   ├── notice_analyzer.py         # 공고 AI 분석
+    │   │   └── briefing_generator.py      # AI 브리핑 생성
+    │   ├── ocr/
+    │   │   └── document_parser.py         # OCR 문서 파싱
     │   ├── sheets/
     │   │   ├── google_sheet_gateway.py    # 실제 Google Sheets API 연동
     │   │   └── console_sheet_gateway.py   # 로컬 개발용 콘솔 Fallback
     │   ├── alert/
     │   │   ├── slack_gateway.py           # Slack Webhook 알림
-    │   │   └── telegram_gateway.py        # Telegram Bot 알림
+    │   │   ├── telegram_gateway.py        # Telegram Bot 알림
+    │   │   └── telegram_bot.py            # Telegram Bot 인터페이스
     │   ├── clustering/
     │   │   ├── tfidf_clusterer.py         # TF-IDF + cosine 클러스터링 (기본)
     │   │   └── embedding_clusterer.py     # Sentence-Transformers 임베딩 (선택)
@@ -850,8 +870,10 @@ interx_gov_intelligence/
     │       └── morpheme_scorer.py         # 형태소 기반 점수 계산
     │
     └── interfaces/
-        └── dashboard/
-            └── app.py                     # Streamlit 대시보드 UI
+        ├── dashboard/
+        │   └── app.py                     # Streamlit 대시보드 UI (14탭)
+        └── analysis/
+            └── portfolio_analysis.py      # 포트폴리오 분석 인터페이스
 ```
 
 ---
