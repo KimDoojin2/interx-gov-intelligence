@@ -40,7 +40,7 @@ venv/Scripts/python -m pytest tests/unit/ -v --tb=short  # 단위 테스트
 | 파일 | 역할 | 핵심 파라미터 |
 |---|---|---|
 | `scoring.yaml` | 점수 가중치·등급 컷·키워드 | grade_a=48, grade_b=30, grade_c=18 |
-| `sites.yaml` | 수집 사이트 목록 (enabled 플래그) | 23개 enabled |
+| `sites.yaml` | 수집 사이트 목록 (enabled 플래그) | Cloud 19개 + 로컬 4개 |
 | `recurring.yaml` | 정기공고 패턴 (name + aliases) | 125줄 |
 | `sheets.yaml` | Sheets 10시트 컬럼 매핑 | 01~97 시트 |
 | `settings.yaml` | 타임아웃·페이지수·워커수 | max_pages=5 |
