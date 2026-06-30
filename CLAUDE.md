@@ -42,7 +42,7 @@ venv/Scripts/python -m pytest tests/unit/ -v --tb=short  # 단위 테스트
 | `scoring.yaml` | 점수 가중치·등급 컷·키워드 | grade_a=48, grade_b=30, grade_c=18 |
 | `sites.yaml` | 수집 사이트 목록 (enabled 플래그) | 19개 enabled |
 | `recurring.yaml` | 정기공고 패턴 (name + aliases) | 125줄 |
-| `sheets.yaml` | Sheets 9시트 컬럼 매핑 | 01~96 시트 |
+| `sheets.yaml` | Sheets 10시트 컬럼 매핑 | 01~97 시트 |
 | `settings.yaml` | 타임아웃·페이지수·워커수 | max_pages=5 |
 
 ## 스코어링 알고리즘 핵심 (priority_scoring_policy.py)
@@ -79,9 +79,9 @@ ML 모드: data/models/win_pred_lr.pkl 존재 시 자동 전환
 - P01: 파트너후보=Y (A/B/C)
 - 복합: M01|P01, M05|P01
 
-## Google Sheets 9시트
+## Google Sheets 10시트
 01_영업기회_정보 / 02_L3강공고 / 03_파트너전달 / 05_긴급마감_공고
-20_BD리포트 / 22_KPI / 93_통계 / 94_실행로그 / 96_에러로그
+20_요약대시보드 / 22_KPI현황 / 93_사이트별수집통계 / 94_실행로그 / 96_수집에러로그 / 97_상태변경로그
 
 ## 수집기 구조
 - `BaseCollector` (requests) / `PlaywrightBaseCollector` 상속
