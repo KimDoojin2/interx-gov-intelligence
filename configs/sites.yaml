@@ -13,7 +13,7 @@ sites:
     collector_type: requests
   - code: kiat
     name: KIAT (한국산업기술진흥원)
-    enabled: false   # Playwright 필수 — Streamlit Cloud에서 미설치 시 0건
+    enabled: true    # Playwright 필수 — 로컬 전용
     collector_type: playwright
   - code: smba
     name: 중소벤처기업부
@@ -60,7 +60,7 @@ sites:
     collector_type: requests
   - code: jbtp
     name: 전북테크노파크
-    enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
+    enabled: true    # 2026-06 서버 복구 확인
     collector_type: requests
   - code: jejutp
     name: 제주테크노파크
@@ -84,11 +84,11 @@ sites:
     collector_type: requests
   - code: smart_factory
     name: 스마트제조혁신추진단 (smart-factory.kr)
-    enabled: false   # URL 변경 (404) + Playwright 필수 — 비활성화
+    enabled: true    # SPA 셸 선로드 방식으로 수정, Playwright 필수
     collector_type: playwright
   - code: iitp
     name: 정보통신기획평가원 (iitp.kr)
-    enabled: false   # Playwright 필수 + RemoteDisconnected — Streamlit Cloud 비활성
+    enabled: true    # 2026-06 서버 정상 확인, Playwright 필수
     collector_type: playwright
   # ── 테크노파크 12개 (v3.1 신규) ──
   - code: seoultp

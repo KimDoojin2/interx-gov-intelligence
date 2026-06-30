@@ -219,17 +219,30 @@ class SmartFactoryCollector(PlaywrightBaseCollector):
             )
             page = ctx.new_page()
 
+            # SPA 셸 먼저 로드 (직접 SPA 라우트 접근 시 404)
+            page.goto(_SF_BASE + "/", wait_until="networkidle", timeout=30_000)
+            page.wait_for_timeout(2_000)
+
             for board in _SF_BOARDS:
                 log.info("[smart_factory] 게시판 수집 시작: %s (%s)",
                          board["label"], board["list_url"])
 
                 for pg in range(1, self.max_pages + 1):
                     try:
-                        # SPA는 페이지 파라미터 없이 진입 후 pagination 클릭 필요
-                        # — 첫 페이지만 직접 URL, 이후는 SPA 클릭 방식
                         if pg == 1:
-                            page.goto(board["list_url"],
-                                      wait_until="networkidle", timeout=30_000)
+                            # SPA 내부 라우트 이동 (pushState)
+                            spa_path = board["list_url"].replace(_SF_BASE, "")
+                            page.evaluate(f"window.location.hash = ''; window.history.pushState({{}}, '', '{spa_path}'); window.dispatchEvent(new PopStateEvent('popstate'))")
+                            page.wait_for_timeout(1_500)
+                            # popstate 미반영 시 직접 goto 시도
+                            try:
+                                page.wait_for_selector(
+                                    "tr.ant-table-row, tbody tr",
+                                    timeout=5_000,
+                                )
+                            except Exception:
+                                page.goto(board["list_url"],
+                                          wait_until="networkidle", timeout=30_000)
                         else:
                             # Ant Design pagination: 페이지 번호 버튼 클릭
                             try:
