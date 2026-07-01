@@ -409,6 +409,14 @@ POSITIVE_KEYWORDS: Dict[str, float] = {
 # medium: 일부 관련 가능 (교육/인력/창업) → neg_multiplier_medium (4.0)
 # weak:   간접 관련 가능 (식품/농업/일반) → neg_multiplier_weak (2.0)
 NEGATIVE_KEYWORDS_STRONG: Dict[str, float] = {
+    # ── 비공고 콘텐츠 (사칭/사기/채용/인사 등) — 공고가 아닌 게시물 ──
+    "사칭": 10, "사기": 10, "주의 당부": 10, "주의 안내": 10,
+    "직원 사칭": 10, "피싱": 10, "보이스피싱": 10,
+    "채용": 8, "채용공고": 8, "직원모집": 8,
+    "인사발령": 8, "인사이동": 8, "휴무": 8, "휴관": 8,
+    "결과발표": 6, "선정결과": 6, "합격자": 6,
+    "기관소식": 7, "보도자료": 6, "언론보도": 6,
+    "행사안내": 7,
     # 엔터테인먼트 / 비제조 콘텐츠 — 완전 범위 외
     "게임": 5, "웹툰": 5, "만화": 5, "영화": 5, "애니": 5,
     "캐릭터": 4, "축제": 4, "음악": 4, "공연": 4,
@@ -744,6 +752,27 @@ _TITLE_BLOCK_KEYWORDS = {
     "실감 콘텐츠",
     "영상 공모전",  # 영상/아이디어 공모전
     "영상공모전",
+    # ── v7: 비공고 콘텐츠 제목 차단 ──
+    "사칭",        # 직원 사칭 주의 안내
+    "사기 주의",   # 사기 주의 당부
+    "사기주의",
+    "채용공고",    # 채용 공고
+    "직원 모집",   # 직원 모집
+    "직원모집",
+    "인사발령",    # 인사 공지
+    "인사이동",
+    "결과발표",    # 선정 결과 발표
+    "선정결과",
+    "합격자 발표", # 합격자 발표
+    "합격자발표",
+    "보도자료",    # 기관 보도자료
+    "언론보도",
+    "휴무 안내",   # 기관 휴무
+    "휴무안내",
+    "시스템 점검",  # 시스템 점검 안내
+    "시스템점검",
+    "서버 점검",
+    "서버점검",
 }
 
 
@@ -917,6 +946,44 @@ def _score_by_position(kw: str, weight: float,
     return score
 
 
+def _notice_validity(notice: Notice) -> Tuple[bool, float]:
+    """
+    본문 내용으로 '진짜 사업 공고인지' 판단.
+    Returns: (is_valid, bonus_or_penalty)
+      - 공고 구조 시그널 多 → bonus (+5~15)
+      - 비공고 시그널 多   → penalty (-30~-50), is_valid=False
+    """
+    text = ((notice.title or "") + " " +
+            (notice.body_text or "") + " " +
+            (notice.summary or "")).lower()
+
+    notice_signals = [
+        "지원대상", "신청방법", "신청기간", "접수기간",
+        "사업기간", "사업목적", "지원내용", "지원규모",
+        "선정절차", "평가기준", "제출서류", "신청자격",
+        "총사업비", "정부출연금", "지원한도", "참여자격",
+        "공고기간", "모집기간", "사업공고", "모집공고",
+    ]
+    signal_count = sum(1 for s in notice_signals if s in text)
+
+    non_notice_signals = [
+        "사칭", "사기", "주의 당부", "주의 안내", "피싱",
+        "채용공고", "직원 모집", "인사발령", "인사이동",
+        "결과 발표", "선정 결과", "합격자 발표", "선정결과",
+        "보도자료", "기관 소식", "행사 안내", "세미나 안내",
+        "시스템 점검", "서버 점검", "휴무", "휴관",
+    ]
+    non_count = sum(1 for s in non_notice_signals if s in text)
+
+    if non_count >= 2:
+        return False, -50.0
+    if non_count == 1 and signal_count <= 1:
+        return False, -30.0
+
+    bonus = min(15.0, signal_count * 2.5)
+    return True, bonus
+
+
 class PriorityScoringPolicy:
     """
     가점/감점 키워드, 솔루션 맵, structured 보너스를 종합해
@@ -940,6 +1007,9 @@ class PriorityScoringPolicy:
         # scored_text (하위 호환용), full_text (core 체크용)
         scored_text = f"{title_text} {summary_text} {core_text}"
         full_text   = f"{scored_text} {body}"
+
+        # ── 본문 기반 공고 유효성 체크 ─────────────────────────────────────────
+        is_valid_notice, validity_adj = _notice_validity(notice)
 
         # ── 코어 키워드 존재 여부 ─────────────────────────────────────────────
         core_found = any(kw in full_text for kw in CORE_KEYWORDS)
@@ -992,7 +1062,10 @@ class PriorityScoringPolicy:
         notice_type, type_mult = _classify_notice_type(notice.title, notice.summary)
 
         # ── 적합도(fitness) 계산 ──────────────────────────────────────────────
-        if not core_found:
+        if not is_valid_notice:
+            raw_fit = 0.0
+            log.debug("비공고 콘텐츠 감지 (validity=%.1f): %s", validity_adj, notice.title[:40])
+        elif not core_found:
             raw_fit = 0.0
         elif pos_score <= 3.0 and not any(kw in scored_text for kw in _MIN_SIGNAL):
             raw_fit = 0.0
@@ -1003,6 +1076,7 @@ class PriorityScoringPolicy:
                 + struct_bonus                           # 구조화 보너스
                 + combo_bonus                            # 콤보 보너스
                 + budget_bonus                           # 예산 구간 보너스
+                + validity_adj                           # 본문 공고 구조 보너스
             )
             # [고도화 3] 유형별 배율 적용
             raw_fit *= type_mult

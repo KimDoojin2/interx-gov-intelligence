@@ -117,6 +117,38 @@ class DailyPipelineOrchestrator:
             except Exception as e:
                 log.debug("[Pipeline] 기존 공고 ID 조회 실패: %s", e)
 
+        # ── 2-C. 비공고 콘텐츠 제거 (제목 기반) ────────────────────────────────
+        import re as _re
+        _NON_NOTICE_RE = _re.compile(
+            r"(사칭|사기|주의\s*당부|주의\s*안내|피싱|보이스피싱|"
+            r"채용공고|직원\s*모집|인사발령|인사이동|"
+            r"결과\s*발표|선정\s*결과|합격자\s*발표|"
+            r"보도\s*자료|언론\s*보도|기관\s*소식|"
+            r"시스템\s*점검|서버\s*점검|휴무\s*안내|휴관\s*안내)",
+            _re.IGNORECASE,
+        )
+        before_non = len(notices)
+        notices = [n for n in notices if not _NON_NOTICE_RE.search(n.title or "")]
+        non_removed = before_non - len(notices)
+        if non_removed:
+            log.info("[Pipeline] 비공고 콘텐츠 제거: %d건 (%d → %d건)",
+                     non_removed, before_non, len(notices))
+
+        # ── 2-D. 제목 기반 exact-match 중복 제거 ─────────────────────────────
+        seen_titles, title_unique = set(), []
+        for n in notices:
+            norm = (n.title or "").strip()
+            if norm and norm not in seen_titles:
+                seen_titles.add(norm)
+                title_unique.append(n)
+            elif not norm:
+                title_unique.append(n)
+        title_dup = len(notices) - len(title_unique)
+        if title_dup:
+            log.info("[Pipeline] 제목 중복 제거: %d건 (%d → %d건)",
+                     title_dup, len(notices), len(title_unique))
+        notices = title_unique
+
         # ── 3. 마감 지난 공고 제거 ────────────────────────────────────────────
         today_date = date.today()
         before_filter = len(notices)
