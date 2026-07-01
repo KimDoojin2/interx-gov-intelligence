@@ -1093,6 +1093,35 @@ elif page == "🚀 수집 실행":
                 import traceback; st.code(traceback.format_exc())
                 st.session_state.pipeline_running = False
 
+    # ── 수집 완료 결과 표시 (rerun 후에도 유지) ──────────────────────────────
+    if not st.session_state.pipeline_running and st.session_state.get("pipeline_result"):
+        _pr = st.session_state.pipeline_result
+        _nn = _pr.get("notices", []); _scs = _pr.get("score_cards", [])
+        _sm = {s.notice_id: s for s in _scs}
+        _gc = {"A": 0, "B": 0, "C": 0, "D": 0}
+        for _n in _nn:
+            _sc = _sm.get(_n.notice_id)
+            if _sc: _gc[_sc.priority_grade] = _gc.get(_sc.priority_grade, 0) + 1
+        st.success(f"**수집 완료** — 총 {len(_nn)}건 | A={_gc['A']} B={_gc['B']} C={_gc['C']} D={_gc['D']}")
+        _l3c = sum(1 for _n in _nn if getattr(_n, "l3_strong", "N") == "Y")
+        if _l3c:
+            st.info(f"L3 강공고 {_l3c}건 감지")
+
+    # ── 수집 이력 ────────────────────────────────────────────────────────────
+    history = st.session_state.get("collection_history", [])
+    if history:
+        st.markdown(_section("최근 수집 이력"), unsafe_allow_html=True)
+        for h in reversed(history[-5:]):
+            _hg = h.get("grades", {})
+            st.markdown(
+                f'<div style="padding:8px 12px;border-radius:8px;background:{t["card"]};'
+                f'border:1px solid {t["border"]};margin-bottom:6px;font-size:.82rem">'
+                f'<b>{h["timestamp"]}</b> — {h["total"]}건 '
+                f'(A={_hg.get("A",0)} B={_hg.get("B",0)} C={_hg.get("C",0)} D={_hg.get("D",0)}) '
+                f'| L3={h.get("l3_count",0)}</div>',
+                unsafe_allow_html=True
+            )
+
 
 # =============================================================================
 #  PAGE: Notice List + Detail
