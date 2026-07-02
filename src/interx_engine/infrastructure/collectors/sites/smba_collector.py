@@ -1,5 +1,6 @@
 from __future__ import annotations
 import random
+import re
 import time
 from typing import List
 from urllib.parse import urljoin
@@ -11,6 +12,9 @@ from interx_engine.core.entities.notice import Notice
 
 _SMBA_BASE = "https://www.mss.go.kr"
 _SMBA_HOME = _SMBA_BASE + "/site/smba/main.do"
+_VIEW_URL  = _SMBA_BASE + "/site/smba/ex/bbs/View.do?cbIdx=310&bcIdx={bc_idx}&parentSeq={bc_idx}"
+
+_ONCLICK_RE = re.compile(r"doBbsFView\(\s*'(\d+)'\s*,\s*'(\d+)'")
 
 
 class SmbaCollector(BaseCollector):
@@ -19,7 +23,6 @@ class SmbaCollector(BaseCollector):
     LIST_URL = _SMBA_BASE + "/site/smba/ex/bbs/List.do?cbIdx=310&pageIndex={page}"
 
     def collect(self, execution_id: str) -> List[Notice]:
-        # 홈페이지 쿠키 선취득 → ConnectionReset 방지
         try:
             time.sleep(random.uniform(2.0, 4.0))
             self._session.get(
@@ -43,11 +46,21 @@ class SmbaCollector(BaseCollector):
             a = row.find("a", href=True)
             if not a:
                 continue
-            title  = a.get_text(strip=True)
-            href   = a["href"]
-            detail = href if href.startswith("http") else urljoin(_SMBA_BASE, href)
-            text   = row.get_text(" ", strip=True)
-            dates  = _extract_dates(text)
+            title = a.get_text(strip=True)
+            if not title or len(title) < 3:
+                continue
+
+            onclick = row.get("onclick", "")
+            m = _ONCLICK_RE.search(onclick)
+            if m:
+                bc_idx = m.group(2)
+                detail = _VIEW_URL.format(bc_idx=bc_idx)
+            else:
+                href = a["href"]
+                detail = href if href.startswith("http") else urljoin(_SMBA_BASE, href)
+
+            text  = row.get_text(" ", strip=True)
+            dates = _extract_dates(text)
             notices.append(self._make_notice(
                 execution_id, title, detail,
                 dates[-1] if dates else "",

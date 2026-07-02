@@ -208,7 +208,7 @@ def _extract_structured_sections(text: str) -> Dict[str, str]:
 
     for line in lines:
         matched = False
-        if len(line) <= 25:  # 섹션 헤더는 짧음
+        if len(line) <= 25:
             for sec_name, kws in _SECTION_MAP.items():
                 if any(kw in line for kw in kws):
                     _flush()
@@ -224,6 +224,53 @@ def _extract_structured_sections(text: str) -> Dict[str, str]:
                 current_buf = []
 
     _flush()
+    return structured
+
+
+def _extract_structured_from_html(soup: BeautifulSoup) -> Dict[str, str]:
+    """
+    HTML 구조 기반 섹션 추출 — 텍스트 기반 추출의 보완.
+    <th>/<dt>/<strong> 안의 섹션 헤더 → 인접 <td>/<dd>/다음 텍스트로 매핑.
+    """
+    structured: Dict[str, str] = {}
+
+    for th in soup.find_all(["th", "dt"]):
+        th_text = th.get_text(strip=True)
+        if not th_text or len(th_text) > 30:
+            continue
+        for sec_name, kws in _SECTION_MAP.items():
+            if sec_name in structured:
+                continue
+            if any(kw in th_text for kw in kws):
+                td = th.find_next_sibling("td") or th.find_next_sibling("dd")
+                if td:
+                    val = td.get_text(" ", strip=True)[:300]
+                    if len(val) > 5:
+                        structured[sec_name] = val
+                break
+
+    for strong in soup.find_all(["strong", "b"]):
+        s_text = strong.get_text(strip=True)
+        if not s_text or len(s_text) > 25:
+            continue
+        for sec_name, kws in _SECTION_MAP.items():
+            if sec_name in structured:
+                continue
+            if any(kw in s_text for kw in kws):
+                parent = strong.parent
+                if parent:
+                    siblings_text = []
+                    for sib in parent.next_siblings:
+                        t = sib.get_text(strip=True) if hasattr(sib, "get_text") else str(sib).strip()
+                        if t:
+                            siblings_text.append(t)
+                        if len(" ".join(siblings_text)) > 300:
+                            break
+                    val = " ".join(siblings_text)[:300]
+                    if len(val) > 5:
+                        structured[sec_name] = val
+                break
+
     return structured
 
 
@@ -350,6 +397,8 @@ class BaseCollector(NoticeCollectorPort, ABC):
         "#board_content", "#boardContent", "#viewContent",
         "article", ".article", "main .content", ".entry-content",
         ".sub_content", ".subContent", "#contents",
+        ".tbWrap", ".tbBox", ".tbCont",
+        ".board_wrap", ".boardWrap", "#boardWrap",
     ]
     # 본문에서 제거할 잡음 패턴 (메뉴, 네비, 푸터 텍스트)
     _JUNK_RE = re.compile(
@@ -365,14 +414,28 @@ class BaseCollector(NoticeCollectorPort, ABC):
     def _parse_detail_page(self, soup: BeautifulSoup, detail_url: str) -> Dict[str, Any]:
         """
         범용 상세 페이지 파서 — 본문 영역 정밀 추출.
-        1) script/style/nav 등 불필요 태그 제거
-        2) 본문 컨테이너 탐색 (board_view, view_content 등)
+        1) 콘텐츠 컨테이너 먼저 탐색 (nav/form 안에 있을 수 있으므로 제거 전)
+        2) script/style/nav 등 불필요 태그 제거
         3) 컨테이너 내 텍스트만 body_text로 사용 (메뉴/사이드바 오염 방지)
         """
+        # ── 0) 콘텐츠 컨테이너 선탐색 (junk 제거 전 — nav/form 내부 콘텐츠 보호) ──
+        pre_content = None
+        for sel in self._CONTENT_SELECTORS:
+            pre_content = soup.select_one(sel)
+            if pre_content and len(pre_content.get_text(strip=True)) > 50:
+                break
+            pre_content = None
+
+        if pre_content:
+            pre_content = pre_content.extract()
+
         # ── 1) 불필요한 태그 완전 제거 ──
-        for tag in soup(["script", "style", "nav", "header", "footer",
-                         "noscript", "iframe", "aside", "form"]):
+        for tag in soup(["script", "style", "header", "footer",
+                         "noscript", "iframe", "aside"]):
             tag.decompose()
+        for nav in soup.find_all("nav"):
+            if len(nav.get_text(strip=True)) < 500:
+                nav.decompose()
         for div in soup.find_all("div", class_=re.compile(
                 r"\b(gnb|lnb|snb|tnb|nav|menu|sidebar|side-bar|header|footer|"
                 r"top-bar|topbar|breadcrumb|page-nav|skip|util|banner)\b", re.I)):
@@ -383,13 +446,15 @@ class BaseCollector(NoticeCollectorPort, ABC):
 
         # ── 2) 본문 컨테이너 탐색 (우선순위순) ──
         content_el = None
-        for sel in self._CONTENT_SELECTORS:
-            content_el = soup.select_one(sel)
-            if content_el and len(content_el.get_text(strip=True)) > 50:
-                break
-            content_el = None
+        if pre_content:
+            content_el = pre_content
+        else:
+            for sel in self._CONTENT_SELECTORS:
+                content_el = soup.select_one(sel)
+                if content_el and len(content_el.get_text(strip=True)) > 50:
+                    break
+                content_el = None
 
-        # 컨테이너를 못 찾으면 가장 긴 텍스트 블록을 가진 div 사용
         if not content_el:
             best_div, best_len = None, 0
             for div in soup.find_all(["div", "td", "section"]):
@@ -422,8 +487,12 @@ class BaseCollector(NoticeCollectorPort, ABC):
         budget = _extract_budget_from_text(text) or _extract_budget_from_text(full_text)
         attachment_items = _extract_attachment_items(soup, detail_url)
 
-        # ── 5) 구조화 섹션 추출 ──
+        # ── 5) 구조화 섹션 추출 (텍스트 + HTML 구조 병합) ──
         structured = _extract_structured_sections(text)
+        html_structured = _extract_structured_from_html(target)
+        for k, v in html_structured.items():
+            if k not in structured:
+                structured[k] = v
 
         # ── 6) 핵심 요약 생성 — 의미 있는 문장만 추출 ──
         summary = self._extract_smart_summary(text, structured)

@@ -32,9 +32,10 @@ class TtpCollector(BaseCollector):
     목록: https://www.djtp.or.kr/pbanc?mid=a20101000000&nPage={page}
     상세: https://pms.dips.or.kr/sso/business.jsp?gubun=pbancView&pbanc_no={id}
     """
-    site_key = "ttp"
-    agency   = "대전테크노파크"
-    LIST_URL = _LIST_URL
+    site_key     = "ttp"
+    agency       = "대전테크노파크"
+    LIST_URL     = _LIST_URL
+    fetch_detail = False  # 상세 URL이 SSO(pms.dips.or.kr) JS 리다이렉트 → body 추출 불가
 
     def _page_url(self, page: int) -> str:
         return self.LIST_URL.format(page=page)

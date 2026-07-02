@@ -134,10 +134,12 @@ class DailyPipelineOrchestrator:
             log.info("[Pipeline] 비공고 콘텐츠 제거: %d건 (%d → %d건)",
                      non_removed, before_non, len(notices))
 
-        # ── 2-D. 제목 기반 exact-match 중복 제거 ─────────────────────────────
+        # ── 2-D. 제목 기반 정규화 중복 제거 ───────────────────────────────────
+        _TITLE_NORM_RE = _re.compile(r"[「」『』【】\[\]()（）<>《》\s·\-_|/]")
         seen_titles, title_unique = set(), []
         for n in notices:
-            norm = (n.title or "").strip()
+            raw = (n.title or "").strip()
+            norm = _TITLE_NORM_RE.sub("", raw)
             if norm and norm not in seen_titles:
                 seen_titles.add(norm)
                 title_unique.append(n)

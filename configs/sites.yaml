@@ -17,7 +17,7 @@ sites:
     collector_type: playwright
   - code: smba
     name: 중소벤처기업부
-    enabled: false   # ConnectTimeout / ConnectionReset — 서버측 차단
+    enabled: true    # 사업공고 cbIdx=310 — 쿠키 선취득으로 ConnectionReset 방지
     collector_type: requests
   - code: nipa
     name: NIPA (정보통신산업진흥원)
